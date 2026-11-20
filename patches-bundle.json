@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-20T19:41:09",
-  "description": "## [1.5.1](https://github.com/Pirrotto/aare-patches/compare/v1.5.0...v1.5.1) (2026-11-20)\n\n### 🐛 Bug Fixes\n\n* Settings screen in the look of AARE's app list ([4343bff](https://github.com/Pirrotto/aare-patches/commit/4343bff04c49a9ab849e5dbe13caa3ac658c547d))",
-  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.5.1/patches-1.5.1.mpp",
+  "created_at": "2026-11-20T20:33:18",
+  "description": "## [1.5.2](https://github.com/Pirrotto/aare-patches/compare/v1.5.1...v1.5.2) (2026-11-20)\n\n### 🐛 Bug Fixes\n\n* Rename the bundle to AARE Patches and describe all patches ([cc51ee3](https://github.com/Pirrotto/aare-patches/commit/cc51ee3cbd9f24d74c43192c6dc5fee094d46923))",
+  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.5.2/patches-1.5.2.mpp",
   "signature_download_url": "",
-  "version": "1.5.1"
+  "version": "1.5.2"
 }

@@ -1,3 +1,9 @@
+## [1.5.2](https://github.com/Pirrotto/aare-patches/compare/v1.5.1...v1.5.2) (2026-11-20)
+
+### 🐛 Bug Fixes
+
+* Rename the bundle to AARE Patches and describe all patches ([cc51ee3](https://github.com/Pirrotto/aare-patches/commit/cc51ee3cbd9f24d74c43192c6dc5fee094d46923))
+
 ## [1.5.1](https://github.com/Pirrotto/aare-patches/compare/v1.5.0...v1.5.1) (2026-11-20)
 
 ### 🐛 Bug Fixes
