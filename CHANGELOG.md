@@ -1,3 +1,9 @@
+## [1.5.1](https://github.com/Pirrotto/aare-patches/compare/v1.5.0...v1.5.1) (2026-11-20)
+
+### 🐛 Bug Fixes
+
+* Settings screen in the look of AARE's app list ([4343bff](https://github.com/Pirrotto/aare-patches/commit/4343bff04c49a9ab849e5dbe13caa3ac658c547d))
+
 ## [1.5.0](https://github.com/Pirrotto/aare-patches/compare/v1.4.0...v1.5.0) (2026-11-20)
 
 ### ✨ New Features
