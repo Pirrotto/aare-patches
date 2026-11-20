@@ -121,11 +121,18 @@ public final class VoiceNotes {
         try {
             if (text == null) return false;
             List<Segment> voices = findVoices(text);
-            if (voices.isEmpty()) return false;
+            // The conversation being read, if it can be answered: a "Reply" card follows the reading.
+            Object conversation = VoiceReply.conversationFor(context, text);
+            if (voices.isEmpty() && conversation == null) return false;
 
             Context app = context.getApplicationContext();
             Player player = Player.get(app);
-            worker.execute(() -> prepare(app, player, text, voices));
+            Runnable after = conversation == null ? null : () -> VoiceReply.offer(context, conversation);
+            if (voices.isEmpty()) {
+                player.say(text, after);
+            } else {
+                worker.execute(() -> prepare(app, player, text, voices, after));
+            }
             return true;
         } catch (Throwable t) {
             Log.w(TAG, "onSpeak", t);
@@ -139,7 +146,7 @@ public final class VoiceNotes {
      * On the worker thread: finds and opens the recordings, then queues the text and the
      * recordings in reading order.
      */
-    private static void prepare(Context context, Player player, String text, List<Segment> voices) {
+    private static void prepare(Context context, Player player, String text, List<Segment> voices, Runnable after) {
         List<Object> items = new ArrayList<>();
         try {
             List<VoiceNotesAccess.Recording> recordings = VoiceNotesAccess.list(context);
@@ -177,6 +184,7 @@ public final class VoiceNotes {
             if (item instanceof ParcelFileDescriptor) player.play((ParcelFileDescriptor) item);
             else player.say((String) item);
         }
+        if (after != null) player.then(after);
     }
 
     // region Matching
@@ -311,7 +319,7 @@ public final class VoiceNotes {
     // region Playback
 
     /** Speaks texts and plays recordings one after the other, on the main thread. */
-    private static final class Player {
+    static final class Player {
         private static Player instance;
 
         static synchronized Player get(Context context) {
@@ -339,14 +347,24 @@ public final class VoiceNotes {
         }
 
         void say(String text) {
+            say(text, null);
+        }
+
+        /** Speaks [text], then runs [then] (on the main thread) once it was spoken. */
+        void say(String text, Runnable then) {
             String t = text.trim();
             while (t.startsWith(".") || t.startsWith(":") || t.startsWith(",")) t = t.substring(1).trim();
-            if (t.isEmpty()) return;
-            enqueue(t);
+            if (!t.isEmpty()) enqueue(t);
+            if (then != null) then(then);
         }
 
         void play(ParcelFileDescriptor recording) {
             enqueue(recording);
+        }
+
+        /** Runs [run] on the main thread after everything queued before it. */
+        void then(Runnable run) {
+            enqueue(run);
         }
 
         private void enqueue(Object item) {
@@ -361,6 +379,17 @@ public final class VoiceNotes {
             if (item == null) {
                 busy = false;
                 releaseFocus();
+                return;
+            }
+            if (item instanceof Runnable) {
+                // Not audio: no focus needed. Release it first if nothing else is queued.
+                if (queue.isEmpty()) releaseFocus();
+                try {
+                    ((Runnable) item).run();
+                } catch (Throwable t) {
+                    Log.w(TAG, "after speech", t);
+                }
+                next();
                 return;
             }
             busy = true;

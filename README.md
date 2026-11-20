@@ -10,6 +10,8 @@ The **Background location** patch adds that one permission to AARE's manifest. I
 
 The **Voice messages** patch plays WhatsApp voice messages in the car. When AARE reads a message aloud (the "Read aloud" button on the car screen), voice messages are played instead of read as "Voice message (0:05)": the sender's name is spoken, then the recording plays through the car speakers and the music pauses meanwhile. WhatsApp keeps voice messages in a folder hidden from other apps; the patch reads them through Shizuku, which AARE already uses for car audio, with a small helper that can only list and open WhatsApp's received voice notes. AARE gets no storage permission.
 
+The **Voice reply** patch (needs Voice messages) lets you answer by voice. After a message is read aloud, a **Reply** card stays on the car screen until you tap or close it. Tap it and AARE asks for your answer, listens, shows what you dictate live on the card, reads it back and asks whether to send it: say "yes" / "send" or "no" / "cancel", or tap **Send** / **Cancel**. It works for WhatsApp and any messaging app whose notifications can be answered, and uses the phone's speech recognition (on the phone itself when available) with the phone's microphone.
+
 The patch only accepts the official AARE releases, signed with the AARE release key published in its README.
 
 ### How to use
