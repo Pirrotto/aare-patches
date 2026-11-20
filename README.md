@@ -27,9 +27,11 @@ Navigation apps then keep following the car with the phone locked, with no need 
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
+> **[v1.0.0](https://github.com/Pirrotto/aare-patches/releases/tag/v1.0.0)**&nbsp;&nbsp;&middot;&nbsp;&nbsp;`main`&nbsp;&nbsp;&middot;&nbsp;&nbsp;**1 patches** across **1 apps**&nbsp;&nbsp;&middot;&nbsp;&nbsp;[Full details](PATCHES.md)
 
-#### The list of patches is shown here after the first release.
-
+| # | App | Patches | Version | Package |
+|---|---|---|---|---|
+| 1 | [**AARE**](PATCHES.md#aare-netprototuxaare) | 1 | `1.5.0` | [`net.prototux.aare`](https://play.google.com/store/apps/details?id=net.prototux.aare) |
 <!-- PATCHES_END -->
 
 ## 🧑‍💻 Building

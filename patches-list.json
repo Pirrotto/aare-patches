@@ -1,5 +1,42 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "0.0.0",
-  "patches": []
+  "version": "1.0.0",
+  "patches": [
+    {
+      "name": "Background location",
+      "description": "Declares the background location permission, so that after choosing \"Allow all the time\" for AARE in the system settings, navigation apps keep GPS with the phone locked even when AARE starts the car connection in the background.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "net.prototux.aare",
+          "name": "AARE",
+          "description": "Open-source Android Auto replacement (github.com/prototux/AARE).",
+          "apkFileType": "APK",
+          "appIconColor": "#3DDBC4",
+          "signatures": [
+            "63ef0de1db2c09bb7fb25ce7ea4adc3538af423b885278b59df2889c7f18286f"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": null,
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "1.5.0",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    }
+  ]
 }
