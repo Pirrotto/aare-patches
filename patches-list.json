@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "patches": [
     {
       "name": "Background location",
@@ -76,7 +76,7 @@
     },
     {
       "name": "Voice reply",
-      "description": "After a message is read aloud, keeps a \"Reply\" card on the car screen until it is tapped or closed. Tapping it lets you dictate the answer, shown live on the card, then send it after saying \"yes\" or tapping \"Send\". Uses the phone's speech recognition, on the phone when available.",
+      "description": "After a message is read aloud, shows a \"Reply\" card on the car screen for 15 seconds, and adds \"Reply\" to the messages of the notification centre. Replying lets you dictate the answer, shown live on the car screen, then send it after saying \"yes\" or tapping \"Send\". Uses the phone's speech recognition, on the phone when available.",
       "default": true,
       "category": null,
       "compatiblePackages": [

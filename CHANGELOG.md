@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/Pirrotto/aare-patches/compare/v1.3.0...v1.4.0) (2026-11-20)
+
+### ✨ New Features
+
+* Reply from the notification centre; Reply card closes after 15 s ([881832b](https://github.com/Pirrotto/aare-patches/commit/881832b66714d908bd36ddf2c526747f5a0e0ae3))
+
 ## [1.3.0](https://github.com/Pirrotto/aare-patches/compare/v1.2.0...v1.3.0) (2026-11-20)
 
 ### ✨ New Features
