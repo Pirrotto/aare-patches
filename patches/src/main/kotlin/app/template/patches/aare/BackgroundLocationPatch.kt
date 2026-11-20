@@ -26,7 +26,11 @@ val backgroundLocationPatch = patch(
 ) {
     compatibleWith(COMPATIBILITY_AARE)
 
+    // Its switch on the Settings screen shows the permission and opens it.
+    dependsOn(settingsPatch)
+
     execute {
         addManifestPermission(BACKGROUND_LOCATION)
+        registerSetting("background_location")
     }
 }

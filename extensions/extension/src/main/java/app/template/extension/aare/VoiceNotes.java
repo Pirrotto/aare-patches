@@ -130,7 +130,9 @@ public final class VoiceNotes {
         if (context != null && listenerRef.get() != context) listenerRef = new java.lang.ref.WeakReference<>(context);
         try {
             if (text == null) return false;
-            List<Segment> voices = findVoices(text);
+            // Each feature can be turned off on the Settings screen of the patches.
+            List<Segment> voices = PatchSettings.isEnabled(context, PatchSettings.VOICE_MESSAGES)
+                    ? findVoices(text) : new ArrayList<>();
             // The conversation being read, if it can be answered: a "Reply" card follows the reading.
             Object conversation = VoiceReply.conversationFor(context, text);
             if (voices.isEmpty() && conversation == null) return false;

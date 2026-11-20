@@ -12,7 +12,9 @@ The **Voice messages** patch plays WhatsApp voice messages in the car. When AARE
 
 The **Voice reply** patch (needs Voice messages) lets you answer by voice. After a message is read aloud, a **Reply** card shows on the car screen for 15 seconds, and every message that can be answered gets a **Reply** button in the notification centre. Tap Reply and AARE asks for your answer, listens, shows what you dictate live on the card, reads it back and asks whether to send it: say "yes" / "send" or "no" / "cancel", or tap **Send** / **Cancel**. It works for WhatsApp and any messaging app whose notifications can be answered, and uses the phone's speech recognition (on the phone itself when available) with the phone's microphone.
 
-The patch only accepts the official AARE releases, signed with the AARE release key published in its README.
+The **Settings** patch (included with every other patch) adds a **Settings** row at the end of AARE's settings home. It opens a screen in AARE's style with one switch and a short description for each installed patch: Voice messages and Voice reply can be turned off there without patching again, and Background location shows whether *Allow all the time* is granted (tap it to open the permission). Each patch registers its own switch, so a new release of the patches brings its new switches by itself.
+
+The patches only accept the official AARE releases, signed with the AARE release key published in its README.
 
 ### How to use
 
@@ -29,7 +31,7 @@ The patch only accepts the official AARE releases, signed with the AARE release 
 
 Navigation apps then keep following the car with the phone locked, with no need to open AARE before starting the car, and WhatsApp voice messages play in the car.
 
-Patching AARE again later (a new AARE version, or another patch) installs over the patched app and keeps its settings, as long as Morphe Manager is the same: keep both patches selected.
+Patching AARE again later (a new AARE version, or another patch) installs over the patched app and keeps its settings, as long as Morphe Manager is the same: keep the same patches selected.
 
 ## 🩹 Patches list
 

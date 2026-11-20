@@ -91,6 +91,7 @@ public final class VoiceReply {
         onRuntime(carRuntime);
         try {
             Object l = VoiceNotes.listener();
+            if (!PatchSettings.isEnabled(VoiceNotes.listener(), PatchSettings.VOICE_REPLY)) return actions;
             if (l == null || findConversation(l, noticeTitle, noticeText) == null) return actions;
             List<Object> withReply = new ArrayList<>(actions == null ? Collections.emptyList() : actions);
             withReply.add(action(phrase("Reply", "Rispondi"), () -> replyFromHistory(noticeTitle, noticeText)));
@@ -139,6 +140,7 @@ public final class VoiceReply {
     static Object conversationFor(Object notificationListener, String spoken) {
         // Only with the "Voice reply" patch, which hands over the car session's runtime.
         if (runtime.get() == null) return null;
+        if (!PatchSettings.isEnabled(notificationListener instanceof android.content.Context ? (android.content.Context) notificationListener : null, PatchSettings.VOICE_REPLY)) return null;
         try {
             Method conversations = notificationListener.getClass().getMethod("conversations", String.class);
             List<?> list = (List<?>) conversations.invoke(notificationListener, (Object) null);

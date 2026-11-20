@@ -56,11 +56,13 @@ val voiceReplyPatch = patch(
     compatibleWith(COMPATIBILITY_AARE)
 
     // Reading aloud, and the voice messages in it, go through the Voice messages patch.
-    dependsOn(voiceMessagesPatch)
+    dependsOn(voiceMessagesPatch, settingsPatch)
 
     extendWith("extensions/extension.mpe")
 
     execute {
+        registerSetting("voice_reply")
+
         // Messages kept in the notification centre get a "Reply" button. Range call: the last
         // parameter register is above v15 in AARE 1.5.0, and p0..p4 are consecutive.
         CarRuntimeRememberFingerprint.method.addInstructions(

@@ -47,7 +47,11 @@ val voiceMessagesPatch = patch(
 
     extendWith("extensions/extension.mpe")
 
+    dependsOn(settingsPatch)
+
     execute {
+        registerSetting("voice_messages")
+
         // Remember the voice messages of WhatsApp notifications, with their times.
         NotificationPostedFingerprint.method.addInstruction(
             0,
