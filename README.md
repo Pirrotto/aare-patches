@@ -8,6 +8,8 @@ AARE asks Android for the *location* foreground-service type, so the navigation 
 
 The **Background location** patch adds that one permission to AARE's manifest. It changes nothing else.
 
+The **Voice messages** patch plays WhatsApp voice messages in the car. When AARE reads a message aloud (the "Read aloud" button on the car screen), voice messages are played instead of read as "Voice message (0:05)": the sender's name is spoken, then the recording plays through the car speakers and the music pauses meanwhile. WhatsApp keeps voice messages in a folder hidden from media apps, so this patch also declares "All files access" for AARE.
+
 The patch only accepts the official AARE releases, signed with the AARE release key published in its README.
 
 ### How to use
@@ -20,9 +22,12 @@ The patch only accepts the official AARE releases, signed with the AARE release 
 
 2. Download the official `aare-<version>.apk` from the [AARE releases](https://github.com/prototux/AARE/releases) and patch it with Morphe Manager.
 3. Uninstall the official AARE (the patched app has a different signature), then install the patched one and set AARE up again.
-4. In **Settings → Apps → AARE → Permissions → Location**, choose **Allow all the time**.
+4. In **Settings → Apps → AARE → Permissions → Location**, choose **Allow all the time** (Background location).
+5. In **Settings → Apps → AARE → All files access**, turn it on (Voice messages).
 
-Navigation apps then keep following the car with the phone locked, with no need to open AARE before starting the car.
+Navigation apps then keep following the car with the phone locked, with no need to open AARE before starting the car, and WhatsApp voice messages play in the car.
+
+Patching AARE again later (a new AARE version, or another patch) installs over the patched app and keeps its settings, as long as Morphe Manager is the same: keep both patches selected.
 
 ## 🩹 Patches list
 
