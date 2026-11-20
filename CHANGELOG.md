@@ -1,3 +1,13 @@
+## [1.2.0](https://github.com/Pirrotto/aare-patches/compare/v1.1.0...v1.2.0) (2026-11-20)
+
+### ✨ New Features
+
+* Read voice messages through Shizuku instead of all files access ([91e938c](https://github.com/Pirrotto/aare-patches/commit/91e938cc3ae9839a11b9288f51efde692995c4ce))
+
+### 🐛 Bug Fixes
+
+* Qualify PARCELABLE_WRITE_RETURN_VALUE in the voice notes helper ([7aedc4f](https://github.com/Pirrotto/aare-patches/commit/7aedc4f83cb734e5330719b1f703b4a213fc467e))
+
 ## [1.1.0](https://github.com/Pirrotto/aare-patches/compare/v1.0.0...v1.1.0) (2026-11-20)
 
 ### ✨ New Features

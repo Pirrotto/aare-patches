@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "patches": [
     {
       "name": "Background location",
@@ -40,7 +40,7 @@
     },
     {
       "name": "Voice messages",
-      "description": "Plays WhatsApp voice messages in the car when a message is read aloud, instead of reading \"Voice message (0:05)\". Needs \"All files access\" for AARE in the system settings, because WhatsApp keeps voice messages in a folder hidden from media apps.",
+      "description": "Plays WhatsApp voice messages in the car when a message is read aloud, instead of reading \"Voice message (0:05)\". Reads them through Shizuku, which AARE already uses for car audio, so AARE needs no storage permission.",
       "default": true,
       "category": null,
       "compatiblePackages": [
