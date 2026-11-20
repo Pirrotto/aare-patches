@@ -2,6 +2,7 @@ package app.template.patches.aare
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.instructions
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.methodCall
@@ -46,9 +47,10 @@ internal object NoticeAutoDismissFingerprint : Fingerprint(
 @Suppress("unused")
 val voiceReplyPatch = patch(
     name = "Voice reply",
-    description = "After a message is read aloud, keeps a \"Reply\" card on the car screen until it is tapped " +
-        "or closed. Tapping it lets you dictate the answer, shown live on the card, then send it after " +
-        "saying \"yes\" or tapping \"Send\". Uses the phone's speech recognition, on the phone when available.",
+    description = "After a message is read aloud, shows a \"Reply\" card on the car screen for 15 seconds, and adds " +
+        "\"Reply\" to the messages of the notification centre. Replying lets you dictate the answer, shown live " +
+        "on the car screen, then send it after saying \"yes\" or tapping \"Send\". Uses the phone's speech " +
+        "recognition, on the phone when available.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)
@@ -59,10 +61,14 @@ val voiceReplyPatch = patch(
     extendWith("extensions/extension.mpe")
 
     execute {
-        // The car session's runtime, which holds the cards of the car screen.
-        CarRuntimeRememberFingerprint.method.addInstruction(
+        // Messages kept in the notification centre get a "Reply" button. Range call: the last
+        // parameter register is above v15 in AARE 1.5.0, and p0..p4 are consecutive.
+        CarRuntimeRememberFingerprint.method.addInstructions(
             0,
-            "invoke-static { p0 }, $REPLY_CLASS->onRuntime(Ljava/lang/Object;)V",
+            """
+                invoke-static/range { p0 .. p4 }, $REPLY_CLASS->withReply(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Landroid/graphics/Bitmap;Ljava/util/List;)Ljava/util/List;
+                move-result-object p4
+            """,
         )
         CarRuntimeNoticeFingerprint.method.addInstruction(
             0,

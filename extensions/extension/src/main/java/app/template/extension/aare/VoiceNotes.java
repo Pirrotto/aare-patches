@@ -92,8 +92,17 @@ public final class VoiceNotes {
 
     // region Hooks
 
+    /** AARE's notification listener, as last seen. */
+    private static volatile java.lang.ref.WeakReference<Context> listenerRef = new java.lang.ref.WeakReference<>(null);
+
+    /** AARE's notification listener, if it posted anything since AARE started. */
+    static Context listener() {
+        return listenerRef.get();
+    }
+
     /** Called at the start of CarNotificationListener.onNotificationPosted. */
     public static void onPosted(Context context, StatusBarNotification sbn) {
+        if (context != null && listenerRef.get() != context) listenerRef = new java.lang.ref.WeakReference<>(context);
         try {
             if (sbn == null || !PACKAGES.contains(sbn.getPackageName())) return;
             Bundle extras = sbn.getNotification().extras;
@@ -118,6 +127,7 @@ public final class VoiceNotes {
      * @return true if the text was handled here, so AARE must not speak it.
      */
     public static boolean onSpeak(Context context, String text) {
+        if (context != null && listenerRef.get() != context) listenerRef = new java.lang.ref.WeakReference<>(context);
         try {
             if (text == null) return false;
             List<Segment> voices = findVoices(text);

@@ -33,9 +33,10 @@ import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
 
 /**
- * Answering a message by voice, after AARE read it aloud: a "Reply" card stays on the car screen
- * until it is tapped or closed; tapping it asks who to answer, listens, shows the dictated text
- * live on the card, reads it back and sends it after a spoken "yes" or a tap on "Send".
+ * Answering a message by voice, after AARE read it aloud: a "Reply" card shows on the car screen
+ * for 15 seconds, and every answerable message in the notification centre gets a "Reply" button.
+ * Replying asks for the answer, listens, shows the dictated text live on a card that stays,
+ * reads it back and sends it after a spoken "yes" or a tap on "Send".
  *
  * Works on AARE's own objects through reflection (they are not obfuscated): the car UI state of
  * CarRuntime for the cards, and CarNotificationListener for the conversations and the reply.
@@ -80,6 +81,24 @@ public final class VoiceReply {
     /** Called at the start of CarRuntime.remember and CarRuntime.notice: the car session's runtime. */
     public static void onRuntime(Object carRuntime) {
         if (carRuntime != null && runtime.get() != carRuntime) runtime = new WeakReference<>(carRuntime);
+    }
+
+    /**
+     * Called at the start of CarRuntime.remember, which keeps a message in the notification centre:
+     * returns its actions with "Reply" added when the message's conversation can be answered.
+     */
+    public static List<?> withReply(Object carRuntime, String noticeTitle, String noticeText, Bitmap noticeIcon, List<?> actions) {
+        onRuntime(carRuntime);
+        try {
+            Object l = VoiceNotes.listener();
+            if (l == null || findConversation(l, noticeTitle, noticeText) == null) return actions;
+            List<Object> withReply = new ArrayList<>(actions == null ? Collections.emptyList() : actions);
+            withReply.add(action(phrase("Reply", "Rispondi"), () -> replyFromHistory(noticeTitle, noticeText)));
+            return withReply;
+        } catch (Throwable t) {
+            Log.w(TAG, "withReply", t);
+            return actions;
+        }
     }
 
     /**
@@ -139,6 +158,31 @@ public final class VoiceReply {
         return null;
     }
 
+    /**
+     * The conversation of a message kept in the notification centre: AARE titles it with the
+     * conversation's name ("Group · Sender" for groups) and shows the message's text.
+     */
+    private static Object findConversation(Object notificationListener, String noticeTitle, String noticeText) throws Exception {
+        Method conversations = notificationListener.getClass().getMethod("conversations", String.class);
+        List<?> list = (List<?>) conversations.invoke(notificationListener, (Object) null);
+        if (list == null) return null;
+        Object byText = null;
+        for (Object c : list) {
+            if (!(Boolean) call(c, "getCanReply")) continue;
+            List<?> lines = (List<?>) call(c, "getMessages");
+            if (lines == null) continue;
+            boolean hasText = false;
+            for (Object line : lines) {
+                if (noticeText != null && noticeText.equals(call(line, "getText"))) hasText = true;
+            }
+            if (!hasText) continue;
+            String name = String.valueOf(call(c, "getTitle"));
+            if (noticeTitle != null && !name.isEmpty() && noticeTitle.startsWith(name)) return c;
+            if (byText == null) byText = c;
+        }
+        return byText;
+    }
+
     // endregion
 
     // region Flow
@@ -156,10 +200,35 @@ public final class VoiceReply {
                 if (!showCard(title, phrase("Answer by voice?", "Vuoi rispondere?"),
                         action(phrase("Reply", "Rispondi"), VoiceReply::startDictation))) return;
                 state = State.OFFERED;
+                expireOffer();
             } catch (Throwable t) {
                 Log.w(TAG, "offer", t);
             }
         });
+    }
+
+    /** "Reply" tapped in the notification centre: dictation straight away. */
+    private static void replyFromHistory(String noticeTitle, String noticeText) {
+        if (state == State.DICTATING || state == State.CONFIRMING || state == State.SENDING) return;
+        try {
+            Object l = VoiceNotes.listener();
+            Object c = l == null ? null : findConversation(l, noticeTitle, noticeText);
+            if (c == null) {
+                if (l != null) {
+                    listener = l;
+                    speaker().say(phrase("This message can't be answered any more.", "Non si può più rispondere a questo messaggio."), null);
+                }
+                return;
+            }
+            listener = l;
+            conversation = c;
+            title = String.valueOf(call(c, "getTitle"));
+            icon = (Bitmap) call(c, "getIcon");
+            removeCard();
+            startDictation();
+        } catch (Throwable t) {
+            Log.w(TAG, "replyFromHistory", t);
+        }
     }
 
     private static void startDictation() {
@@ -226,6 +295,20 @@ public final class VoiceReply {
         state = State.OFFERED;
         showCard(title, phrase("Answer by voice?", "Vuoi rispondere?"),
                 action(phrase("Reply", "Rispondi"), VoiceReply::startDictation));
+        expireOffer();
+    }
+
+    /** How long an unused "Reply" card stays: the message can still be answered from the notification centre. */
+    private static final long OFFER_MS = 15_000L;
+
+    private static void expireOffer() {
+        Object offered = card;
+        main.postDelayed(() -> {
+            if (state == State.OFFERED && card == offered) {
+                removeCard();
+                state = State.IDLE;
+            }
+        }, OFFER_MS);
     }
 
     private static String replyTitle() {
