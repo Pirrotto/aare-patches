@@ -1,8 +1,8 @@
 package app.template.patches.aare
 
 import app.morphe.patcher.patch.patch
-import app.morphe.patcher.patch.resourceXml
 import app.template.patches.shared.Constants.COMPATIBILITY_AARE
+import app.template.patches.shared.addManifestPermission
 
 private const val BACKGROUND_LOCATION = "android.permission.ACCESS_BACKGROUND_LOCATION"
 
@@ -27,19 +27,6 @@ val backgroundLocationPatch = patch(
     compatibleWith(COMPATIBILITY_AARE)
 
     execute {
-        resourceXml("AndroidManifest.xml").use { manifest ->
-            val root = manifest.root
-
-            val declared = root.children("uses-permission").any {
-                it.attribute("android:name") == BACKGROUND_LOCATION
-            }
-            if (declared) return@use
-
-            // Keep the usual manifest order: permissions before <application>.
-            val application = root.children("application").first()
-            root.insertChild(application.index, "uses-permission") {
-                setAttribute("android:name", BACKGROUND_LOCATION)
-            }
-        }
+        addManifestPermission(BACKGROUND_LOCATION)
     }
 }

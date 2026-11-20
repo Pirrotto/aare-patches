@@ -8,7 +8,6 @@ import app.morphe.patcher.methodCall
 import app.morphe.patcher.patch.patch
 import app.morphe.patcher.util.smali.ExternalLabel
 import app.template.patches.shared.Constants.COMPATIBILITY_AARE
-import app.template.patches.shared.addManifestPermission
 
 private const val EXTENSION_CLASS = "Lapp/template/extension/aare/VoiceNotes;"
 
@@ -40,8 +39,8 @@ internal object NotificationPostedFingerprint : Fingerprint(
 val voiceMessagesPatch = patch(
     name = "Voice messages",
     description = "Plays WhatsApp voice messages in the car when a message is read aloud, instead of " +
-        "reading \"Voice message (0:05)\". Needs \"All files access\" for AARE in the system settings, " +
-        "because WhatsApp keeps voice messages in a folder hidden from media apps.",
+        "reading \"Voice message (0:05)\". Reads them through Shizuku, which AARE already uses for " +
+        "car audio, so AARE needs no storage permission.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)
@@ -49,9 +48,6 @@ val voiceMessagesPatch = patch(
     extendWith("extensions/extension.mpe")
 
     execute {
-        // WhatsApp's voice note folders hold a .nomedia file, so only all files access can read them.
-        addManifestPermission("android.permission.MANAGE_EXTERNAL_STORAGE")
-
         // Remember the voice messages of WhatsApp notifications, with their times.
         NotificationPostedFingerprint.method.addInstruction(
             0,

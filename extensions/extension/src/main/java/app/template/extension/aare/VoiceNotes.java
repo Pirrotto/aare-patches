@@ -8,16 +8,15 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
 import android.service.notification.StatusBarNotification;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 
-import java.io.File;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,6 +25,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,8 +40,9 @@ import java.util.regex.Pattern;
  *
  * WhatsApp keeps received voice messages in
  * Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Voice Notes/[year+week]/PTT-*.opus, folders
- * with a .nomedia file, so they need "All files access" (MANAGE_EXTERNAL_STORAGE), which the patch
- * declares. Playback uses the media usage, like AARE's text-to-speech, so it reaches the car.
+ * hidden from media apps. They are read through Shizuku (see {@link VoiceNotesAccess}), which AARE
+ * already uses for car audio, so AARE needs no storage permission. Playback uses the media usage,
+ * like AARE's text-to-speech, so it reaches the car.
  */
 @SuppressWarnings("unused")
 public final class VoiceNotes {
@@ -64,6 +66,9 @@ public final class VoiceNotes {
 
     private static final int MAX_RECORDS = 200;
 
+    /** Finds and opens recordings off the main thread, one request at a time, in order. */
+    private static final ExecutorService worker = Executors.newSingleThreadExecutor();
+
     /** A voice message seen in a notification. */
     private static final class Record {
         final String sender;
@@ -80,7 +85,7 @@ public final class VoiceNotes {
     /** Newest last. Only touched on the main thread, where notifications and speak() arrive. */
     private static final ArrayDeque<Record> records = new ArrayDeque<>();
 
-    private static boolean accessHintSpoken;
+    private static volatile boolean shizukuHintSpoken;
 
     private VoiceNotes() {
     }
@@ -118,32 +123,9 @@ public final class VoiceNotes {
             List<Segment> voices = findVoices(text);
             if (voices.isEmpty()) return false;
 
-            Player player = Player.get(context);
-            if (!hasFileAccess()) {
-                player.say(replaceVoices(text, voices, phrase("voice message", "messaggio vocale")));
-                if (!accessHintSpoken) {
-                    accessHintSpoken = true;
-                    player.say(phrase(
-                            "To hear voice messages, allow AARE all files access in the phone settings.",
-                            "Per ascoltare i vocali, concedi ad AARE l'accesso a tutti i file nelle impostazioni del telefono."));
-                }
-                return true;
-            }
-
-            Set<File> used = new HashSet<>();
-            int start = 0;
-            for (Segment v : voices) {
-                player.say(text.substring(start, v.start));
-                File file = findRecording(v.record, used);
-                if (file != null) {
-                    used.add(file);
-                    player.play(file);
-                } else {
-                    player.say(phrase("Voice message not downloaded yet.", "Messaggio vocale non ancora scaricato."));
-                }
-                start = v.end;
-            }
-            player.say(text.substring(start));
+            Context app = context.getApplicationContext();
+            Player player = Player.get(app);
+            worker.execute(() -> prepare(app, player, text, voices));
             return true;
         } catch (Throwable t) {
             Log.w(TAG, "onSpeak", t);
@@ -152,6 +134,50 @@ public final class VoiceNotes {
     }
 
     // endregion
+
+    /**
+     * On the worker thread: finds and opens the recordings, then queues the text and the
+     * recordings in reading order.
+     */
+    private static void prepare(Context context, Player player, String text, List<Segment> voices) {
+        List<Object> items = new ArrayList<>();
+        try {
+            List<VoiceNotesAccess.Recording> recordings = VoiceNotesAccess.list(context);
+            if (recordings == null) {
+                items.add(replaceVoices(text, voices, phrase("voice message", "messaggio vocale")));
+                if (!shizukuHintSpoken) {
+                    shizukuHintSpoken = true;
+                    items.add(phrase(
+                            "To hear voice messages, start Shizuku and allow it for AARE.",
+                            "Per ascoltare i vocali, avvia Shizuku e consentilo ad AARE."));
+                }
+            } else {
+                Set<String> used = new HashSet<>();
+                int start = 0;
+                for (Segment v : voices) {
+                    items.add(text.substring(start, v.start));
+                    VoiceNotesAccess.Recording r = findRecording(recordings, v.record, used);
+                    ParcelFileDescriptor pfd = r == null ? null : VoiceNotesAccess.open(context, r.path);
+                    if (pfd != null) {
+                        used.add(r.path);
+                        items.add(pfd);
+                    } else {
+                        items.add(phrase("Voice message not downloaded yet.", "Messaggio vocale non ancora scaricato."));
+                    }
+                    start = v.end;
+                }
+                items.add(text.substring(start));
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "prepare", t);
+            items.clear();
+            items.add(replaceVoices(text, voices, phrase("voice message", "messaggio vocale")));
+        }
+        for (Object item : items) {
+            if (item instanceof ParcelFileDescriptor) player.play((ParcelFileDescriptor) item);
+            else player.say((String) item);
+        }
+    }
 
     // region Matching
 
@@ -212,7 +238,8 @@ public final class VoiceNotes {
                 if (r.text.equals(voiceText) && (r.sender.isEmpty() || spoken.contains(r.sender))) candidates.add(r);
             }
             Collections.sort(candidates, (a, b) -> Long.compare(a.timeMs, b.timeMs));
-            List<Record> newest = candidates.subList(Math.max(0, candidates.size() - positions.size()), candidates.size());
+            List<Record> newest = new ArrayList<>(
+                    candidates.subList(Math.max(0, candidates.size() - positions.size()), candidates.size()));
             int offset = positions.size() - newest.size();
             for (int k = 0; k < positions.size(); k++) {
                 int pos = positions.get(k);
@@ -245,56 +272,25 @@ public final class VoiceNotes {
         return b.append(text.substring(start)).toString();
     }
 
-    private static boolean hasFileAccess() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return Environment.isExternalStorageManager();
-        return false;
-    }
-
-    /** The voice note folders of WhatsApp and WhatsApp Business, current and legacy locations. */
-    private static List<File> voiceFolders() {
-        File storage = Environment.getExternalStorageDirectory();
-        List<File> folders = new ArrayList<>();
-        folders.add(new File(storage, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Voice Notes"));
-        folders.add(new File(storage, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Voice Notes"));
-        folders.add(new File(storage, "WhatsApp/Media/WhatsApp Voice Notes"));
-        folders.add(new File(storage, "WhatsApp Business/Media/WhatsApp Business Voice Notes"));
-        return folders;
-    }
-
-    /** Received voice notes (PTT-…) of the latest weekly folders. */
-    private static List<File> recentRecordings() {
-        List<File> files = new ArrayList<>();
-        for (File folder : voiceFolders()) {
-            File[] weeks = folder.listFiles(File::isDirectory);
-            if (weeks == null) continue;
-            Arrays.sort(weeks, (a, b) -> b.getName().compareTo(a.getName()));
-            for (int i = 0; i < Math.min(3, weeks.length); i++) {
-                File[] notes = weeks[i].listFiles((dir, name) -> name.startsWith("PTT-"));
-                if (notes != null) files.addAll(Arrays.asList(notes));
-            }
-        }
-        return files;
-    }
-
     /**
      * The recording of a voice message: the received voice note saved closest after the message
      * time. Without a record, the newest one of the last day.
      */
-    private static File findRecording(Record record, Set<File> used) {
-        File best = null;
+    private static VoiceNotesAccess.Recording findRecording(
+            List<VoiceNotesAccess.Recording> recordings, Record record, Set<String> used) {
+        VoiceNotesAccess.Recording best = null;
         long bestScore = Long.MAX_VALUE;
         long now = System.currentTimeMillis();
-        for (File f : recentRecordings()) {
-            if (used.contains(f) || f.length() == 0) continue;
-            long modified = f.lastModified();
+        for (VoiceNotesAccess.Recording f : recordings) {
+            if (used.contains(f.path) || f.size == 0) continue;
             long score;
             if (record != null && record.timeMs > 0) {
-                long delta = modified - record.timeMs;
+                long delta = f.modifiedMs - record.timeMs;
                 if (delta < -BEFORE_MS || delta > AFTER_MS) continue;
                 // A file saved before the message time is a weaker match than one after it.
                 score = delta >= 0 ? delta : -delta * 10;
             } else {
-                long age = now - modified;
+                long age = now - f.modifiedMs;
                 if (age < 0 || age > 24 * 60 * 60_000L) continue;
                 score = age;
             }
@@ -318,7 +314,7 @@ public final class VoiceNotes {
     private static final class Player {
         private static Player instance;
 
-        static Player get(Context context) {
+        static synchronized Player get(Context context) {
             if (instance == null) instance = new Player(context.getApplicationContext());
             return instance;
         }
@@ -337,7 +333,6 @@ public final class VoiceNotes {
         private boolean busy;
         private int utterance;
         private AudioFocusRequest focus;
-        private MediaPlayer media;
 
         private Player(Context context) {
             this.context = context;
@@ -346,12 +341,12 @@ public final class VoiceNotes {
         void say(String text) {
             String t = text.trim();
             while (t.startsWith(".") || t.startsWith(":") || t.startsWith(",")) t = t.substring(1).trim();
-            if (t.isEmpty() || t.equals(".")) return;
+            if (t.isEmpty()) return;
             enqueue(t);
         }
 
-        void play(File file) {
-            enqueue(file);
+        void play(ParcelFileDescriptor recording) {
+            enqueue(recording);
         }
 
         private void enqueue(Object item) {
@@ -370,7 +365,7 @@ public final class VoiceNotes {
             }
             busy = true;
             requestFocus();
-            if (item instanceof File) playFile((File) item);
+            if (item instanceof ParcelFileDescriptor) playRecording((ParcelFileDescriptor) item);
             else speak((String) item);
         }
 
@@ -384,6 +379,7 @@ public final class VoiceNotes {
                 return;
             }
             if (tts == null) {
+                // Started on first use; the text waits until it's ready.
                 queue.addFirst(text);
                 tts = new TextToSpeech(context, status -> main.post(() -> {
                     ttsReady = status == TextToSpeech.SUCCESS;
@@ -412,43 +408,38 @@ public final class VoiceNotes {
                 }));
                 return;
             }
-            if (ttsReady == null) {
-                // Still starting: retry once it's ready.
-                queue.addFirst(text);
-                busy = false;
-                return;
-            }
             String id = "aare-voice-" + (++utterance);
             if (tts.speak(text, TextToSpeech.QUEUE_ADD, new Bundle(), id) != TextToSpeech.SUCCESS) done();
         }
 
-        private void playFile(File file) {
+        private void playRecording(ParcelFileDescriptor pfd) {
+            MediaPlayer player = new MediaPlayer();
+            Runnable finish = () -> {
+                player.release();
+                closeQuietly(pfd);
+                done();
+            };
             try {
-                MediaPlayer player = new MediaPlayer();
-                media = player;
                 player.setAudioAttributes(ATTRIBUTES);
-                player.setDataSource(file.getAbsolutePath());
+                player.setDataSource(pfd.getFileDescriptor());
                 player.setOnPreparedListener(MediaPlayer::start);
-                player.setOnCompletionListener(p -> {
-                    p.release();
-                    if (media == p) media = null;
-                    done();
-                });
+                player.setOnCompletionListener(p -> finish.run());
                 player.setOnErrorListener((p, what, extra) -> {
-                    Log.w(TAG, "cannot play " + file + ": " + what + "/" + extra);
-                    p.release();
-                    if (media == p) media = null;
-                    done();
+                    Log.w(TAG, "cannot play voice message: " + what + "/" + extra);
+                    finish.run();
                     return true;
                 });
                 player.prepareAsync();
             } catch (Throwable t) {
-                Log.w(TAG, "cannot play " + file, t);
-                if (media != null) {
-                    media.release();
-                    media = null;
-                }
-                done();
+                Log.w(TAG, "cannot play voice message", t);
+                finish.run();
+            }
+        }
+
+        private static void closeQuietly(ParcelFileDescriptor pfd) {
+            try {
+                pfd.close();
+            } catch (Throwable ignored) {
             }
         }
 
