@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/Pirrotto/aare-patches/compare/v1.2.0...v1.3.0) (2026-11-20)
+
+### ✨ New Features
+
+* Add Voice reply patch for AARE ([8870fbd](https://github.com/Pirrotto/aare-patches/commit/8870fbd56538e8be593b64e7e9dc30bfc2f80137))
+
 ## [1.2.0](https://github.com/Pirrotto/aare-patches/compare/v1.1.0...v1.2.0) (2026-11-20)
 
 ### ✨ New Features
