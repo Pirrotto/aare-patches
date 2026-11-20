@@ -1,14 +1,13 @@
 group = "app.template"
 
 patches {
-    // TODO: Update this section with your project details.
     about {
-        name = "UserXYZ Patches"
-        description = "Patches for apps I like"
-        source = "git@github.com:UserXYZ/morphe-patches.git"
-        author = "Awesome dev"
-        contact = "na"
-        website = "na"
+        name = "AARE Background Location Patches"
+        description = "Lets AARE keep navigation apps' GPS with the phone locked after a background start"
+        source = "git@github.com:Pirrotto/aare-patches.git"
+        author = "Pirrotto"
+        contact = "https://github.com/Pirrotto/aare-patches/issues"
+        website = "https://github.com/Pirrotto/aare-patches"
         license = "GPLv3"
     }
 }
