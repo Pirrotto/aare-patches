@@ -1,3 +1,9 @@
+## [1.5.0](https://github.com/Pirrotto/aare-patches/compare/v1.4.0...v1.5.0) (2026-11-20)
+
+### ✨ New Features
+
+* Add Settings screen with a switch for each patch ([16879c1](https://github.com/Pirrotto/aare-patches/commit/16879c13f2b4839b9f60e3eda1cd5897128758e9))
+
 ## [1.4.0](https://github.com/Pirrotto/aare-patches/compare/v1.3.0...v1.4.0) (2026-11-20)
 
 ### ✨ New Features
