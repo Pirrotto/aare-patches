@@ -72,7 +72,7 @@ public class VoiceNotesShell extends Binder {
                     reply.writeInt(0);
                 } else {
                     reply.writeInt(1);
-                    pfd.writeToParcel(reply, PARCELABLE_WRITE_RETURN_VALUE);
+                    pfd.writeToParcel(reply, android.os.Parcelable.PARCELABLE_WRITE_RETURN_VALUE);
                 }
                 return true;
             }
