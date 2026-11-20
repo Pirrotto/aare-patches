@@ -2,8 +2,8 @@ group = "app.template"
 
 patches {
     about {
-        name = "AARE Background Location Patches"
-        description = "Lets AARE keep navigation apps' GPS with the phone locked after a background start"
+        name = "AARE Patches"
+        description = "Background location, WhatsApp voice messages and voice reply in the car, with a Settings screen to turn each one on or off"
         source = "git@github.com:Pirrotto/aare-patches.git"
         author = "Pirrotto"
         contact = "https://github.com/Pirrotto/aare-patches/issues"

@@ -1,6 +1,6 @@
-# AARE Background Location Patches
+# AARE Patches
 
-A [Morphe](https://morphe.software) patch for [AARE](https://github.com/prototux/AARE), the open-source Android Auto replacement.
+[Morphe](https://morphe.software) patches for [AARE](https://github.com/prototux/AARE), the open-source Android Auto replacement: background location, WhatsApp voice messages and voice reply in the car, and a Settings screen to turn each one on or off.
 
 ## ❓ About
 
