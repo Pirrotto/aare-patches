@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-21T14:23:05",
-  "description": "## [1.8.0](https://github.com/Pirrotto/aare-patches/compare/v1.7.4...v1.8.0) (2026-11-21)\n\n### ✨ New Features\n\n* AARE assistant and car microphone ([486f5ac](https://github.com/Pirrotto/aare-patches/commit/486f5ac609e56cfd8008953586523e4ed431da0c))",
-  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.8.0/patches-1.8.0.mpp",
+  "created_at": "2026-11-21T14:25:55",
+  "description": "## [1.8.1](https://github.com/Pirrotto/aare-patches/compare/v1.8.0...v1.8.1) (2026-11-21)\n\n### 🐛 Bug Fixes\n\n* AARE assistant keeps the words as spoken ([5de482f](https://github.com/Pirrotto/aare-patches/commit/5de482fde7d11a6ad362c8e5aca13abf37a1bb66))",
+  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.8.1/patches-1.8.1.mpp",
   "signature_download_url": "",
-  "version": "1.8.0"
+  "version": "1.8.1"
 }

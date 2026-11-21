@@ -1,3 +1,9 @@
+## [1.8.1](https://github.com/Pirrotto/aare-patches/compare/v1.8.0...v1.8.1) (2026-11-21)
+
+### 🐛 Bug Fixes
+
+* AARE assistant keeps the words as spoken ([5de482f](https://github.com/Pirrotto/aare-patches/commit/5de482fde7d11a6ad362c8e5aca13abf37a1bb66))
+
 ## [1.8.0](https://github.com/Pirrotto/aare-patches/compare/v1.7.4...v1.8.0) (2026-11-21)
 
 ### ✨ New Features
