@@ -1,3 +1,9 @@
+## [1.7.2](https://github.com/Pirrotto/aare-patches/compare/v1.7.1...v1.7.2) (2026-11-21)
+
+### 🐛 Bug Fixes
+
+* Integrated Shizuku pairing with our own SPAKE2 ([671983b](https://github.com/Pirrotto/aare-patches/commit/671983b92270877d8c32f788a86d172b5d99011e))
+
 ## [1.7.1](https://github.com/Pirrotto/aare-patches/compare/v1.7.0...v1.7.1) (2026-11-21)
 
 ### 🐛 Bug Fixes
