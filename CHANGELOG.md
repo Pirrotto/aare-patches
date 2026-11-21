@@ -1,3 +1,9 @@
+## [1.9.3](https://github.com/Pirrotto/aare-patches/compare/v1.9.2...v1.9.3) (2026-11-21)
+
+### 🐛 Bug Fixes
+
+* Find the wireless debugging port without mDNS ([f02a738](https://github.com/Pirrotto/aare-patches/commit/f02a738de568eb590603cff0a7aa092947054001))
+
 ## [1.9.2](https://github.com/Pirrotto/aare-patches/compare/v1.9.1...v1.9.2) (2026-11-21)
 
 ### 🐛 Bug Fixes
