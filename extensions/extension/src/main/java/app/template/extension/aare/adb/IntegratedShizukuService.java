@@ -175,8 +175,10 @@ public final class IntegratedShizukuService extends Service {
             case STARTED:
             case ALREADY_RUNNING:
                 finish(text("Integrated Shizuku is running", "Shizuku integrato è attivo"),
-                        text("Car audio and voice messages work without the Shizuku app until the phone restarts.",
-                                "Audio in auto e vocali funzionano senza l'app Shizuku fino al riavvio del telefono."));
+                        text("Car audio and voice messages work without the Shizuku app. Wireless debugging is off "
+                                        + "again; AARE starts it by itself after a restart.",
+                                "Audio in auto e vocali funzionano senza l'app Shizuku. Il debug wireless è di nuovo "
+                                        + "spento; dopo un riavvio AARE riparte da sola."));
                 break;
             case NOT_PAIRED:
                 finish(text("Pairing needed", "Serve l'accoppiamento"),

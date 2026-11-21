@@ -148,6 +148,36 @@ public final class IntegratedShizuku {
      * for the few seconds this takes, and back off when it was off.
      */
     public static Result start(Context context) {
+        Result result = startServer(context);
+        if (result == Result.STARTED) switchOffWirelessDebugging(context);
+        return result;
+    }
+
+    /**
+     * Wireless debugging isn't needed once the server runs (it keeps running without it), and an
+     * open debugging port isn't something to leave on: switch it off, as the user would.
+     */
+    private static void switchOffWirelessDebugging(Context context) {
+        if (!canWriteSecureSettings(context)) return;
+        ContentResolver cr = context.getContentResolver();
+        if (!wirelessDebuggingEnabled(cr)) return;
+        try {
+            Settings.Global.putInt(cr, "adb_wifi_enabled", 0);
+            Thread.sleep(2000);
+            if (!isRunning()) {
+                // This phone stops the server with it: start again and leave wireless debugging on.
+                Log.w(TAG, "integrated shizuku: stopped with wireless debugging, starting again");
+                Settings.Global.putInt(cr, "adb_wifi_enabled", 1);
+                if (startServer(context) == Result.STARTED) {
+                    lastError(context, "this phone stops the server without wireless debugging: left on");
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "integrated shizuku: switch off wireless debugging", t);
+        }
+    }
+
+    private static Result startServer(Context context) {
         if (isRunning()) return Result.ALREADY_RUNNING;
         if (!isPaired(context)) return Result.NOT_PAIRED;
         // Wireless debugging works on Wi-Fi only.
