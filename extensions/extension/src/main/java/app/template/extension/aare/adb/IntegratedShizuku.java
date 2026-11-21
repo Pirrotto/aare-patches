@@ -149,20 +149,72 @@ public final class IntegratedShizuku {
      */
     public static Result start(Context context) {
         Result result = startServer(context);
+        // Only right after a start: when the server already ran, wireless debugging may be on for
+        // something else (adb from a computer), and isn't AARE's to switch off.
         if (result == Result.STARTED) switchOffWirelessDebugging(context);
         return result;
     }
 
+    /** Wireless debugging is on right now (the notification says so instead of claiming it's off). */
+    public static boolean wirelessDebuggingOn(Context context) {
+        return wirelessDebuggingEnabled(context.getContentResolver());
+    }
+
+    /** How the last switch-off went, for diagnostics (null before the first start). */
+    public static String wirelessDebuggingReport(Context context) {
+        return context.getSharedPreferences("aare_integrated_shizuku", Context.MODE_PRIVATE).getString("adb_wifi_off", null);
+    }
+
+    private static void wirelessDebuggingReport(Context context, String report) {
+        context.getSharedPreferences("aare_integrated_shizuku", Context.MODE_PRIVATE).edit().putString("adb_wifi_off", report).apply();
+        Log.i(TAG, "integrated shizuku: wireless debugging " + report);
+    }
+
+    /** Waits up to a second for adb_wifi_enabled to read 0. */
+    private static boolean waitOff(ContentResolver cr) throws InterruptedException {
+        for (int i = 0; i < 10; i++) {
+            if (!wirelessDebuggingEnabled(cr)) return true;
+            Thread.sleep(100);
+        }
+        return false;
+    }
+
     /**
      * Wireless debugging isn't needed once the server runs (it keeps running without it), and an
-     * open debugging port isn't something to leave on: switch it off, as the user would.
+     * open debugging port isn't something to leave on: switch it off, as the user would. AARE's own
+     * secure-settings write doesn't take on every phone, so the server (shell user) does it when it
+     * didn't, and the setting is read back before anyone is told it's off.
      */
     private static void switchOffWirelessDebugging(Context context) {
-        if (!canWriteSecureSettings(context)) return;
         ContentResolver cr = context.getContentResolver();
-        if (!wirelessDebuggingEnabled(cr)) return;
+        if (!wirelessDebuggingEnabled(cr)) {
+            wirelessDebuggingReport(context, "off");
+            return;
+        }
+        StringBuilder how = new StringBuilder();
         try {
-            Settings.Global.putInt(cr, "adb_wifi_enabled", 0);
+            boolean off = false;
+            if (canWriteSecureSettings(context)) {
+                try {
+                    Settings.Global.putInt(cr, "adb_wifi_enabled", 0);
+                    off = waitOff(cr);
+                    how.append(off ? "off by AARE" : "AARE's write didn't take");
+                } catch (Throwable t) {
+                    how.append("AARE's write failed: ").append(t);
+                }
+            } else {
+                how.append("AARE can't write secure settings");
+            }
+            if (!off) {
+                String server = serverSwitchOff();
+                off = waitOff(cr);
+                how.append(off ? "; off by the server" : "; the server's didn't take either (" + server + ")");
+            }
+            if (!off) {
+                wirelessDebuggingReport(context, "left on: " + how);
+                lastError(context, "wireless debugging couldn't be switched off: " + how);
+                return;
+            }
             Thread.sleep(2000);
             if (!isRunning()) {
                 // This phone stops the server with it: start again and leave wireless debugging on.
@@ -171,9 +223,29 @@ public final class IntegratedShizuku {
                 if (startServer(context) == Result.STARTED) {
                     lastError(context, "this phone stops the server without wireless debugging: left on");
                 }
+                wirelessDebuggingReport(context, "left on: the server stops without it");
+                return;
             }
+            wirelessDebuggingReport(context, how.toString());
         } catch (Throwable t) {
             Log.w(TAG, "integrated shizuku: switch off wireless debugging", t);
+            wirelessDebuggingReport(context, (wirelessDebuggingEnabled(cr) ? "left on: " : "off: ") + how + "; " + t);
+        }
+    }
+
+    /** Asks the server to switch wireless debugging off as the shell user; its answer, or the error. */
+    private static String serverSwitchOff() {
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+        try {
+            if (!isRunning()) return "server not running";
+            Shizuku.getBinder().transact(IntegratedServer.TRANSACTION_WIRELESS_DEBUGGING_OFF, data, reply, 0);
+            return "adb_wifi_enabled=" + reply.readString();
+        } catch (Throwable t) {
+            return t.toString();
+        } finally {
+            data.recycle();
+            reply.recycle();
         }
     }
 
@@ -278,6 +350,8 @@ public final class IntegratedShizuku {
             b.append(" error ").append(t).append('\n');
         }
         b.append("last error: ").append(lastError(context)).append('\n');
+        b.append("wireless debugging now=").append(wirelessDebuggingOn(context) ? "on" : "off")
+                .append(" last switch-off: ").append(wirelessDebuggingReport(context)).append('\n');
         try {
             if (isRunning()) {
                 Parcel data = Parcel.obtain();

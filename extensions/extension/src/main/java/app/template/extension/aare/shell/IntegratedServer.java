@@ -49,6 +49,11 @@ public final class IntegratedServer extends IShizukuService.Stub {
     static final String EXTRA_BINDER = "moe.shizuku.privileged.api.intent.extra.BINDER";
     /** Answered with 1, so AARE can tell this server from the real Shizuku. */
     public static final int TRANSACTION_IS_INTEGRATED = 0x00A4A2E5; // within FIRST..LAST_CALL_TRANSACTION
+    /**
+     * Switches wireless debugging off as the shell user, and answers with what adb_wifi_enabled
+     * reads afterwards: for phones where AARE's own secure-settings write doesn't take.
+     */
+    public static final int TRANSACTION_WIRELESS_DEBUGGING_OFF = 0x00A4A2E7;
 
     private static final int SERVER_VERSION = 13;
     private static final int SERVER_PATCH_VERSION = 6;
@@ -160,6 +165,13 @@ public final class IntegratedServer extends IShizukuService.Stub {
         if (code == TRANSACTION_DIAGNOSTICS) {
             enforceApp();
             if (reply != null) reply.writeString(diagnostics());
+            return true;
+        }
+        if (code == TRANSACTION_WIRELESS_DEBUGGING_OFF) {
+            enforceApp();
+            String out = run("settings put global adb_wifi_enabled 0; settings get global adb_wifi_enabled").trim();
+            log("wireless debugging switched off by the server: adb_wifi_enabled=" + out, null);
+            if (reply != null) reply.writeString(out);
             return true;
         }
         return super.onTransact(code, data, reply, flags);

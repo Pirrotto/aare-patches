@@ -174,11 +174,21 @@ public final class IntegratedShizukuService extends Service {
         switch (result) {
             case STARTED:
             case ALREADY_RUNNING:
-                finish(text("Integrated Shizuku is running", "Shizuku integrato è attivo"),
-                        text("Car audio and voice messages work without the Shizuku app. Wireless debugging is off "
-                                        + "again; AARE starts it by itself after a restart.",
-                                "Audio in auto e vocali funzionano senza l'app Shizuku. Il debug wireless è di nuovo "
-                                        + "spento; dopo un riavvio AARE riparte da sola."));
+                // Read back, not assumed: the switch-off doesn't take on every phone.
+                if (IntegratedShizuku.wirelessDebuggingOn(this)) {
+                    finish(text("Integrated Shizuku is running", "Shizuku integrato è attivo"),
+                            text("Car audio and voice messages work without the Shizuku app. Wireless debugging is "
+                                            + "still on: tap to switch it off, AARE keeps working.",
+                                    "Audio in auto e vocali funzionano senza l'app Shizuku. Il debug wireless è ancora "
+                                            + "acceso: tocca per spegnerlo, AARE continua a funzionare."),
+                            wirelessDebuggingSettings());
+                } else {
+                    finish(text("Integrated Shizuku is running", "Shizuku integrato è attivo"),
+                            text("Car audio and voice messages work without the Shizuku app. Wireless debugging is "
+                                            + "off; AARE starts it by itself after a restart.",
+                                    "Audio in auto e vocali funzionano senza l'app Shizuku. Il debug wireless è "
+                                            + "spento; dopo un riavvio AARE riparte da sola."));
+                }
                 break;
             case SHIZUKU_APP_RUNNING:
                 finish(text("The Shizuku app is running", "È attiva l'app Shizuku"),
@@ -275,11 +285,27 @@ public final class IntegratedShizukuService extends Service {
 
     /** Ends the work: the service goes, a last notification (if any) stays. */
     private void finish(String title, String body) {
+        finish(title, body, null);
+    }
+
+    /** Opens Developer options at Wireless debugging, for switching it off by hand. */
+    private PendingIntent wirelessDebuggingSettings() {
+        Intent wireless = new Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                .putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        android.os.Bundle args = new android.os.Bundle();
+        args.putString(":settings:fragment_args_key", "toggle_adb_wireless");
+        wireless.putExtra(":settings:show_fragment_args", args);
+        return PendingIntent.getActivity(this, 2, wireless, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    private void finish(String title, String body, PendingIntent tap) {
         main.post(() -> {
             stopPairingSearch();
             stopForeground(STOP_FOREGROUND_REMOVE);
             if (title != null) {
                 Notification.Builder b = builder().setContentTitle(title).setAutoCancel(true);
+                if (tap != null) b.setContentIntent(tap);
                 if (body != null) b.setContentText(body).setStyle(new Notification.BigTextStyle().bigText(body));
                 getSystemService(NotificationManager.class).notify(NOTIFICATION + 1, b.build());
             }
