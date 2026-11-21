@@ -34,6 +34,7 @@ public final class PatchSettings {
     public static final String INTEGRATED_SHIZUKU = "integrated_shizuku";
     public static final String CAR_MICROPHONE = "car_microphone";
     public static final String AARE_ASSISTANT = "aare_assistant";
+    public static final String TUNNEL_NAVIGATION = "tunnel_navigation";
 
     /** One switch of the screen. */
     static final class Feature {
@@ -113,6 +114,7 @@ public final class PatchSettings {
             + "c-1.71,0 -3.1,-1.39 -3.1,-3.1zM8,13h8v-2L8,11v2zM17,7h-4v1.9h4c1.71,0 3.1,1.39 3.1,3.1s-1.39,3.1 -3.1,3.1h-4V17h4"
             + "c2.76,0 5,-2.24 5,-5s-2.24,-5 -5,-5z";
     static final String ICON_PLAY = "M8,5v14l11,-7z";
+    static final String ICON_TUNNEL = "M12,2L4.5,20.29l0.71,0.71L12,18l6.79,3 0.71,-0.71z";
     static final String ICON_CAR = "M18.92,6.01C18.72,5.42 18.16,5 17.5,5h-11c-0.66,0 -1.21,0.42 -1.42,1.01L3,12v8c0,0.55 0.45,1 1,1h1"
             + "c0.55,0 1,-0.45 1,-1v-1h12v1c0,0.55 0.45,1 1,1h1c0.55,0 1,-0.45 1,-1v-8l-2.08,-5.99z"
             + "M6.5,16c-0.83,0 -1.5,-0.67 -1.5,-1.5S5.67,13 6.5,13s1.5,0.67 1.5,1.5S7.33,16 6.5,16z"
@@ -133,6 +135,13 @@ public final class PatchSettings {
                                 "Mantiene il GPS per la navigazione a telefono bloccato. Serve «Consenti sempre» per AARE: "
                                         + "tocca per aprire il permesso di posizione."),
                         true, ICON_LOCATION),
+                new Feature(TUNNEL_NAVIGATION,
+                        phrase("Tunnel navigation", "Navigazione in galleria"),
+                        phrase("With the car's GPS for the phone: in tunnels the position keeps moving, estimated from the car's "
+                                        + "speed, compass and gyroscope, until the GPS is back.",
+                                "Col GPS dell'auto per il telefono: in galleria la posizione continua ad avanzare, stimata da "
+                                        + "velocità, bussola e giroscopio dell'auto, finché torna il GPS."),
+                        false, ICON_TUNNEL),
                 new Feature(VOICE_MESSAGES,
                         phrase("Voice messages", "Messaggi vocali"),
                         phrase("Plays WhatsApp voice messages in the car when AARE reads a message. Needs Shizuku running.",

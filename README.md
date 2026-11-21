@@ -16,6 +16,8 @@ The **AARE assistant** patch makes the steering-wheel voice button and the rail'
 
 The **Car microphone** patch makes dictated replies and AARE's assistant listen through the car's microphone (AARE's microphone route: the car's, or the phone's when the car has none), on Android 13 or newer.
 
+The **Tunnel navigation** patch keeps the position moving in tunnels when AARE gives the phone the car's GPS (its *car GPS for the phone* option). In a tunnel the car has no fix, so the position stops and the navigation app (Vela, Maps, Waze…) stops too. The car still sends its speed, compass and gyroscope: from the last good fix the patch estimates where the car is, once a second, and hands that to the phone until the GPS is back. The gyroscope's direction is learned from the GPS while driving, so it works whatever the car. It can be turned off in Settings.
+
 The **Integrated Shizuku** patch removes the need for the Shizuku app. AARE pairs once with the phone's wireless debugging (Settings → Integrated Shizuku → Pair, then the six-digit code in AARE's notification), and from then on starts its own small Shizuku server as the shell user, the way Shizuku does. AARE's car audio, app launcher and the Voice messages patch use it through the same Shizuku API, unchanged. The server serves AARE only. AARE starts it again by itself after a restart and each time the car connects, if it isn't running, as soon as the phone is on a Wi-Fi network: the car's own Wi-Fi works too, no internet needed (it switches wireless debugging on just for the start, and off again; the first time on a new network, choose *Always allow on this network*). Car audio channels opened before it is up start again on the Shizuku method.
 
 The **Settings** patch (included with every other patch) adds a **Settings** row at the end of AARE's settings home. It opens a screen in AARE's style with one switch and a short description for each installed patch: Voice messages and Voice reply can be turned off there without patching again, and Background location shows whether *Allow all the time* is granted (tap it to open the permission). Each patch registers its own switch, so a new release of the patches brings its new switches by itself.
@@ -43,6 +45,7 @@ Patching AARE again later (a new AARE version, or another patch) installs over t
 
 **English**
 
+- **1.10 – Tunnel navigation**: with the car's GPS for the phone, the position keeps moving in tunnels (estimated from the car's speed, compass and gyroscope).
 - **1.9 – Integrated Shizuku works reliably**: starts on any Wi-Fi (also where mDNS is filtered), one start at a time, and the server stays up after the start. *Copy diagnostics* in Settings reports its state.
 - **1.9 – AARE assistant in German**, besides Italian and English (language in Settings).
 - **1.8 – AARE assistant**: the voice button opens AARE's own assistant on the car screen (navigation, music, messages and replies, calls, time). Anything else goes to Google on the phone. **Car microphone** for dictation and the assistant.
@@ -58,6 +61,7 @@ Every release lists its fixes in [the releases](https://github.com/Pirrotto/aare
 
 **Italiano**
 
+- **1.10 – Navigazione in galleria**: col GPS dell'auto per il telefono, in galleria la posizione continua ad avanzare (stimata da velocità, bussola e giroscopio dell'auto).
 - **1.9 – Shizuku integrato affidabile**: parte con qualsiasi Wi-Fi (anche dove gli annunci di rete sono bloccati), un avvio alla volta, e il server resta acceso. In Settings, *Copia diagnostica* ne mostra lo stato.
 - **1.9 – Assistente AARE in tedesco**, oltre a italiano e inglese (lingua in Settings).
 - **1.8 – Assistente AARE**: il tasto vocale apre l'assistente di AARE sullo schermo dell'auto (navigazione, musica, messaggi e risposte, chiamate, ora); il resto va a Google sul telefono. **Microfono dell'auto** per dettatura e assistente.
