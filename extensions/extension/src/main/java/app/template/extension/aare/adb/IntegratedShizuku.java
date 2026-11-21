@@ -227,6 +227,15 @@ public final class IntegratedShizuku {
                 // Lets AARE switch wireless debugging on by itself next time (and after a reboot).
                 stage = "pm grant";
                 adb.shell("pm grant " + pkg + " " + Manifest.permission.WRITE_SECURE_SETTINGS + " 2>/dev/null");
+                // app_process must load AARE's code: a quick foreground run says so (or why not).
+                stage = "check";
+                String check = adb.shell("CLASSPATH='" + apk + "' /system/bin/app_process /system/bin "
+                        + IntegratedServer.class.getName() + " --check 2>&1; echo exit=$?");
+                Log.i(TAG, "integrated shizuku: " + check.trim());
+                if (!check.contains("check ok")) {
+                    lastError(context, "app_process: " + tail(check, 400));
+                    return Result.FAILED;
+                }
                 stage = "start server";
                 String output = adb.shell("kill $(pidof " + SERVER_NAME + ") 2>/dev/null; : >" + SERVER_LOG + "; "
                         + "CLASSPATH='" + apk + "' setsid /system/bin/app_process /system/bin --nice-name=" + SERVER_NAME + " "
@@ -246,7 +255,8 @@ public final class IntegratedShizuku {
                 // What happened, for the notification and Settings.
                 String why;
                 try {
-                    why = adb.shell("echo pid: $(pidof " + SERVER_NAME + "); tail -n 12 " + SERVER_LOG + " 2>&1");
+                    why = adb.shell("echo pid: $(pidof " + SERVER_NAME + "); ls -l " + SERVER_LOG + " 2>&1; tail -n 12 "
+                            + SERVER_LOG + " 2>&1");
                 } catch (IOException e) {
                     // A fresh connection for the report.
                     try (AdbClient again = new AdbClient(key, "127.0.0.1", port)) {
@@ -255,7 +265,7 @@ public final class IntegratedShizuku {
                         why = "start output: " + output.trim() + " | report: " + t2;
                     }
                 }
-                lastError(context, "server: " + why.trim()
+                lastError(context, "check: " + tail(check, 80) + " | start: " + output.trim() + " | server: " + why.trim()
                         + (anyShizukuRunning() ? " | binder: not ours" : " | binder: none"));
                 return Result.FAILED;
             } catch (AdbClient.NotPairedException e) {
@@ -309,6 +319,11 @@ public final class IntegratedShizuku {
             b.append("server report: ").append(t).append('\n');
         }
         return b.toString();
+    }
+
+    private static String tail(String s, int max) {
+        String t = s.trim().replace('\n', ' ');
+        return t.length() <= max ? t : "…" + t.substring(t.length() - max);
     }
 
     /** Stops the server; AARE's Shizuku features stop until the next start. */

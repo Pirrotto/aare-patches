@@ -80,6 +80,13 @@ public final class IntegratedServer extends IShizukuService.Stub {
     }
 
     public static void main(String[] args) {
+        System.err.println("aare server main, uid " + android.os.Process.myUid() + ", args " + args.length);
+        System.err.flush();
+        if (args.length == 1 && "--check".equals(args[0])) {
+            // Started in the foreground by AARE to see that app_process loads AARE's code.
+            System.out.println("check ok uid=" + android.os.Process.myUid() + " sdk=" + android.os.Build.VERSION.SDK_INT);
+            System.exit(0);
+        }
         Looper.prepareMainLooper();
         if (args.length < 3) {
             log("usage: IntegratedServer <package> <uid> <apk>", null);
