@@ -1,3 +1,9 @@
+## [1.7.4](https://github.com/Pirrotto/aare-patches/compare/v1.7.3...v1.7.4) (2026-11-21)
+
+### 🐛 Bug Fixes
+
+* Switch wireless debugging off once integrated Shizuku runs ([463ede6](https://github.com/Pirrotto/aare-patches/commit/463ede68147b16a78f4616488929af93873d5e64))
+
 ## [1.7.3](https://github.com/Pirrotto/aare-patches/compare/v1.7.2...v1.7.3) (2026-11-21)
 
 ### 🐛 Bug Fixes
