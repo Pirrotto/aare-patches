@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-20T20:33:18",
-  "description": "## [1.5.2](https://github.com/Pirrotto/aare-patches/compare/v1.5.1...v1.5.2) (2026-11-20)\n\n### 🐛 Bug Fixes\n\n* Rename the bundle to AARE Patches and describe all patches ([cc51ee3](https://github.com/Pirrotto/aare-patches/commit/cc51ee3cbd9f24d74c43192c6dc5fee094d46923))",
-  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.5.2/patches-1.5.2.mpp",
+  "created_at": "2026-11-21T08:29:15",
+  "description": "## [1.6.0](https://github.com/Pirrotto/aare-patches/compare/v1.5.2...v1.6.0) (2026-11-21)\n\n### ✨ New Features\n\n* Integrated Shizuku, without the Shizuku app ([eea4ed4](https://github.com/Pirrotto/aare-patches/commit/eea4ed42ecc5488766fbc8674cab4e2d58f14122))",
+  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.6.0/patches-1.6.0.mpp",
   "signature_download_url": "",
-  "version": "1.5.2"
+  "version": "1.6.0"
 }
