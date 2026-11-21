@@ -62,4 +62,4 @@ The Integrated Shizuku patch builds on the work of others:
 
 - [Shizuku](https://github.com/RikkaApps/Shizuku) (Apache-2.0) and [Shizuku-API](https://github.com/RikkaApps/Shizuku-API) (MIT): adb client, pairing flow and the server protocol AARE speaks.
 - [libadb-android](https://github.com/MuntashirAkon/libadb-android) (GPL-3.0-or-later or Apache-2.0): the pairing protocol.
-- [spake2-java](https://github.com/MuntashirAkon/spake2-java) (LGPL-3.0, included unchanged under `extensions/extension/src/main/java/io/github/muntashirakon`): SPAKE2, compatible with BoringSSL.
+- [BoringSSL](https://boringssl.googlesource.com/boringssl)'s `spake25519.cc`: the SPAKE2 variant adb uses, rewritten in plain Java for the pairing.

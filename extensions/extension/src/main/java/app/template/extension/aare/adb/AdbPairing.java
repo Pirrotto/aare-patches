@@ -17,16 +17,13 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLSocket;
 
-import io.github.muntashirakon.crypto.spake2.Spake2Context;
-import io.github.muntashirakon.crypto.spake2.Spake2Role;
-
 /**
  * Pairs AARE with the phone's wireless debugging, as "adb pair" does with the six-digit code
  * shown under Wireless debugging > Pair device with pairing code.
  *
  * Protocol of AOSP's adb/pairing_connection (TLS 1.3, then SPAKE2 on the code and the TLS exported
  * key, then the public keys exchanged under AES-128-GCM). Adapted from libadb-android
- * (GPL-3.0-or-later / Apache-2.0) and Shizuku (Apache-2.0).
+ * (GPL-3.0-or-later / Apache-2.0) and Shizuku (Apache-2.0); SPAKE2 is our own {@link Spake2}.
  */
 final class AdbPairing {
     private static final String EXPORTED_KEY_LABEL = "adb-label\u0000";
@@ -53,32 +50,38 @@ final class AdbPairing {
     }
 
     static void pair(AdbKey key, String host, int port, String code, String deviceName) throws Exception {
+        String stage = "connect";
         try (Socket plain = new Socket()) {
             plain.connect(new InetSocketAddress(host, port), 10_000);
             plain.setTcpNoDelay(true);
             plain.setSoTimeout(30_000);
+            stage = "tls";
             try (SSLSocket tls = (SSLSocket) key.sslContext().getSocketFactory().createSocket(plain, host, port, true)) {
                 tls.startHandshake();
                 DataInputStream in = new DataInputStream(tls.getInputStream());
                 DataOutputStream out = new DataOutputStream(tls.getOutputStream());
 
                 // The password binds the code to this very TLS session.
+                stage = "export";
                 byte[] material = exportKeyingMaterial(tls);
                 byte[] codeBytes = code.getBytes(StandardCharsets.UTF_8);
                 byte[] password = new byte[codeBytes.length + material.length];
                 System.arraycopy(codeBytes, 0, password, 0, codeBytes.length);
                 System.arraycopy(material, 0, password, codeBytes.length, material.length);
 
-                Spake2Context spake = new Spake2Context(Spake2Role.Alice, CLIENT_NAME, SERVER_NAME);
+                stage = "spake2";
+                Spake2 spake = new Spake2(true, CLIENT_NAME, SERVER_NAME);
                 byte[] ourMsg = spake.generateMessage(password);
+                Arrays.fill(password, (byte) 0);
                 writePacket(out, TYPE_SPAKE2_MSG, ourMsg);
                 byte[] theirMsg = readPacket(in, TYPE_SPAKE2_MSG);
                 byte[] keyMaterial = spake.processMessage(theirMsg);
-                if (keyMaterial == null) throw new WrongCodeException();
-                byte[] aesKey = hkdfSha256(keyMaterial, HKDF_INFO, 16);
                 spake.destroy();
+                if (keyMaterial == null) throw new IOException("adbd's SPAKE2 message isn't a curve point");
+                byte[] aesKey = hkdfSha256(keyMaterial, HKDF_INFO, 16);
 
                 // Our public key goes to adbd, which stores it like an authorized computer.
+                stage = "peer info";
                 ByteBuffer info = ByteBuffer.allocate(PEER_INFO_SIZE).order(ByteOrder.BIG_ENDIAN);
                 info.put((byte) 0 /* ADB_RSA_PUB_KEY */);
                 byte[] pub = key.adbPublicKey(deviceName);
@@ -88,12 +91,16 @@ final class AdbPairing {
                 byte[] theirInfo;
                 try {
                     theirInfo = gcm(false, aesKey, 0, readPacket(in, TYPE_PEER_INFO));
-                } catch (javax.crypto.AEADBadTagException e) {
+                } catch (javax.crypto.AEADBadTagException | java.io.EOFException e) {
+                    // Different keys on the two sides: the code was wrong.
                     throw new WrongCodeException();
                 }
                 if (theirInfo.length != PEER_INFO_SIZE) throw new IOException("unexpected peer info size " + theirInfo.length);
-                Arrays.fill(password, (byte) 0);
             }
+        } catch (WrongCodeException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new IOException(stage + ": " + e.getMessage(), e);
         }
     }
 

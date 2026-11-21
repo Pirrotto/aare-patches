@@ -119,6 +119,14 @@ public final class IntegratedShizukuService extends Service {
 
     // region Work
 
+    private final Runnable pairingTimeout = () -> {
+        if (pairingSearch != null && !IntegratedShizuku.isPaired(this)) {
+            finish(text("Pairing not done", "Accoppiamento non riuscito"),
+                    text("Pair device with pairing code didn't open in time. Try again from Settings.",
+                            "«Associa dispositivo con codice» non si è aperto in tempo. Riprova da Settings."));
+        }
+    };
+
     private void startPairingSearch() {
         stopPairingSearch();
         pairingSearch = new AdbMdns(this, AdbMdns.TLS_PAIRING, port -> main.post(() -> {
@@ -129,16 +137,11 @@ public final class IntegratedShizukuService extends Service {
         }));
         pairingSearch.start();
         // Pairing codes expire: give up after five minutes.
-        main.postDelayed(() -> {
-            if (pairingSearch != null && !IntegratedShizuku.isPaired(this)) {
-                finish(text("Pairing not done", "Accoppiamento non riuscito"),
-                        text("Pair device with pairing code didn't open in time. Try again from Settings.",
-                                "«Associa dispositivo con codice» non si è aperto in tempo. Riprova da Settings."));
-            }
-        }, 5 * 60_000);
+        main.postDelayed(pairingTimeout, 5 * 60_000);
     }
 
     private void stopPairingSearch() {
+        main.removeCallbacks(pairingTimeout);
         if (pairingSearch != null) {
             pairingSearch.stop();
             pairingSearch = null;
