@@ -1,3 +1,9 @@
+## [1.9.3-dev.1](https://github.com/Pirrotto/aare-patches/compare/v1.9.2...v1.9.3-dev.1) (2026-11-21)
+
+### 🐛 Bug Fixes
+
+* Integrated Shizuku switches wireless debugging off for real ([efdc9f5](https://github.com/Pirrotto/aare-patches/commit/efdc9f57ccc46789dd6d0cf374974ebf00451cd1))
+
 ## [1.9.2](https://github.com/Pirrotto/aare-patches/compare/v1.9.1...v1.9.2) (2026-11-21)
 
 ### 🐛 Bug Fixes

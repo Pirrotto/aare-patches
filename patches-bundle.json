@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-21T18:24:48",
-  "description": "## [1.9.2](https://github.com/Pirrotto/aare-patches/compare/v1.9.1...v1.9.2) (2026-11-21)\n\n### 🐛 Bug Fixes\n\n* Integrated Shizuku start report and Shizuku app detection ([de359d7](https://github.com/Pirrotto/aare-patches/commit/de359d7a9e171622316c888e8f20a1989f386570))",
-  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.9.2/patches-1.9.2.mpp",
+  "created_at": "2026-11-21T18:41:23",
+  "description": "## [1.9.3-dev.1](https://github.com/Pirrotto/aare-patches/compare/v1.9.2...v1.9.3-dev.1) (2026-11-21)\n\n### 🐛 Bug Fixes\n\n* Integrated Shizuku switches wireless debugging off for real ([efdc9f5](https://github.com/Pirrotto/aare-patches/commit/efdc9f57ccc46789dd6d0cf374974ebf00451cd1))",
+  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.9.3-dev.1/patches-1.9.3-dev.1.mpp",
   "signature_download_url": "",
-  "version": "1.9.2"
+  "version": "1.9.3-dev.1"
 }
