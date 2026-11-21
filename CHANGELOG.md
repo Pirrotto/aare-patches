@@ -1,3 +1,9 @@
+## [1.9.5](https://github.com/Pirrotto/aare-patches/compare/v1.9.4...v1.9.5) (2026-11-21)
+
+### 🐛 Bug Fixes
+
+* Check that app_process loads AARE before starting the server ([5c6b548](https://github.com/Pirrotto/aare-patches/commit/5c6b54872981b30efab2e31e65392ac4aab19827))
+
 ## [1.9.4](https://github.com/Pirrotto/aare-patches/compare/v1.9.3...v1.9.4) (2026-11-21)
 
 ### 🐛 Bug Fixes

@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-21T19:16:51",
-  "description": "## [1.9.4](https://github.com/Pirrotto/aare-patches/compare/v1.9.3...v1.9.4) (2026-11-21)\n\n### 🐛 Bug Fixes\n\n* One integrated Shizuku start at a time ([8c43c7f](https://github.com/Pirrotto/aare-patches/commit/8c43c7f824af8835b9a2bd34084dd46225b26760))",
-  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.9.4/patches-1.9.4.mpp",
+  "created_at": "2026-11-21T21:06:31",
+  "description": "## [1.9.5](https://github.com/Pirrotto/aare-patches/compare/v1.9.4...v1.9.5) (2026-11-21)\n\n### 🐛 Bug Fixes\n\n* Check that app_process loads AARE before starting the server ([5c6b548](https://github.com/Pirrotto/aare-patches/commit/5c6b54872981b30efab2e31e65392ac4aab19827))",
+  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.9.5/patches-1.9.5.mpp",
   "signature_download_url": "",
-  "version": "1.9.4"
+  "version": "1.9.5"
 }
