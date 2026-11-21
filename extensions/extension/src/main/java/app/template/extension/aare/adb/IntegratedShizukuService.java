@@ -180,6 +180,13 @@ public final class IntegratedShizukuService extends Service {
                                 "Audio in auto e vocali funzionano senza l'app Shizuku. Il debug wireless è di nuovo "
                                         + "spento; dopo un riavvio AARE riparte da sola."));
                 break;
+            case SHIZUKU_APP_RUNNING:
+                finish(text("The Shizuku app is running", "È attiva l'app Shizuku"),
+                        text("AARE uses the Shizuku app now. To use the integrated one, stop the Shizuku app (or restart "
+                                        + "the phone without starting it), then tap Start.",
+                                "AARE sta usando l'app Shizuku. Per usare quello integrato, ferma l'app Shizuku (o riavvia "
+                                        + "il telefono senza avviarla), poi tocca Avvia."));
+                break;
             case NOT_PAIRED:
                 finish(text("Pairing needed", "Serve l'accoppiamento"),
                         text("Pair AARE with wireless debugging from Settings, once.",

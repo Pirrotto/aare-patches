@@ -36,7 +36,7 @@ public final class IntegratedShizuku {
 
     /** How a start ended, for the notification. */
     public enum Result {
-        STARTED, ALREADY_RUNNING, NOT_PAIRED, WIRELESS_DEBUGGING_OFF, NO_WIFI, FAILED
+        STARTED, ALREADY_RUNNING, SHIZUKU_APP_RUNNING, NOT_PAIRED, WIRELESS_DEBUGGING_OFF, NO_WIFI, FAILED
     }
 
     private IntegratedShizuku() {
@@ -179,6 +179,8 @@ public final class IntegratedShizuku {
 
     private static Result startServer(Context context) {
         if (isRunning()) return Result.ALREADY_RUNNING;
+        // AARE keeps the first Shizuku it gets: with the Shizuku app's running, ours would be ignored.
+        if (anyShizukuRunning()) return Result.SHIZUKU_APP_RUNNING;
         if (!isPaired(context)) return Result.NOT_PAIRED;
         // Wireless debugging works on Wi-Fi only.
         if (!onWifi(context)) return Result.NO_WIFI;
@@ -217,9 +219,9 @@ public final class IntegratedShizuku {
                         + " </dev/null >>" + SERVER_LOG + " 2>&1 & echo started");
                 Log.i(TAG, "integrated shizuku: " + output.trim());
 
-                // The server sends its binder within a couple of seconds.
+                // The server sends its binder within a few seconds.
                 stage = "wait binder";
-                for (int i = 0; i < 40; i++) {
+                for (int i = 0; i < 80; i++) {
                     if (isRunning()) {
                         lastError(context, null);
                         return Result.STARTED;
@@ -227,7 +229,17 @@ public final class IntegratedShizuku {
                     Thread.sleep(250);
                 }
                 // What happened, for the notification and Settings.
-                String why = adb.shell("echo pid: $(pidof " + SERVER_NAME + "); tail -n 12 " + SERVER_LOG + " 2>&1");
+                String why;
+                try {
+                    why = adb.shell("echo pid: $(pidof " + SERVER_NAME + "); tail -n 12 " + SERVER_LOG + " 2>&1");
+                } catch (IOException e) {
+                    // A fresh connection for the report.
+                    try (AdbClient again = new AdbClient(key, "127.0.0.1", port)) {
+                        why = again.shell("echo pid: $(pidof " + SERVER_NAME + "); tail -n 12 " + SERVER_LOG + " 2>&1");
+                    } catch (Throwable t2) {
+                        why = "start output: " + output.trim() + " | report: " + t2;
+                    }
+                }
                 lastError(context, "server: " + why.trim()
                         + (anyShizukuRunning() ? " | binder: not ours" : " | binder: none"));
                 return Result.FAILED;

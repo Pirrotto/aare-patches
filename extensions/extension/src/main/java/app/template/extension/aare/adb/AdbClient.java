@@ -71,19 +71,22 @@ final class AdbClient implements Closeable {
     }
 
     /** Runs a command with "sh -c" semantics and returns its output, after it ends. */
+    private int nextLocalId = 1;
+
     String shell(String command) throws IOException {
-        final int localId = 1;
+        final int localId = nextLocalId++;
         write(A_OPEN, localId, 0, ("shell:" + command + "\u0000").getBytes(StandardCharsets.UTF_8));
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         Message m = read();
+        while (m.arg1 != localId && m.arg1 != 0) m = read(); // skip leftovers of an earlier stream
         if (m.command == A_CLSE) {
-            write(A_CLSE, localId, m.arg0, null);
             throw new IOException("adb: shell refused");
         }
         if (m.command != A_OKAY) throw new IOException("adb: unexpected reply " + Integer.toHexString(m.command));
         while (true) {
             m = read();
             int remoteId = m.arg0;
+            if (m.arg1 != localId) continue; // a late message of an earlier stream
             if (m.command == A_WRTE) {
                 if (m.data != null) output.write(m.data, 0, m.data.length);
                 write(A_OKAY, localId, remoteId, null);
