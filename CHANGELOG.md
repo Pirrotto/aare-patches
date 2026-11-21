@@ -1,3 +1,9 @@
+## [1.9.4](https://github.com/Pirrotto/aare-patches/compare/v1.9.3...v1.9.4) (2026-11-21)
+
+### 🐛 Bug Fixes
+
+* One integrated Shizuku start at a time ([8c43c7f](https://github.com/Pirrotto/aare-patches/commit/8c43c7f824af8835b9a2bd34084dd46225b26760))
+
 ## [1.9.3](https://github.com/Pirrotto/aare-patches/compare/v1.9.2...v1.9.3) (2026-11-21)
 
 ### 🐛 Bug Fixes
