@@ -211,10 +211,10 @@ public final class IntegratedShizuku {
                 stage = "pm grant";
                 adb.shell("pm grant " + pkg + " " + Manifest.permission.WRITE_SECURE_SETTINGS + " 2>/dev/null");
                 stage = "start server";
-                String output = adb.shell("kill $(pidof " + SERVER_NAME + ") 2>/dev/null; "
+                String output = adb.shell("kill $(pidof " + SERVER_NAME + ") 2>/dev/null; : >" + SERVER_LOG + "; "
                         + "CLASSPATH='" + apk + "' setsid /system/bin/app_process /system/bin --nice-name=" + SERVER_NAME + " "
                         + IntegratedServer.class.getName() + " " + pkg + " " + uid + " '" + apk + "'"
-                        + " </dev/null >" + SERVER_LOG + " 2>&1 & echo started");
+                        + " </dev/null >>" + SERVER_LOG + " 2>&1 & echo started");
                 Log.i(TAG, "integrated shizuku: " + output.trim());
 
                 // The server sends its binder within a couple of seconds.
@@ -248,6 +248,40 @@ public final class IntegratedShizuku {
                 }
             }
         }
+    }
+
+    /** A text report for Settings' "Copy diagnostics": AARE's side, then the server's. */
+    public static String diagnostics(Context context) {
+        StringBuilder b = new StringBuilder("AARE patches diagnostics\n");
+        b.append("sdk=").append(Build.VERSION.SDK_INT).append(" paired=").append(isPaired(context))
+                .append(" secure=").append(canWriteSecureSettings(context)).append('\n');
+        try {
+            b.append("shizuku ping=").append(Shizuku.pingBinder());
+            if (Shizuku.pingBinder()) {
+                b.append(" version=").append(Shizuku.getVersion()).append(" uid=").append(Shizuku.getUid())
+                        .append(" granted=").append(Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED);
+            }
+            b.append(" integrated=").append(isRunning()).append('\n');
+        } catch (Throwable t) {
+            b.append(" error ").append(t).append('\n');
+        }
+        b.append("last error: ").append(lastError(context)).append('\n');
+        try {
+            if (isRunning()) {
+                Parcel data = Parcel.obtain();
+                Parcel reply = Parcel.obtain();
+                try {
+                    Shizuku.getBinder().transact(IntegratedServer.TRANSACTION_DIAGNOSTICS, data, reply, 0);
+                    b.append(reply.readString());
+                } finally {
+                    data.recycle();
+                    reply.recycle();
+                }
+            }
+        } catch (Throwable t) {
+            b.append("server report: ").append(t).append('\n');
+        }
+        return b.toString();
     }
 
     /** Stops the server; AARE's Shizuku features stop until the next start. */

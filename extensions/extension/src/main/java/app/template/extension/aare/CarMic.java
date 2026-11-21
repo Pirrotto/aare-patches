@@ -47,6 +47,14 @@ final class CarMic {
      */
     @SuppressWarnings("unchecked")
     static Handle attach(Object carRuntime, Intent intent) {
+        return attach(carRuntime, intent, 1500);
+    }
+
+    /**
+     * The same, ending the audio [silenceMillis] after the speaker stops: with an audio source the
+     * recognizer listens until the audio ends, so AARE finds the end of speech itself.
+     */
+    static Handle attach(Object carRuntime, Intent intent, long silenceMillis) {
         if (carRuntime == null || Build.VERSION.SDK_INT < 33) return null;
         ParcelFileDescriptor[] pipe = null;
         try {
@@ -77,10 +85,16 @@ final class CarMic {
             }, "aare-car-mic");
             writer.start();
 
+            final EndOfSpeech vad = new EndOfSpeech(silenceMillis);
             Function3<byte[], Integer, Integer, Unit> sink = (data, offset, length) -> {
+                if (vad.ended) return Unit.INSTANCE;
                 byte[] copy = new byte[length];
                 System.arraycopy(data, offset, copy, 0, length);
                 queue.offer(copy);
+                if (vad.feed(copy)) {
+                    Log.i(TAG, "end of speech");
+                    queue.offer(end);
+                }
                 return Unit.INSTANCE;
             };
             Function0<Unit> stopped = () -> {
@@ -128,6 +142,46 @@ final class CarMic {
                 }
             }
             return null;
+        }
+    }
+
+    /**
+     * A simple end-of-speech detector on 16-bit PCM: learns the car's noise over the first moments,
+     * then ends [silence] ms after the voice drops back to it (15 s at most, 8 s if nobody speaks).
+     */
+    static final class EndOfSpeech {
+        private final long silence;
+        private final long started = System.currentTimeMillis();
+        private double noise = -1;
+        private boolean speaking;
+        private long lastVoice;
+        volatile boolean ended;
+
+        EndOfSpeech(long silence) {
+            this.silence = silence;
+        }
+
+        boolean feed(byte[] pcm) {
+            if (ended) return false;
+            long now = System.currentTimeMillis();
+            double sum = 0;
+            int samples = pcm.length / 2;
+            for (int i = 0; i + 1 < pcm.length; i += 2) {
+                int v = (short) ((pcm[i] & 0xFF) | (pcm[i + 1] << 8));
+                sum += (double) v * v;
+            }
+            double rms = samples > 0 ? Math.sqrt(sum / samples) : 0;
+            if (noise < 0) noise = rms;
+            boolean voice = rms > Math.max(noise * 2.5, 400);
+            if (!speaking) noise = noise * 0.95 + rms * 0.05; // follow the background until speech
+            if (voice) {
+                speaking = true;
+                lastVoice = now;
+            }
+            if ((speaking && now - lastVoice > silence) || now - started > 15_000 || (!speaking && now - started > 8_000)) {
+                ended = true;
+            }
+            return ended;
         }
     }
 

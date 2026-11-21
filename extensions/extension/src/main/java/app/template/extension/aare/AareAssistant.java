@@ -70,6 +70,10 @@ public final class AareAssistant {
     private static String dictationTitle = "";
 
     private static SpeechRecognizer recognizer;
+    /** After an immediate error: the network recognizer and the phone's language tag, once. */
+    private static boolean fallbackRecognizer;
+    private static boolean retried;
+    private static boolean lastYesNo;
     private static CarMic.Handle carMic;
     private static AudioFocusRequest focus;
     private static Object card;
@@ -500,7 +504,7 @@ public final class AareAssistant {
         if (context == null) return;
         try {
             if (recognizer == null) {
-                boolean onDevice = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                boolean onDevice = !fallbackRecognizer && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                         && SpeechRecognizer.isOnDeviceRecognitionAvailable(context);
                 recognizer = onDevice ? SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
                         : SpeechRecognizer.createSpeechRecognizer(context);
@@ -509,7 +513,8 @@ public final class AareAssistant {
             recognizer.setRecognitionListener(new Listener(expected));
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                     .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale().toLanguageTag())
+                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE, fallbackRecognizer && "auto".equals(PatchSettings.assistantLanguage())
+                            ? Locale.getDefault().toLanguageTag() : locale().toLanguageTag())
                     .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                     .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
@@ -519,7 +524,10 @@ public final class AareAssistant {
             }
             requestFocus(context);
             closeCarMic();
-            if (CarMic.enabled(context)) carMic = CarMic.attach(runtime.get(), intent);
+            if (CarMic.enabled(context) && !fallbackRecognizer) {
+                carMic = CarMic.attach(runtime.get(), intent, yesNo ? 1000 : state == State.DICTATE ? 2000 : 1500);
+            }
+            lastYesNo = yesNo;
             recognizer.startListening(intent);
         } catch (Throwable t) {
             Log.w(TAG, "listen", t);
@@ -575,15 +583,40 @@ public final class AareAssistant {
             releaseFocus();
             if (state != expected) return;
             Log.i(TAG, "recognition error " + error);
+            // Busy, client, server or language errors right away: once more with the other recognizer
+            // (on-device / Google's), without the car's microphone.
+            boolean early = error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                    || error == SpeechRecognizer.ERROR_SERVER || error == 11 /* server disconnected */
+                    || error == 12 /* language not supported */ || error == 13 /* language unavailable */
+                    || error == SpeechRecognizer.ERROR_AUDIO || error == SpeechRecognizer.ERROR_NO_MATCH;
+            if (early && !retried) {
+                retried = true;
+                fallbackRecognizer = !fallbackRecognizer;
+                try {
+                    if (recognizer != null) recognizer.destroy();
+                } catch (Throwable ignored) {
+                }
+                recognizer = null;
+                main.postDelayed(() -> {
+                    if (state == expected) listen(lastYesNo);
+                }, 300);
+                return;
+            }
+            retried = false;
             if (expected == State.CONFIRM) return; // the Yes and No buttons stay
             finish(error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS
                     ? tr("Allow AARE to use the microphone.", "Concedi ad AARE il microfono.", "Erlaube AARE das Mikrofon.")
-                    : tr("I didn't catch that.", "Non ho capito.", "Das habe ich nicht verstanden."));
+                    : error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                    ? tr("I didn't catch that (" + error + ").", "Non ho capito (" + error + ").",
+                    "Das habe ich nicht verstanden (" + error + ").")
+                    : tr("Voice input error " + error + ".", "Errore del riconoscimento vocale " + error + ".",
+                    "Fehler der Spracherkennung " + error + "."));
         }
 
         @Override
         public void onResults(Bundle results) {
             releaseFocus();
+            retried = false;
             if (state != expected) return;
             String text = first(results);
             switch (expected) {

@@ -352,7 +352,7 @@ public final class VoiceReply {
             }
             requestListenFocus(context);
             closeCarMic();
-            if (CarMic.enabled(context)) carMic = CarMic.attach(runtime.get(), intent);
+            if (CarMic.enabled(context)) carMic = CarMic.attach(runtime.get(), intent, confirming ? 1000 : 2000);
             recognizer.startListening(intent);
         } catch (Throwable t) {
             Log.w(TAG, "listen", t);

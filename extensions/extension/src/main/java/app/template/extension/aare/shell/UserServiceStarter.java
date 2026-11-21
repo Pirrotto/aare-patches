@@ -28,8 +28,10 @@ public final class UserServiceStarter {
             else if (arg.startsWith("--package=")) pkg = arg.substring(10);
             else if (arg.startsWith("--class=")) cls = arg.substring(8);
         }
+        IntegratedServer.log("user service starter: " + cls + " uid " + android.os.Process.myUid(), null);
         try {
             IBinder service = create(pkg, cls);
+            IntegratedServer.log("user service created: " + cls, null);
 
             // The integrated server's binder, from AARE, which received it.
             Bundle reply = Providers.call(Providers.authority(pkg), "getBinder", new Bundle());
@@ -46,7 +48,7 @@ public final class UserServiceStarter {
             Bundle options = new Bundle();
             options.putString(IntegratedServer.USER_SERVICE_ARG_TOKEN, token);
             IShizukuService.Stub.asInterface(server).attachUserService(service, options);
-            Log.i(TAG, "user service " + cls + " started");
+            IntegratedServer.log("user service " + cls + " started", null);
         } catch (Throwable t) {
             IntegratedServer.log("unable to start user service " + cls, t);
             System.exit(1);

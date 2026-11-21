@@ -384,6 +384,21 @@ public final class PatchSettingsActivity extends Activity {
         startIcon[0] = (ImageView) ((LinearLayout) startRow).getChildAt(0);
         card.addView(startRow);
 
+        TextView[] diagTexts = new TextView[2];
+        card.addView(actionRow(PatchSettings.ICON_DEVELOPER,
+                PatchSettings.phrase("Copy diagnostics", "Copia diagnostica"),
+                PatchSettings.phrase("Copies the state and messages of integrated Shizuku, to paste in a chat or an issue.",
+                        "Copia stato e messaggi di Shizuku integrato, da incollare in chat o in una segnalazione."),
+                v -> new Thread(() -> {
+                    String report = app.template.extension.aare.adb.IntegratedShizuku.diagnostics(this);
+                    runOnUiThread(() -> {
+                        android.content.ClipboardManager clip = getSystemService(android.content.ClipboardManager.class);
+                        clip.setPrimaryClip(android.content.ClipData.newPlainText("AARE diagnostics", report));
+                        android.widget.Toast.makeText(this, PatchSettings.phrase("Diagnostics copied.", "Diagnostica copiata."),
+                                android.widget.Toast.LENGTH_SHORT).show();
+                    });
+                }).start(), diagTexts));
+
         PatchSettings.Feature auto = new PatchSettings.Feature("integrated_shizuku_auto_start",
                 PatchSettings.phrase("Start by itself", "Avvio automatico"),
                 PatchSettings.phrase("After a restart and when the car connects, as soon as the phone is on Wi-Fi.",

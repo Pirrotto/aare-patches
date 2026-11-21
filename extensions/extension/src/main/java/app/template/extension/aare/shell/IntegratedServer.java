@@ -43,6 +43,9 @@ import moe.shizuku.server.IShizukuServiceConnection;
 public final class IntegratedServer extends IShizukuService.Stub {
     static final String TAG = "AareShell";
     static final String NICE_NAME = "aare_shizuku";
+    static final String LOG = "/data/local/tmp/aare_shizuku.log";
+    /** Answered with a text report (log tail, processes), for Settings' "Copy diagnostics". */
+    public static final int TRANSACTION_DIAGNOSTICS = 0x00A4A2E6;
     static final String EXTRA_BINDER = "moe.shizuku.privileged.api.intent.extra.BINDER";
     /** Answered with 1, so AARE can tell this server from the real Shizuku. */
     public static final int TRANSACTION_IS_INTEGRATED = 0x00A4A2E5; // within FIRST..LAST_CALL_TRANSACTION
@@ -154,7 +157,47 @@ public final class IntegratedServer extends IShizukuService.Stub {
             if (reply != null) reply.writeInt(1);
             return true;
         }
+        if (code == TRANSACTION_DIAGNOSTICS) {
+            enforceApp();
+            if (reply != null) reply.writeString(diagnostics());
+            return true;
+        }
         return super.onTransact(code, data, reply, flags);
+    }
+
+    private String diagnostics() {
+        StringBuilder b = new StringBuilder();
+        b.append("server uid=").append(android.os.Process.myUid()).append(" pid=").append(android.os.Process.myPid())
+                .append(" sdk=").append(android.os.Build.VERSION.SDK_INT).append(" se=").append(getSELinuxContext()).append('\n');
+        synchronized (services) {
+            for (Record r : services.values()) {
+                b.append("service ").append(r.key).append(" starting=").append(r.starting)
+                        .append(" alive=").append(r.service != null && r.service.pingBinder()).append('\n');
+            }
+        }
+        b.append(run("ps -A -o PID,USER,NAME | grep -i -e aare -e " + packageName));
+        b.append("--- log\n").append(run("tail -n 40 " + LOG));
+        return b.toString();
+    }
+
+    private static String run(String command) {
+        try {
+            java.lang.Process p = new ProcessBuilder("sh", "-c", command).redirectErrorStream(true).start();
+            p.getOutputStream().close();
+            byte[] out = readAll(p.getInputStream());
+            p.waitFor();
+            return new String(out, StandardCharsets.UTF_8);
+        } catch (Throwable t) {
+            return command + ": " + t + "\n";
+        }
+    }
+
+    private static byte[] readAll(java.io.InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int n;
+        while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
+        return out.toByteArray();
     }
 
     // endregion
@@ -417,10 +460,14 @@ public final class IntegratedServer extends IShizukuService.Stub {
                 start = true;
             }
         }
+        log("addUserService " + key + (start ? " (start)" : " (running)"), null);
         if (start) {
             final Record r = record;
             main.postDelayed(() -> {
-                if (r.starting) remove(r);
+                if (r.starting) {
+                    log("user service didn't attach in 30 s: " + r.key, null);
+                    remove(r);
+                }
             }, 30_000);
             starter.execute(() -> startUserService(r, component.getClassName(), suffix));
         }
@@ -429,12 +476,15 @@ public final class IntegratedServer extends IShizukuService.Stub {
 
     private void startUserService(Record record, String className, String suffix) {
         String process = packageName + ":" + (suffix != null ? suffix : "user_service");
+        // Output to the log file, never to this process's pipes (which close and would kill it).
         String cmd = "(CLASSPATH='" + apk + "' /system/bin/app_process /system/bin --nice-name='" + process + "' "
                 + UserServiceStarter.class.getName() + " --token='" + record.token + "' --package='" + packageName
-                + "' --class='" + className + "' --uid=" + appUid + ")&";
+                + "' --class='" + className + "' --uid=" + appUid + " </dev/null >>" + LOG + " 2>&1)&";
+        log("starting user service " + className + " as " + process, null);
         try {
-            java.lang.Process sh = Runtime.getRuntime().exec("sh");
-            sh.getOutputStream().write(cmd.getBytes(StandardCharsets.UTF_8));
+            java.lang.Process sh = new ProcessBuilder("sh", "-c", cmd)
+                    .redirectOutput(ProcessBuilder.Redirect.appendTo(new File(LOG))).redirectErrorStream(true)
+                    .start();
             sh.getOutputStream().close();
             sh.waitFor();
         } catch (Throwable t) {
@@ -483,6 +533,7 @@ public final class IntegratedServer extends IShizukuService.Stub {
         if (record == null) throw new IllegalArgumentException("unknown user service token");
         record.starting = false;
         record.service = binder;
+        log("user service attached: " + record.key, null);
         try {
             binder.linkToDeath(record.death, 0);
         } catch (Throwable ignored) {
