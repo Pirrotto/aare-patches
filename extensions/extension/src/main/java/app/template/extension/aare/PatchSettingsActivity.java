@@ -409,16 +409,7 @@ public final class PatchSettingsActivity extends Activity {
 
     private void startPairing() {
         askRuntimePermissions();
-        if (!app.template.extension.aare.adb.IntegratedShizuku.developerOptionsEnabled(this)) {
-            android.widget.Toast.makeText(this, PatchSettings.phrase(
-                    "Turn on Developer options first: tap \"Build number\" seven times.",
-                    "Prima attiva le Opzioni sviluppatore: tocca sette volte «Numero build»."), android.widget.Toast.LENGTH_LONG).show();
-            try {
-                startActivity(new Intent(Settings.ACTION_DEVICE_INFO_SETTINGS));
-            } catch (Throwable ignored) {
-            }
-            return;
-        }
+        // Some phones don't report Developer options as on even when they are: just try to open them.
         app.template.extension.aare.adb.IntegratedShizukuService.pair(this);
         Intent wireless = new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
                 .putExtra(":settings:fragment_args_key", "toggle_adb_wireless");
@@ -427,7 +418,16 @@ public final class PatchSettingsActivity extends Activity {
         wireless.putExtra(":settings:show_fragment_args", args);
         try {
             startActivity(wireless.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            // No Developer options yet: they appear after tapping "Build number" seven times.
+            android.widget.Toast.makeText(this, PatchSettings.phrase(
+                    "Turn on Developer options first: tap \"Build number\" seven times.",
+                    "Prima attiva le Opzioni sviluppatore: tocca sette volte «Numero build»."), android.widget.Toast.LENGTH_LONG).show();
+            try {
+                startActivity(new Intent(Settings.ACTION_DEVICE_INFO_SETTINGS));
+            } catch (Throwable ignored) {
+            }
+            return;
         }
         android.widget.Toast.makeText(this, PatchSettings.phrase(
                 "Turn on Wireless debugging, tap \"Pair device with pairing code\" and type the code in AARE's notification.",

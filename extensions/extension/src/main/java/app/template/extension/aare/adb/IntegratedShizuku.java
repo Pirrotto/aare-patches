@@ -81,14 +81,22 @@ public final class IntegratedShizuku {
         return Settings.Global.getInt(cr, "adb_wifi_enabled", 0) == 1;
     }
 
+    /**
+     * The phone is connected to a Wi-Fi network as usual (the one wireless debugging uses). The
+     * app-private network AARE opens to a car it isn't connected to ("use a temporary Wi-Fi network")
+     * doesn't count: wireless debugging says "Wi-Fi disconnected" on it.
+     */
+    @SuppressWarnings("deprecation")
     public static boolean onWifi(Context context) {
         try {
+            android.net.wifi.WifiManager wm = context.getApplicationContext().getSystemService(android.net.wifi.WifiManager.class);
+            android.net.wifi.WifiInfo info = wm != null ? wm.getConnectionInfo() : null;
+            if (info != null && info.getNetworkId() != -1) return true;
             android.net.ConnectivityManager cm = context.getSystemService(android.net.ConnectivityManager.class);
-            android.net.NetworkCapabilities caps = cm.getNetworkCapabilities(cm.getActiveNetwork());
-            if (caps != null && caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) return true;
             for (android.net.Network n : cm.getAllNetworks()) {
                 android.net.NetworkCapabilities c = cm.getNetworkCapabilities(n);
-                if (c != null && c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) return true;
+                if (c != null && c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+                        && c.getNetworkSpecifier() == null) return true;
             }
         } catch (Throwable ignored) {
         }

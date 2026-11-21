@@ -68,16 +68,18 @@ public final class AutoStart {
 
     private static void run(Context context) {
         try {
+            // Tries again until it works or the time is up: Wi-Fi may come and go while the car connects.
             long deadline = System.currentTimeMillis() + WIFI_WAIT_MS;
-            while (!IntegratedShizuku.onWifi(context) && System.currentTimeMillis() < deadline) {
-                Thread.sleep(2000);
+            IntegratedShizuku.Result result = null;
+            while (System.currentTimeMillis() < deadline) {
+                if (IntegratedShizuku.onWifi(context)) {
+                    result = IntegratedShizuku.start(context);
+                    Log.i(TAG, "integrated shizuku: car start " + result);
+                    if (result == IntegratedShizuku.Result.STARTED || result == IntegratedShizuku.Result.ALREADY_RUNNING
+                            || result == IntegratedShizuku.Result.NOT_PAIRED) break;
+                }
+                Thread.sleep(10_000);
             }
-            if (!IntegratedShizuku.onWifi(context)) {
-                Log.i(TAG, "integrated shizuku: no Wi-Fi in the car, not started");
-                return;
-            }
-            IntegratedShizuku.Result result = IntegratedShizuku.start(context);
-            Log.i(TAG, "integrated shizuku: car start " + result);
             if (result == IntegratedShizuku.Result.STARTED) main.post(AutoStart::restartAudio);
         } catch (Throwable t) {
             Log.w(TAG, "integrated shizuku: car start", t);
