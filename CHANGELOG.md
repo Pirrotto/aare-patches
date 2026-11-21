@@ -1,3 +1,9 @@
+## [1.9.6](https://github.com/Pirrotto/aare-patches/compare/v1.9.5...v1.9.6) (2026-11-21)
+
+### 🐛 Bug Fixes
+
+* Keep the integrated Shizuku server alive after the adb command ([3ae3156](https://github.com/Pirrotto/aare-patches/commit/3ae3156cab9527b29e37a26c6cd7f52a4a9b9cc7))
+
 ## [1.9.5](https://github.com/Pirrotto/aare-patches/compare/v1.9.4...v1.9.5) (2026-11-21)
 
 ### 🐛 Bug Fixes
