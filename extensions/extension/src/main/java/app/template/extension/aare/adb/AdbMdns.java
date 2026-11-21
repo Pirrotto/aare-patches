@@ -66,7 +66,9 @@ final class AdbMdns {
                     public void onServiceResolved(NsdServiceInfo resolved) {
                         //noinspection deprecation
                         InetAddress host = resolved.getHost();
-                        if (running && host != null && isThisPhone(host) && isListening(resolved.getPort())) {
+                        // Listening on this phone's loopback: ours (the address can be written in many ways,
+                        // IPv6 with a scope, another interface…).
+                        if (running && host != null && isListening(resolved.getPort())) {
                             listener.onPort(resolved.getPort());
                         }
                     }
@@ -117,6 +119,60 @@ final class AdbMdns {
             mdns.stop();
         }
         return port.get();
+    }
+
+    /**
+     * When mDNS finds nothing (some networks filter it), the adb port is found by trying this phone's
+     * own loopback ports: adbd answers an adb hello with "STLS" (or CNXN/AUTH). Takes a few seconds.
+     */
+    static int scan(long timeoutMillis) {
+        final int from = 30000, to = 65535;
+        final java.util.concurrent.atomic.AtomicInteger found = new java.util.concurrent.atomic.AtomicInteger(-1);
+        final java.util.concurrent.atomic.AtomicInteger next = new java.util.concurrent.atomic.AtomicInteger(from);
+        final long deadline = System.currentTimeMillis() + timeoutMillis;
+        Thread[] workers = new Thread[48];
+        for (int w = 0; w < workers.length; w++) {
+            workers[w] = new Thread(() -> {
+                int port;
+                while (found.get() < 0 && System.currentTimeMillis() < deadline && (port = next.getAndIncrement()) <= to) {
+                    if (isAdb(port)) found.compareAndSet(-1, port);
+                }
+            }, "aare-adb-scan");
+            workers[w].start();
+        }
+        for (Thread t : workers) {
+            try {
+                t.join(Math.max(1, deadline - System.currentTimeMillis()));
+            } catch (InterruptedException ignored) {
+            }
+        }
+        return found.get();
+    }
+
+    private static boolean isAdb(int port) {
+        try (java.net.Socket s = new java.net.Socket()) {
+            s.connect(new InetSocketAddress("127.0.0.1", port), 150);
+            s.setSoTimeout(800);
+            byte[] hello = "host::\u0000".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            java.nio.ByteBuffer b = java.nio.ByteBuffer.allocate(24 + hello.length).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+            int sum = 0;
+            for (byte x : hello) sum += x & 0xFF;
+            b.putInt(0x4e584e43).putInt(0x01000000).putInt(4096).putInt(hello.length).putInt(sum).putInt(0x4e584e43 ^ 0xFFFFFFFF);
+            b.put(hello);
+            s.getOutputStream().write(b.array());
+            byte[] header = new byte[24];
+            int n = 0;
+            java.io.InputStream in = s.getInputStream();
+            while (n < 24) {
+                int r = in.read(header, n, 24 - n);
+                if (r < 0) return false;
+                n += r;
+            }
+            int command = java.nio.ByteBuffer.wrap(header).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt();
+            return command == 0x534C5453 /* STLS */ || command == 0x4e584e43 /* CNXN */ || command == 0x48545541 /* AUTH */;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /** Only the service of this phone, not of another phone on the same Wi-Fi. */

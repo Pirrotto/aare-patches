@@ -198,7 +198,13 @@ public final class IntegratedShizuku {
         }
         String stage = "mdns";
         try {
-            int port = AdbMdns.find(context, AdbMdns.TLS_CONNECT, 15_000);
+            int port = AdbMdns.find(context, AdbMdns.TLS_CONNECT, 10_000);
+            if (port <= 0 && wirelessDebuggingEnabled(cr)) {
+                // mDNS can be filtered on some networks: look for adbd on this phone directly.
+                stage = "port scan";
+                port = AdbMdns.scan(20_000);
+                Log.i(TAG, "integrated shizuku: adb port by scan " + port);
+            }
             if (port <= 0) {
                 lastError(context, "wireless debugging port not found");
                 return wirelessDebuggingEnabled(cr) ? Result.NO_WIFI : Result.WIRELESS_DEBUGGING_OFF;
