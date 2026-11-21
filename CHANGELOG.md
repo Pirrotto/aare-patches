@@ -1,3 +1,9 @@
+## [1.8.0](https://github.com/Pirrotto/aare-patches/compare/v1.7.4...v1.8.0) (2026-11-21)
+
+### ✨ New Features
+
+* AARE assistant and car microphone ([486f5ac](https://github.com/Pirrotto/aare-patches/commit/486f5ac609e56cfd8008953586523e4ed431da0c))
+
 ## [1.7.4](https://github.com/Pirrotto/aare-patches/compare/v1.7.3...v1.7.4) (2026-11-21)
 
 ### 🐛 Bug Fixes
