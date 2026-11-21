@@ -12,6 +12,8 @@ The **Voice messages** patch plays WhatsApp voice messages in the car. When AARE
 
 The **Voice reply** patch (needs Voice messages) lets you answer by voice. After a message is read aloud, a **Reply** card shows on the car screen for 15 seconds, and every message that can be answered gets a **Reply** button in the notification centre. Tap Reply and AARE asks for your answer, listens, shows what you dictate live on the card, reads it back and asks whether to send it: say "yes" / "send" or "no" / "cancel", or tap **Send** / **Cancel**. It works for WhatsApp and any messaging app whose notifications can be answered, and uses the phone's speech recognition (on the phone itself when available) with the phone's microphone.
 
+The **Integrated Shizuku** patch removes the need for the Shizuku app. AARE pairs once with the phone's wireless debugging (Settings → Integrated Shizuku → Pair, then the six-digit code in AARE's notification), and from then on starts its own small Shizuku server as the shell user, the way Shizuku does. AARE's car audio, app launcher and the Voice messages patch use it through the same Shizuku API, unchanged. The server serves AARE only. After a restart AARE starts it again by itself as soon as the phone is on Wi-Fi (it switches wireless debugging on just for the start, and off again). Wireless debugging needs Wi-Fi, so after a restart the phone must join a Wi-Fi network once before the car audio through Shizuku works.
+
 The **Settings** patch (included with every other patch) adds a **Settings** row at the end of AARE's settings home. It opens a screen in AARE's style with one switch and a short description for each installed patch: Voice messages and Voice reply can be turned off there without patching again, and Background location shows whether *Allow all the time* is granted (tap it to open the permission). Each patch registers its own switch, so a new release of the patches brings its new switches by itself.
 
 The patches only accept the official AARE releases, signed with the AARE release key published in its README.
@@ -53,3 +55,11 @@ Based on the [Morphe patches template](https://github.com/MorpheApp/morphe-patch
 ## 📜 License
 
 AARE Background Location Patches are licensed under the [GNU General Public License v3.0](LICENSE).
+
+## 🙏 Credits
+
+The Integrated Shizuku patch builds on the work of others:
+
+- [Shizuku](https://github.com/RikkaApps/Shizuku) (Apache-2.0) and [Shizuku-API](https://github.com/RikkaApps/Shizuku-API) (MIT): adb client, pairing flow and the server protocol AARE speaks.
+- [libadb-android](https://github.com/MuntashirAkon/libadb-android) (GPL-3.0-or-later or Apache-2.0): the pairing protocol.
+- [spake2-java](https://github.com/MuntashirAkon/spake2-java) (LGPL-3.0, included unchanged under `extensions/extension/src/main/java/io/github/muntashirakon`): SPAKE2, compatible with BoringSSL.

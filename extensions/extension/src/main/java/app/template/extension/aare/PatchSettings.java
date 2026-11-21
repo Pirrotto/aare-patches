@@ -31,6 +31,7 @@ public final class PatchSettings {
     public static final String BACKGROUND_LOCATION = "background_location";
     public static final String VOICE_MESSAGES = "voice_messages";
     public static final String VOICE_REPLY = "voice_reply";
+    public static final String INTEGRATED_SHIZUKU = "integrated_shizuku";
 
     /** One switch of the screen. */
     static final class Feature {
@@ -96,6 +97,15 @@ public final class PatchSettings {
             + "M12,11.5c-1.38,0 -2.5,-1.12 -2.5,-2.5s1.12,-2.5 2.5,-2.5 2.5,1.12 2.5,2.5 -1.12,2.5 -2.5,2.5z";
     private static final String ICON_MIC = "M12,14c1.66,0 2.99,-1.34 2.99,-3L15,5c0,-1.66 -1.34,-3 -3,-3S9,3.34 9,5v6c0,1.66 1.34,3 3,3z"
             + "M17.3,11c0,3 -2.54,5.1 -5.3,5.1S6.7,14 6.7,11L5,11c0,3.41 2.72,6.23 6,6.72L11,21h2v-3.28c3.28,-0.48 6,-3.3 6,-6.72h-1.7z";
+    static final String ICON_DEVELOPER = "M7,5h10v2h2L19,3c0,-1.1 -0.9,-1.99 -2,-1.99L7,1c-1.1,0 -2,0.9 -2,2v4h2L7,5z"
+            + "M15.41,16.59L20,12l-4.59,-4.59L14,8.83 17.17,12 14,15.17l1.41,1.42z"
+            + "M10,15.17L6.83,12 10,8.83 8.59,7.41 4,12l4.59,4.59L10,15.17z"
+            + "M17,19L7,19v-2L5,17v4c0,1.1 0.9,2 2,2h10c1.1,0 2,-0.9 2,-2v-4h-2v2z";
+    static final String ICON_LINK = "M3.9,12c0,-1.71 1.39,-3.1 3.1,-3.1h4L11,7L7,7c-2.76,0 -5,2.24 -5,5s2.24,5 5,5h4v-1.9L7,15.1"
+            + "c-1.71,0 -3.1,-1.39 -3.1,-3.1zM8,13h8v-2L8,11v2zM17,7h-4v1.9h4c1.71,0 3.1,1.39 3.1,3.1s-1.39,3.1 -3.1,3.1h-4V17h4"
+            + "c2.76,0 5,-2.24 5,-5s-2.24,-5 -5,-5z";
+    static final String ICON_PLAY = "M8,5v14l11,-7z";
+    static final String ICON_STOP = "M6,6h12v12H6z";
     private static final String ICON_REPLY = "M10,9V5l-7,7 7,7v-4.1c5,0 8.5,1.6 11,5.1 -1,-5 -4,-10 -11,-11z";
 
     private static List<Feature> known() {
@@ -118,7 +128,14 @@ public final class PatchSettings {
                                         + "dictate the answer, then confirm to send it.",
                                 "Dopo la lettura mostra «Rispondi» per 15 secondi e nel centro notifiche: "
                                         + "detti la risposta e confermi l'invio."),
-                        false, ICON_REPLY));
+                        false, ICON_REPLY),
+                new Feature(INTEGRATED_SHIZUKU,
+                        phrase("Integrated Shizuku", "Shizuku integrato"),
+                        phrase("Car audio and voice messages without the Shizuku app: AARE pairs with wireless debugging "
+                                        + "once and starts by itself after each restart, on Wi-Fi.",
+                                "Audio in auto e vocali senza l'app Shizuku: AARE si accoppia una volta col debug wireless "
+                                        + "e si riavvia da sola dopo ogni riavvio, col Wi-Fi."),
+                        false, ICON_DEVELOPER));
     }
 
     // endregion
@@ -241,7 +258,7 @@ public final class PatchSettings {
 
     // endregion
 
-    static String phrase(String english, String italian) {
+    public static String phrase(String english, String italian) {
         return "it".equals(Locale.getDefault().getLanguage()) ? italian : english;
     }
 }
