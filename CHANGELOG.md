@@ -1,3 +1,9 @@
+## [1.9.2](https://github.com/Pirrotto/aare-patches/compare/v1.9.1...v1.9.2) (2026-11-21)
+
+### 🐛 Bug Fixes
+
+* Integrated Shizuku start report and Shizuku app detection ([de359d7](https://github.com/Pirrotto/aare-patches/commit/de359d7a9e171622316c888e8f20a1989f386570))
+
 ## [1.9.1](https://github.com/Pirrotto/aare-patches/compare/v1.9.0...v1.9.1) (2026-11-21)
 
 ### 🐛 Bug Fixes
