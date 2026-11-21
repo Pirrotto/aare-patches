@@ -48,7 +48,7 @@ public final class UserServiceStarter {
             IShizukuService.Stub.asInterface(server).attachUserService(service, options);
             Log.i(TAG, "user service " + cls + " started");
         } catch (Throwable t) {
-            Log.e(TAG, "unable to start user service " + cls, t);
+            IntegratedServer.log("unable to start user service " + cls, t);
             System.exit(1);
         }
         Looper.loop();

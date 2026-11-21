@@ -300,6 +300,7 @@ public final class PatchSettingsActivity extends Activity {
 
         TextView[] status = new TextView[2];
         card.addView(actionRow(PatchSettings.ICON_DEVELOPER, "", "", null, status));
+        status[1].setTextIsSelectable(true); // the last error can be copied
 
         TextView[] pairTexts = new TextView[2];
         card.addView(actionRow(PatchSettings.ICON_LINK,
@@ -353,6 +354,9 @@ public final class PatchSettingsActivity extends Activity {
                     "AARE usa l'app Shizuku; quello integrato non serve finché è attiva.")
                     : paired ? PatchSettings.phrase("Tap Start, or it starts by itself after the next restart.",
                     "Tocca Avvia, oppure parte da solo al prossimo riavvio.")
+                    + (app.template.extension.aare.adb.IntegratedShizuku.lastError(this) != null
+                    ? "\n" + PatchSettings.phrase("Last error: ", "Ultimo errore: ")
+                    + app.template.extension.aare.adb.IntegratedShizuku.lastError(this) : "")
                     : PatchSettings.phrase("Pair it once, below.", "Accoppialo una volta, qui sotto."));
             pairTexts[0].setText(paired ? PatchSettings.phrase("Pair again", "Accoppia di nuovo")
                     : PatchSettings.phrase("Pair with wireless debugging", "Accoppia col debug wireless"));

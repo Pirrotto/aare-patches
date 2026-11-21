@@ -194,8 +194,9 @@ public final class IntegratedShizukuService extends Service {
                                 "Il debug wireless funziona solo col Wi-Fi: collegati a una rete Wi-Fi, poi riavvia."));
                 break;
             default:
+                String why = IntegratedShizuku.lastError(this);
                 finish(text("Integrated Shizuku didn't start", "Shizuku integrato non è partito"),
-                        text("Try again; if it keeps failing, send the log.", "Riprova; se continua, manda il log."));
+                        text("Details: ", "Dettagli: ") + (why != null ? why : "-"));
         }
     }
 

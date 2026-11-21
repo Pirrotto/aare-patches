@@ -22,6 +22,17 @@ import rikka.shizuku.Shizuku;
 public final class IntegratedShizuku {
     private static final String TAG = "AarePatches";
     private static final String SERVER_NAME = "aare_shizuku_server";
+    private static final String SERVER_LOG = "/data/local/tmp/aare_shizuku.log";
+
+    /** Why the last start failed, shown in the notification and in Settings (null after a start). */
+    public static String lastError(Context context) {
+        return context.getSharedPreferences("aare_integrated_shizuku", Context.MODE_PRIVATE).getString("last_error", null);
+    }
+
+    private static void lastError(Context context, String error) {
+        context.getSharedPreferences("aare_integrated_shizuku", Context.MODE_PRIVATE).edit().putString("last_error", error).apply();
+        if (error != null) Log.w(TAG, "integrated shizuku: " + error);
+    }
 
     /** How a start ended, for the notification. */
     public enum Result {
@@ -153,36 +164,51 @@ public final class IntegratedShizuku {
                 return Result.WIRELESS_DEBUGGING_OFF;
             }
         }
+        String stage = "mdns";
         try {
             int port = AdbMdns.find(context, AdbMdns.TLS_CONNECT, 15_000);
-            if (port <= 0) return wirelessDebuggingEnabled(cr) ? Result.NO_WIFI : Result.WIRELESS_DEBUGGING_OFF;
+            if (port <= 0) {
+                lastError(context, "wireless debugging port not found");
+                return wirelessDebuggingEnabled(cr) ? Result.NO_WIFI : Result.WIRELESS_DEBUGGING_OFF;
+            }
+            stage = "adb connect";
             AdbKey key = new AdbKey(context);
             try (AdbClient adb = new AdbClient(key, "127.0.0.1", port)) {
                 String pkg = context.getPackageName();
                 String apk = context.getApplicationInfo().sourceDir;
                 int uid = android.os.Process.myUid();
                 // Lets AARE switch wireless debugging on by itself next time (and after a reboot).
+                stage = "pm grant";
                 adb.shell("pm grant " + pkg + " " + Manifest.permission.WRITE_SECURE_SETTINGS + " 2>/dev/null");
+                stage = "start server";
                 String output = adb.shell("kill $(pidof " + SERVER_NAME + ") 2>/dev/null; "
                         + "CLASSPATH='" + apk + "' setsid /system/bin/app_process /system/bin --nice-name=" + SERVER_NAME + " "
                         + IntegratedServer.class.getName() + " " + pkg + " " + uid + " '" + apk + "'"
-                        + " </dev/null >/dev/null 2>&1 & echo started");
+                        + " </dev/null >" + SERVER_LOG + " 2>&1 & echo started");
                 Log.i(TAG, "integrated shizuku: " + output.trim());
+
+                // The server sends its binder within a couple of seconds.
+                stage = "wait binder";
+                for (int i = 0; i < 40; i++) {
+                    if (isRunning()) {
+                        lastError(context, null);
+                        return Result.STARTED;
+                    }
+                    Thread.sleep(250);
+                }
+                // What happened, for the notification and Settings.
+                String why = adb.shell("echo pid: $(pidof " + SERVER_NAME + "); tail -n 12 " + SERVER_LOG + " 2>&1");
+                lastError(context, "server: " + why.trim()
+                        + (anyShizukuRunning() ? " | binder: not ours" : " | binder: none"));
+                return Result.FAILED;
             } catch (AdbClient.NotPairedException e) {
                 setPaired(context, false);
+                lastError(context, "adb: key not paired anymore");
                 return Result.NOT_PAIRED;
             }
-            // The server sends its binder within a couple of seconds.
-            for (int i = 0; i < 40; i++) {
-                if (isRunning()) return Result.STARTED;
-                Thread.sleep(250);
-            }
-            return Result.FAILED;
-        } catch (IOException e) {
-            Log.w(TAG, "integrated shizuku: start", e);
-            return Result.FAILED;
         } catch (Throwable t) {
             Log.w(TAG, "integrated shizuku: start", t);
+            lastError(context, stage + ": " + t);
             return Result.FAILED;
         } finally {
             if (switchedOn) {

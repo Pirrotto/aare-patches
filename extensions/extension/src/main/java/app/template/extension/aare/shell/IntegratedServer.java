@@ -45,7 +45,7 @@ public final class IntegratedServer extends IShizukuService.Stub {
     static final String NICE_NAME = "aare_shizuku";
     static final String EXTRA_BINDER = "moe.shizuku.privileged.api.intent.extra.BINDER";
     /** Answered with 1, so AARE can tell this server from the real Shizuku. */
-    public static final int TRANSACTION_IS_INTEGRATED = ('A' << 24) | ('A' << 16) | ('R' << 8) | 'E';
+    public static final int TRANSACTION_IS_INTEGRATED = 0x00A4A2E5; // within FIRST..LAST_CALL_TRANSACTION
 
     private static final int SERVER_VERSION = 13;
     private static final int SERVER_PATCH_VERSION = 6;
@@ -67,14 +67,27 @@ public final class IntegratedServer extends IShizukuService.Stub {
     private final Map<String, Record> services = new HashMap<>();
     private int deliveredToPid = -1;
 
+    /** To logcat and to stderr, which the start command keeps in /data/local/tmp/aare_shizuku.log. */
+    static void log(String message, Throwable t) {
+        if (t == null) Log.i(TAG, message);
+        else Log.w(TAG, message, t);
+        System.err.println(message + (t != null ? ": " + t : ""));
+        if (t != null) t.printStackTrace();
+        System.err.flush();
+    }
+
     public static void main(String[] args) {
         Looper.prepareMainLooper();
         if (args.length < 3) {
-            Log.e(TAG, "usage: IntegratedServer <package> <uid> <apk>");
+            log("usage: IntegratedServer <package> <uid> <apk>", null);
             System.exit(1);
         }
+        Thread.setDefaultUncaughtExceptionHandler((thread, e) -> {
+            log("crash", e);
+            System.exit(1);
+        });
         IntegratedServer server = new IntegratedServer(args[0], Integer.parseInt(args[1]), args[2]);
-        Log.i(TAG, "integrated Shizuku started for " + args[0] + " as uid " + android.os.Process.myUid());
+        log("integrated Shizuku started for " + args[0] + " as uid " + android.os.Process.myUid(), null);
         server.watchApp();
         Looper.loop();
     }
@@ -96,9 +109,9 @@ public final class IntegratedServer extends IShizukuService.Stub {
                 extras.putParcelable(EXTRA_BINDER, new BinderContainer(this));
                 Providers.call(Providers.authority(packageName), "sendBinder", extras);
                 deliveredToPid = pid;
-                Log.i(TAG, "binder sent to " + packageName + " (pid " + pid + ")");
+                log("binder sent to " + packageName + " (pid " + pid + ")", null);
             } catch (Throwable t) {
-                Log.w(TAG, "sendBinder", t);
+                log("sendBinder failed", t);
             }
         }
         main.postDelayed(this::watchApp, 2000);
@@ -425,7 +438,7 @@ public final class IntegratedServer extends IShizukuService.Stub {
             sh.getOutputStream().close();
             sh.waitFor();
         } catch (Throwable t) {
-            Log.e(TAG, "start user service " + className, t);
+            log("start user service " + className, t);
             remove(record);
         }
     }
