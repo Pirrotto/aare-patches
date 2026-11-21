@@ -240,7 +240,9 @@ public final class IntegratedShizuku {
                 String output = adb.shell("kill $(pidof " + SERVER_NAME + ") 2>/dev/null; : >" + SERVER_LOG + "; "
                         + "CLASSPATH='" + apk + "' setsid /system/bin/app_process /system/bin --nice-name=" + SERVER_NAME + " "
                         + IntegratedServer.class.getName() + " " + pkg + " " + uid + " '" + apk + "'"
-                        + " </dev/null >>" + SERVER_LOG + " 2>&1 & echo started");
+                        // adb kills the command's process group when the command ends: give setsid time to
+                        // move the server out of it before ending.
+                        + " </dev/null >>" + SERVER_LOG + " 2>&1 & sleep 3; echo started pid=$(pidof " + SERVER_NAME + ")");
                 Log.i(TAG, "integrated shizuku: " + output.trim());
 
                 // The server sends its binder within a few seconds.
