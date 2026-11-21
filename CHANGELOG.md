@@ -1,3 +1,9 @@
+## [1.9.1](https://github.com/Pirrotto/aare-patches/compare/v1.9.0...v1.9.1) (2026-11-21)
+
+### 🐛 Bug Fixes
+
+* Integrated Shizuku user services, car microphone end of speech ([a46b72c](https://github.com/Pirrotto/aare-patches/commit/a46b72cbde38ab1a51429190a95a44fa9dc259eb))
+
 ## [1.9.0](https://github.com/Pirrotto/aare-patches/compare/v1.8.1...v1.9.0) (2026-11-21)
 
 ### ✨ New Features
