@@ -1,3 +1,9 @@
+## [1.9.0](https://github.com/Pirrotto/aare-patches/compare/v1.8.1...v1.9.0) (2026-11-21)
+
+### ✨ New Features
+
+* AARE assistant in German ([d87496c](https://github.com/Pirrotto/aare-patches/commit/d87496cb04e89f00aa4ea94a64616cac54f877f6))
+
 ## [1.8.1](https://github.com/Pirrotto/aare-patches/compare/v1.8.0...v1.8.1) (2026-11-21)
 
 ### 🐛 Bug Fixes
