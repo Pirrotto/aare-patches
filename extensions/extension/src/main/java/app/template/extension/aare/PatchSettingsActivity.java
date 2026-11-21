@@ -282,10 +282,11 @@ public final class PatchSettingsActivity extends Activity {
 
         card.addView(text(PatchSettings.phrase("Integrated Shizuku", "Shizuku integrato"), Type.TITLE_MEDIUM, colors.onSurface));
         TextView hint = text(PatchSettings.phrase(
-                "AARE starts its own Shizuku through wireless debugging: no Shizuku app needed. Pair once; after a "
-                        + "restart AARE starts it again by itself as soon as the phone is on Wi-Fi.",
+                "AARE starts its own Shizuku through wireless debugging: no Shizuku app needed. Pair once; then AARE "
+                        + "starts it by itself after a restart and when the car connects, on any Wi-Fi (the car's too).",
                 "AARE avvia il suo Shizuku tramite il debug wireless: l'app Shizuku non serve. Accoppia una volta; "
-                        + "dopo un riavvio AARE lo riavvia da sola appena il telefono è sul Wi-Fi."),
+                        + "poi AARE lo avvia da sola dopo un riavvio e quando ti colleghi all'auto, con qualsiasi Wi-Fi "
+                        + "(anche quello dell'auto)."),
                 Type.BODY_SMALL, colors.onSurfaceVariant);
         LinearLayout.LayoutParams hintParams = wrap();
         hintParams.topMargin = dp(8);
@@ -324,8 +325,9 @@ public final class PatchSettingsActivity extends Activity {
         card.addView(startRow);
 
         PatchSettings.Feature auto = new PatchSettings.Feature("integrated_shizuku_auto_start",
-                PatchSettings.phrase("Start after a restart", "Avvia dopo un riavvio"),
-                PatchSettings.phrase("As soon as the phone is on Wi-Fi.", "Appena il telefono è sul Wi-Fi."),
+                PatchSettings.phrase("Start by itself", "Avvio automatico"),
+                PatchSettings.phrase("After a restart and when the car connects, as soon as the phone is on Wi-Fi.",
+                        "Dopo un riavvio e quando ti colleghi all'auto, appena il telefono è sul Wi-Fi."),
                 false, PatchSettings.ICON_PLAY);
         View autoRow = row(auto);
         M3Switch autoSwitch = (M3Switch) ((LinearLayout) autoRow).getChildAt(2);
