@@ -150,6 +150,11 @@ public final class PatchSettingsActivity extends Activity {
 
         content.addView(section());
         for (PatchSettings.Feature f : PatchSettings.features()) {
+            if (PatchSettings.AARE_ASSISTANT.equals(f.key)) {
+                LinearLayout.LayoutParams params = wrap();
+                params.topMargin = dp(16);
+                content.addView(assistantSection(), params);
+            }
             if (PatchSettings.INTEGRATED_SHIZUKU.equals(f.key)) {
                 LinearLayout.LayoutParams params = wrap();
                 params.topMargin = dp(16);
@@ -266,6 +271,60 @@ public final class PatchSettingsActivity extends Activity {
         toggle.setOnClickListener(v -> row.performClick());
         return row;
     }
+
+    // region AARE assistant
+
+    private static final String[] LANGUAGES = {"auto", "it", "de", "en"};
+
+    private String languageName(String code) {
+        switch (code) {
+            case "it":
+                return "Italiano";
+            case "de":
+                return "Deutsch";
+            case "en":
+                return "English";
+            default:
+                return PatchSettings.phrase("Same as the phone", "Come il telefono");
+        }
+    }
+
+    /** The assistant's card: its language (the words it understands, its voice and answers). */
+    private View assistantSection() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable shape = new GradientDrawable();
+        shape.setColor(colors.surfaceContainer);
+        shape.setCornerRadius(dp(24));
+        card.setBackground(shape);
+        card.setClipToOutline(true);
+        card.setPadding(dp(20), dp(20), dp(20), dp(20));
+
+        card.addView(text(PatchSettings.phrase("AARE assistant", "Assistente AARE"), Type.TITLE_MEDIUM, colors.onSurface));
+        TextView hint = text(PatchSettings.phrase(
+                "The language you speak to it. Speech recognition works offline once Android's offline speech for that "
+                        + "language is downloaded (Settings > System > Languages > Speech > On-device recognition).",
+                "La lingua in cui gli parli. Il riconoscimento funziona anche offline dopo aver scaricato la lingua "
+                        + "(Impostazioni > Sistema > Lingue > Voce > Riconoscimento sul dispositivo)."),
+                Type.BODY_SMALL, colors.onSurfaceVariant);
+        LinearLayout.LayoutParams hintParams = wrap();
+        hintParams.topMargin = dp(8);
+        hintParams.bottomMargin = dp(8);
+        card.addView(hint, hintParams);
+
+        TextView[] texts = new TextView[2];
+        card.addView(actionRow(PatchSettings.ICON_ASSISTANT, PatchSettings.phrase("Language", "Lingua"), "", v -> {
+            String current = PatchSettings.assistantLanguage();
+            int i = java.util.Arrays.asList(LANGUAGES).indexOf(current);
+            String next = LANGUAGES[(i + 1) % LANGUAGES.length];
+            PatchSettings.setAssistantLanguage(this, next);
+            texts[1].setText(languageName(next));
+        }, texts));
+        texts[1].setText(languageName(PatchSettings.assistantLanguage()));
+        return card;
+    }
+
+    // endregion
 
     // region Integrated Shizuku
 

@@ -18,7 +18,7 @@ internal object CarRuntimeAssistantFingerprint : Fingerprint(
 @Suppress("unused")
 val aareAssistantPatch = patch(
     name = "AARE assistant",
-    description = "The voice button opens AARE's own assistant on the car screen, in Italian or English: navigation, " +
+    description = "The voice button opens AARE's own assistant on the car screen, in Italian, German or English: navigation, " +
         "music, messages and replies, calls, the time. For anything else it opens the phone's assistant (Google).",
     default = true,
 ) {

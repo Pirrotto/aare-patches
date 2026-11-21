@@ -70,9 +70,9 @@ public final class VoiceReply {
 
     private static final Set<String> YES = new HashSet<>(Arrays.asList(
             "si", "invia", "inviala", "invialo", "manda", "mandala", "mandalo", "ok", "okay", "certo", "conferma",
-            "yes", "yeah", "send", "sure"));
+            "yes", "yeah", "send", "sure", "ja", "jawohl", "genau", "klar", "senden", "schick", "schicken", "gerne"));
     private static final Set<String> NO = new HashSet<>(Arrays.asList(
-            "no", "annulla", "cancella", "lascia", "stop", "basta", "cancel", "dont"));
+            "no", "annulla", "cancella", "lascia", "stop", "basta", "cancel", "dont", "nein", "abbrechen", "nicht", "stopp"));
 
     private VoiceReply() {
     }

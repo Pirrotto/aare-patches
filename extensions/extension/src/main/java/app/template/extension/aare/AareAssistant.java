@@ -108,13 +108,13 @@ public final class AareAssistant {
 
     private static void listenForCommand() {
         state = State.COMMAND;
-        showCard(phrase("Listening…", "Ti ascolto…"), action(phrase("Cancel", "Annulla"), () -> finish(null)));
+        showCard(tr("Listening…", "Ti ascolto…", "Ich höre…"), action(tr("Cancel", "Annulla", "Abbrechen"), () -> finish(null)));
         listen(false);
     }
 
     private static void onCommand(String heard) {
         if (heard == null || heard.trim().isEmpty()) {
-            finish(phrase("I didn't catch that.", "Non ho capito."));
+            finish(tr("I didn't catch that.", "Non ho capito.", "Das habe ich nicht verstanden."));
             return;
         }
         showCard(capitalize(heard.trim()));
@@ -122,7 +122,7 @@ public final class AareAssistant {
             handle(heard.trim());
         } catch (Throwable t) {
             Log.w(TAG, "command", t);
-            finish(phrase("Something went wrong.", "Qualcosa è andato storto."));
+            finish(tr("Something went wrong.", "Qualcosa è andato storto.", "Etwas ist schiefgelaufen."));
         }
     }
 
@@ -131,8 +131,8 @@ public final class AareAssistant {
         state = State.CONFIRM;
         onYes = yes;
         showCard(question,
-                action(phrase("Yes", "Sì"), AareAssistant::confirmed),
-                action(phrase("No", "No"), () -> finish(phrase("OK.", "Va bene."))));
+                action(tr("Yes", "Sì", "Ja"), AareAssistant::confirmed),
+                action(tr("No", "No", "Nein"), () -> finish(tr("OK.", "Va bene.", "In Ordnung."))));
         say(question, () -> {
             if (state == State.CONFIRM) listen(true);
         });
@@ -152,7 +152,7 @@ public final class AareAssistant {
         state = State.DICTATE;
         dictationTitle = title;
         onDictated = then;
-        showCard(title + ": " + phrase("speak now…", "parla ora…"), action(phrase("Cancel", "Annulla"), () -> finish(null)));
+        showCard(title + ": " + tr("speak now…", "parla ora…", "sprich jetzt…"), action(tr("Cancel", "Annulla", "Abbrechen"), () -> finish(null)));
         say(question, () -> {
             if (state == State.DICTATE) listen(false);
         });
@@ -179,44 +179,53 @@ public final class AareAssistant {
 
     // region Understanding
 
-    private static final String ARTICLES = "(?:a|ad|al|allo|alla|ai|agli|alle|all|in|nel|nello|nella|da|dal|dallo|dalla|verso|per|fino a|to|the)";
+    private static final String ARTICLES = "(?:a|ad|al|allo|alla|ai|agli|alle|all|in|nel|nello|nella|da|dal|dallo|dalla|verso|per|fino a|to|the|"
+            + "nach|zu|zum|zur|ins|in die|in den|an den|an die|bis|bis zum|bis zur)";
 
     private static final Pattern REPLY_WITH_TEXT = Pattern.compile(
-            "^(?:rispondi|rispondere|scrivi|scrivere|manda un messaggio|invia un messaggio|reply|answer|text|message|send a message)"
-                    + "(?: a| ad| to)? (.+?)(?: che | dicendo | dicendogli | dicendole | di | that | saying )(.+)$");
+            "^(?:rispondi|rispondere|scrivi|scrivere|manda un messaggio|invia un messaggio|reply|answer|text|message|send a message|"
+                    + "antworte|antworten|schreib|schreibe|schicke|sende)"
+                    + "(?: a| ad| to| an)? (.+?)(?: che | dicendo | dicendogli | dicendole | di | that | saying | dass | das )(.+)$");
     private static final Pattern REPLY = Pattern.compile(
-            "^(?:rispondi|rispondere|scrivi|scrivere|manda un messaggio|invia un messaggio|reply|answer|text|message|send a message)"
-                    + "(?: a| ad| to)? (.+)$");
-    private static final Pattern CALL = Pattern.compile("^(?:chiama|chiamare|telefona|telefonare|call|phone|ring)(?: a| ad| to)? (.+)$");
+            "^(?:rispondi|rispondere|scrivi|scrivere|manda un messaggio|invia un messaggio|reply|answer|text|message|send a message|"
+                    + "antworte|antworten|schreib|schreibe|schicke|sende)"
+                    + "(?: a| ad| to| an)? (.+)$");
+    /** German "ruf Anna an". */
+    private static final Pattern CALL_DE = Pattern.compile("^(?:ruf|rufe)(?: bitte)? (.+) an$");
+    private static final Pattern CALL = Pattern.compile("^(?:chiama|chiamare|telefona|telefonare|call|phone|ring|anrufen|telefoniere mit)(?: a| ad| to)? (.+)$");
     private static final Pattern NAVIGATE = Pattern.compile(
             "^(?:portami|accompagnami|guidami|naviga|navigare|navigazione|vai|andiamo|andare|indicazioni|percorso|"
-                    + "take me|navigate|drive|go|directions|get me)(?: verso| fino| per| to)?(?: " + ARTICLES + ")? (.+)$");
-    private static final Pattern OPEN = Pattern.compile("^(?:apri|aprire|mostra|mostrami|fammi vedere|open|show)(?: me)?(?: il| lo| la| l| i| gli| le| the)? (.+)$");
+                    + "take me|navigate|drive|go|directions|get me|"
+                    + "bring mich|navigiere|navigation|fahr|fahre|fahren|route|wegbeschreibung|fuhre mich)(?: verso| fino| per| to)?(?: " + ARTICLES + ")? (.+)$");
+    private static final Pattern OPEN = Pattern.compile("^(?:apri|aprire|mostra|mostrami|fammi vedere|open|show|offne|zeig|zeige)(?: me| mir)?(?: il| lo| la| l| i| gli| le| the| die| den| das)? (.+)$");
 
     private static void handle(String heard) throws Exception {
         String text = plain(heard);
         Matcher m;
 
-        if (matchesAny(text, "annulla", "niente", "lascia stare", "lascia perdere", "nulla", "cancel", "never mind", "nothing")) {
-            finish(phrase("OK.", "Va bene."));
+        if (matchesAny(text, "annulla", "niente", "lascia stare", "lascia perdere", "nulla", "cancel", "never mind", "nothing",
+                "abbrechen", "vergiss es", "nichts", "egal")) {
+            finish(tr("OK.", "Va bene.", "In Ordnung."));
             return;
         }
 
         // Trip and time first: "prossima svolta" isn't the next song.
         if (containsAny(text, "quanto manca", "quando arrivo", "a che ora arrivo", "arrivo previsto", "prossima svolta",
-                "how long", "when do we arrive", "when will we arrive", "next turn", "eta")) {
+                "how long", "when do we arrive", "when will we arrive", "next turn", "eta",
+                "wie lange noch", "wann komme ich an", "wann kommen wir an", "ankunft", "nachste abbiegung", "wie weit noch")) {
             tripStatus();
             return;
         }
-        if (containsAny(text, "che ore sono", "che ora e", "che ora sono", "what time", "the time")) {
-            finish(phrase("It's ", "Sono le ") + DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date()) + ".");
+        if (containsAny(text, "che ore sono", "che ora e", "che ora sono", "what time", "the time", "wie spat", "wie viel uhr", "uhrzeit")) {
+            finish(tr("It's ", "Sono le ", "Es ist ") + DateFormat.getTimeInstance(DateFormat.SHORT, locale()).format(new Date()) + ".");
             return;
         }
-        if (containsAny(text, "che giorno", "che data", "quanti ne abbiamo", "what day", "what date", "the date")) {
-            finish(capitalize(DateFormat.getDateInstance(DateFormat.FULL).format(new Date())) + ".");
+        if (containsAny(text, "che giorno", "che data", "quanti ne abbiamo", "what day", "what date", "the date",
+                "welcher tag", "welches datum", "der wievielte", "datum")) {
+            finish(capitalize(DateFormat.getDateInstance(DateFormat.FULL, locale()).format(new Date())) + ".");
             return;
         }
-        if (containsAny(text, "batteria", "battery")) {
+        if (containsAny(text, "batteria", "battery", "akku", "batterie")) {
             batteryStatus();
             return;
         }
@@ -225,17 +234,25 @@ public final class AareAssistant {
             replyTo(m.group(1), original(heard, m.group(2)));
             return;
         }
-        if (containsAny(text, "messaggi", "messaggio", "messages", "message") && !text.startsWith("rispondi")
-                && !text.startsWith("scrivi") && !text.startsWith("reply")) {
+        if (containsAny(text, "messaggi", "messaggio", "messages", "message", "nachrichten", "nachricht") && !text.startsWith("rispondi")
+                && !text.startsWith("scrivi") && !text.startsWith("reply") && !text.startsWith("antworte")
+                && !text.startsWith("schreib")) {
             readMessages();
             return;
         }
         if ((m = REPLY.matcher(text)).matches()) {
-            replyTo(m.group(1), null);
+            // "Schreib Marco ich komme später", "scrivi a Marco arrivo tardi": the name, then the message.
+            String[] words = m.group(1).split(" ");
+            if (words.length >= 3) {
+                String rest = m.group(1).substring(words[0].length() + 1);
+                replyTo(words[0], original(heard, rest));
+            } else {
+                replyTo(m.group(1), null);
+            }
             return;
         }
-        if ((m = CALL.matcher(text)).matches()) {
-            call(m.group(1).replaceFirst("^(?:il|lo|la|l|mio|mia|my|the) ", ""));
+        if ((m = CALL_DE.matcher(text)).matches() || (m = CALL.matcher(text)).matches()) {
+            call(m.group(1).replaceFirst("^(?:il|lo|la|l|mio|mia|my|the|meine|meinen|die|den) ", ""));
             return;
         }
 
@@ -247,15 +264,18 @@ public final class AareAssistant {
             return;
         }
 
-        if (containsAny(text, "modalita notte", "tema scuro", "schermo scuro", "modalita scura", "dark mode", "night mode")) {
+        if (containsAny(text, "modalita notte", "tema scuro", "schermo scuro", "modalita scura", "dark mode", "night mode",
+                "nachtmodus", "dunkelmodus", "dunkler modus")) {
             display("dark");
             return;
         }
-        if (containsAny(text, "modalita giorno", "tema chiaro", "schermo chiaro", "modalita chiara", "light mode", "day mode")) {
+        if (containsAny(text, "modalita giorno", "tema chiaro", "schermo chiaro", "modalita chiara", "light mode", "day mode",
+                "tagmodus", "heller modus")) {
             display("light");
             return;
         }
-        if (matchesAny(text, "home", "mappa", "schermata principale", "pagina iniziale", "torna alla mappa", "map", "home screen")) {
+        if (matchesAny(text, "home", "mappa", "schermata principale", "pagina iniziale", "torna alla mappa", "map", "home screen",
+                "karte", "startseite", "zur karte")) {
             open("home");
             return;
         }
@@ -274,12 +294,14 @@ public final class AareAssistant {
 
     private static String mediaAction(String text) {
         if (text.split(" ").length > 5) return null;
-        if (containsAny(text, "pausa", "metti in pausa", "ferma la musica", "stop musica", "silenzio", "pause", "stop the music")
-                || matchesAny(text, "stop", "ferma")) return "pause";
-        if (containsAny(text, "prossima", "successiva", "canzone dopo", "salta", "next", "skip") || matchesAny(text, "avanti")) return "next";
-        if (containsAny(text, "precedente", "canzone prima", "previous", "go back") || matchesAny(text, "indietro", "back")) return "previous";
-        if (containsAny(text, "riprendi", "continua", "riproduci", "metti la musica", "fai partire", "musica", "play", "resume", "music"))
-            return "play";
+        if (containsAny(text, "pausa", "metti in pausa", "ferma la musica", "stop musica", "silenzio", "pause", "stop the music",
+                "musik aus", "musik stoppen", "anhalten") || matchesAny(text, "stop", "ferma", "stopp")) return "pause";
+        if (containsAny(text, "prossima", "successiva", "canzone dopo", "salta", "next", "skip", "nachster", "nachstes", "nachste",
+                "uberspringen") || matchesAny(text, "avanti", "weiter")) return "next";
+        if (containsAny(text, "precedente", "canzone prima", "previous", "go back", "vorheriger", "vorheriges", "vorherige")
+                || matchesAny(text, "indietro", "back", "zuruck")) return "previous";
+        if (containsAny(text, "riprendi", "continua", "riproduci", "metti la musica", "fai partire", "musica", "play", "resume", "music",
+                "abspielen", "spiel", "spiele", "musik", "fortsetzen")) return "play";
         return null;
     }
 
@@ -289,13 +311,13 @@ public final class AareAssistant {
 
     private static void navigate(String destination) throws Exception {
         JSONObject r = tool("car_navigate", new JSONObject().put("destination", destination));
-        finish(r.optBoolean("ok") ? phrase("Looking for " + destination + ".", "Cerco " + destination + ".") : error(r));
+        finish(r.optBoolean("ok") ? tr("Looking for " + destination + ".", "Cerco " + destination + ".", "Ich suche " + destination + ".") : error(r));
     }
 
     private static void open(String what) throws Exception {
         JSONObject r = tool("car_open", new JSONObject().put("what", what));
         if (r.optBoolean("ok")) finish(null);
-        else finish(phrase("I can't find " + what + " in the car.", "Non trovo " + what + " in auto."));
+        else finish(tr("I can't find " + what + " in the car.", "Non trovo " + what + " in auto.", "Ich finde " + what + " nicht im Auto."));
     }
 
     private static void display(String mode) throws Exception {
@@ -307,7 +329,7 @@ public final class AareAssistant {
         JSONObject s = tool("car_status", new JSONObject());
         JSONObject nav = s.optJSONObject("navigation");
         if (nav == null) {
-            finish(phrase("No navigation is running.", "Nessuna navigazione in corso."));
+            finish(tr("No navigation is running.", "Nessuna navigazione in corso.", "Keine Navigation aktiv."));
             return;
         }
         StringBuilder b = new StringBuilder();
@@ -315,19 +337,18 @@ public final class AareAssistant {
         String trip = nav.optString("trip");
         if (!next.isEmpty()) b.append(next).append(". ");
         if (!trip.isEmpty()) b.append(trip).append('.');
-        finish(b.length() > 0 ? b.toString() : phrase("Navigation is running.", "La navigazione è in corso."));
+        finish(b.length() > 0 ? b.toString() : tr("Navigation is running.", "La navigazione è in corso.", "Die Navigation läuft."));
     }
 
     private static void batteryStatus() throws Exception {
         JSONObject phone = tool("car_status", new JSONObject()).optJSONObject("phone");
         if (phone == null) {
-            finish(phrase("I can't read the battery.", "Non riesco a leggere la batteria."));
+            finish(tr("I can't read the battery.", "Non riesco a leggere la batteria.", "Ich kann den Akku nicht lesen."));
             return;
         }
         int pct = phone.optInt("battery_percent", -1);
         boolean charging = phone.optBoolean("charging");
-        finish(phrase("The phone is at " + pct + "%" + (charging ? ", charging." : "."),
-                "Il telefono è al " + pct + "%" + (charging ? ", in carica." : ".")));
+        finish(tr("The phone is at " + pct + "%" + (charging ? ", charging." : "."), "Il telefono è al " + pct + "%" + (charging ? ", in carica." : "."), "Das Telefon hat " + pct + "%" + (charging ? ", lädt." : ".")));
     }
 
     private static void readMessages() throws Exception {
@@ -338,7 +359,7 @@ public final class AareAssistant {
         }
         JSONArray list = r.optJSONArray("conversations");
         if (list == null || list.length() == 0) {
-            finish(phrase("No new messages.", "Nessun messaggio nuovo."));
+            finish(tr("No new messages.", "Nessun messaggio nuovo.", "Keine neuen Nachrichten."));
             return;
         }
         StringBuilder b = new StringBuilder();
@@ -353,11 +374,11 @@ public final class AareAssistant {
         JSONObject first = list.getJSONObject(0);
         String who = first.optString("conversation");
         showCard(b.toString().trim());
-        String intro = list.length() == 1 ? "" : phrase(list.length() + " conversations. ", list.length() + " conversazioni. ");
+        String intro = list.length() == 1 ? "" : tr(list.length() + " conversations. ", list.length() + " conversazioni. ", list.length() + " Unterhaltungen. ");
         if (first.optBoolean("can_reply")) {
             say(intro + b, () -> {
                 if (state == State.IDLE || state == State.COMMAND) {
-                    confirm(phrase("Reply to " + who + "?", "Vuoi rispondere a " + who + "?"), () -> replyTo(who, null));
+                    confirm(tr("Reply to " + who + "?", "Vuoi rispondere a " + who + "?", "Möchtest du " + who + " antworten?"), () -> replyTo(who, null));
                 }
             });
             state = State.IDLE;
@@ -368,18 +389,18 @@ public final class AareAssistant {
 
     private static void replyTo(String who, String message) {
         if (message == null || message.trim().isEmpty()) {
-            dictate(who, phrase("What should I write to " + who + "?", "Cosa vuoi scrivere a " + who + "?"),
+            dictate(who, tr("What should I write to " + who + "?", "Cosa vuoi scrivere a " + who + "?", "Was möchtest du " + who + " schreiben?"),
                     text -> replyTo(who, text));
             return;
         }
         String m = capitalize(message.trim());
-        confirm(phrase("To " + who + ": " + m + ". Send it?", "A " + who + ": " + m + ". Lo invio?"), () -> {
+        confirm(tr("To " + who + ": " + m + ". Send it?", "A " + who + ": " + m + ". Lo invio?", "An " + who + ": " + m + ". Senden?"), () -> {
             try {
                 JSONObject r = tool("car_reply", new JSONObject().put("conversation", who).put("message", m));
-                finish(r.optBoolean("ok") ? phrase("Sent.", "Inviato.") : error(r));
+                finish(r.optBoolean("ok") ? tr("Sent.", "Inviato.", "Gesendet.") : error(r));
             } catch (Throwable t) {
                 Log.w(TAG, "reply", t);
-                finish(phrase("The message could not be sent.", "Non sono riuscito a inviare il messaggio."));
+                finish(tr("The message could not be sent.", "Non sono riuscito a inviare il messaggio.", "Die Nachricht konnte nicht gesendet werden."));
             }
         });
     }
@@ -389,7 +410,7 @@ public final class AareAssistant {
         if (context == null) return;
         if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED
                 || context.checkSelfPermission(Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
-            finish(phrase("Allow AARE contacts and calls first.", "Prima concedi ad AARE contatti e telefono."));
+            finish(tr("Allow AARE contacts and calls first.", "Prima concedi ad AARE contatti e telefono.", "Erlaube AARE zuerst Kontakte und Telefon."));
             return;
         }
         Map<String, String> found = new LinkedHashMap<>();
@@ -406,27 +427,27 @@ public final class AareAssistant {
             Log.w(TAG, "contacts", t);
         }
         if (found.isEmpty()) {
-            finish(phrase("I can't find " + who + " in your contacts.", "Non trovo " + who + " nei contatti."));
+            finish(tr("I can't find " + who + " in your contacts.", "Non trovo " + who + " nei contatti.", "Ich finde " + who + " nicht in den Kontakten."));
             return;
         }
         String name = null;
         for (String n : found.keySet()) if (plain(n).equals(plain(who))) name = n;
         if (name == null && found.size() > 1) {
             List<String> names = new ArrayList<>(found.keySet());
-            finish(phrase("Which one? ", "Quale? ") + String.join(", ", names.subList(0, Math.min(3, names.size()))) + ".");
+            finish(tr("Which one? ", "Quale? ", "Welche? ") + String.join(", ", names.subList(0, Math.min(3, names.size()))) + ".");
             return;
         }
         if (name == null) name = found.keySet().iterator().next();
         final String contact = name;
         final String number = found.get(name);
-        confirm(phrase("Call " + contact + "?", "Chiamo " + contact + "?"), () -> {
+        confirm(tr("Call " + contact + "?", "Chiamo " + contact + "?", "Soll ich " + contact + " anrufen?"), () -> {
             try {
                 TelecomManager telecom = context.getSystemService(TelecomManager.class);
                 telecom.placeCall(Uri.fromParts("tel", number, null), new Bundle());
                 finish(null);
             } catch (Throwable t) {
                 Log.w(TAG, "call", t);
-                finish(phrase("I couldn't start the call.", "Non sono riuscito a chiamare."));
+                finish(tr("I couldn't start the call.", "Non sono riuscito a chiamare.", "Der Anruf hat nicht geklappt."));
             }
         });
     }
@@ -439,14 +460,13 @@ public final class AareAssistant {
             Object a = assistants.getField("INSTANCE").get(null);
             String pkg = (String) assistants.getMethod("phoneDefault", Context.class).invoke(a, context);
             if (pkg != null && (Boolean) assistants.getMethod("startOnPhone", Context.class, String.class).invoke(a, context, pkg)) {
-                finish(phrase("Ask the phone's assistant: it's listening on the phone.",
-                        "Chiedilo all'assistente del telefono: ti ascolta sul telefono."));
+                finish(tr("Ask the phone's assistant: it's listening on the phone.", "Chiedilo all'assistente del telefono: ti ascolta sul telefono.", "Frag den Assistenten des Telefons: er hört auf dem Telefon zu."));
                 return;
             }
         } catch (Throwable t) {
             Log.w(TAG, "phone assistant", t);
         }
-        finish(phrase("I can't do that yet.", "Questo non lo so ancora fare."));
+        finish(tr("I can't do that yet.", "Questo non lo so ancora fare.", "Das kann ich noch nicht."));
     }
 
     // endregion
@@ -464,11 +484,11 @@ public final class AareAssistant {
 
     private static String error(JSONObject r) {
         String e = r.optString("error");
-        if (e.contains("no navigation app")) return phrase("There's no navigation app in the car.", "Non c'è un navigatore in auto.");
-        if (e.contains("notification access")) return phrase("AARE needs notification access.", "AARE ha bisogno dell'accesso alle notifiche.");
-        if (e.contains("doesn't allow replies")) return phrase("That app doesn't allow replies.", "Quell'app non permette di rispondere.");
-        if (e.startsWith("no conversation") || e.contains("no conversation")) return phrase("I can't find that conversation among the messages.", "Non trovo quella conversazione tra i messaggi.");
-        return phrase("That didn't work.", "Non ha funzionato.");
+        if (e.contains("no navigation app")) return tr("There's no navigation app in the car.", "Non c'è un navigatore in auto.", "Im Auto gibt es keine Navigations-App.");
+        if (e.contains("notification access")) return tr("AARE needs notification access.", "AARE ha bisogno dell'accesso alle notifiche.", "AARE braucht Zugriff auf die Benachrichtigungen.");
+        if (e.contains("doesn't allow replies")) return tr("That app doesn't allow replies.", "Quell'app non permette di rispondere.", "Diese App erlaubt keine Antworten.");
+        if (e.startsWith("no conversation") || e.contains("no conversation")) return tr("I can't find that conversation among the messages.", "Non trovo quella conversazione tra i messaggi.", "Ich finde diese Unterhaltung nicht.");
+        return tr("That didn't work.", "Non ha funzionato.", "Das hat nicht geklappt.");
     }
 
     // endregion
@@ -489,7 +509,7 @@ public final class AareAssistant {
             recognizer.setRecognitionListener(new Listener(expected));
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                     .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale().toLanguageTag())
                     .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                     .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
@@ -504,7 +524,7 @@ public final class AareAssistant {
         } catch (Throwable t) {
             Log.w(TAG, "listen", t);
             releaseFocus();
-            finish(phrase("Voice input isn't available.", "Il riconoscimento vocale non è disponibile."));
+            finish(tr("Voice input isn't available.", "Il riconoscimento vocale non è disponibile.", "Spracherkennung ist nicht verfügbar."));
         }
     }
 
@@ -557,8 +577,8 @@ public final class AareAssistant {
             Log.i(TAG, "recognition error " + error);
             if (expected == State.CONFIRM) return; // the Yes and No buttons stay
             finish(error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS
-                    ? phrase("Allow AARE to use the microphone.", "Concedi ad AARE il microfono.")
-                    : phrase("I didn't catch that.", "Non ho capito."));
+                    ? tr("Allow AARE to use the microphone.", "Concedi ad AARE il microfono.", "Erlaube AARE das Mikrofon.")
+                    : tr("I didn't catch that.", "Non ho capito.", "Das habe ich nicht verstanden."));
         }
 
         @Override
@@ -574,13 +594,13 @@ public final class AareAssistant {
                 case CONFIRM:
                     Boolean answer = VoiceReply.yesOrNo(text);
                     if (Boolean.TRUE.equals(answer)) confirmed();
-                    else if (Boolean.FALSE.equals(answer)) finish(phrase("OK.", "Va bene."));
+                    else if (Boolean.FALSE.equals(answer)) finish(tr("OK.", "Va bene.", "In Ordnung."));
                     break;
                 case DICTATE:
                     Consumer<String> then = onDictated;
                     onDictated = null;
                     state = State.IDLE;
-                    if (text == null || text.trim().isEmpty() || then == null) finish(phrase("I didn't catch that.", "Non ho capito."));
+                    if (text == null || text.trim().isEmpty() || then == null) finish(tr("I didn't catch that.", "Non ho capito.", "Das habe ich nicht verstanden."));
                     else then.accept(text.trim());
                     break;
                 default:
@@ -599,7 +619,7 @@ public final class AareAssistant {
             if (text == null || text.trim().isEmpty()) return;
             String shown = capitalize(text.trim()) + " …";
             if (expected == State.DICTATE) shown = dictationTitle + ": " + shown;
-            showCard(shown, action(phrase("Cancel", "Annulla"), () -> finish(null)));
+            showCard(shown, action(tr("Cancel", "Annulla", "Abbrechen"), () -> finish(null)));
         }
 
         @Override
@@ -657,7 +677,7 @@ public final class AareAssistant {
             Class<?> noticeClass = Class.forName("net.prototux.aare.ui.car.CarNotice", false, AareAssistant.class.getClassLoader());
             Constructor<?> make = noticeClass.getConstructor(String.class, String.class, String.class, Bitmap.class,
                     List.class, long.class, boolean.class);
-            Object n = make.newInstance(key, phrase("Assistant", "Assistente"), text, null, Arrays.asList(actions),
+            Object n = make.newInstance(key, tr("Assistant", "Assistente", "Assistent"), text, null, Arrays.asList(actions),
                     System.currentTimeMillis(), false);
             VoiceReply.sticky.add(n);
             int at = old == null ? -1 : notices.indexOf(old);
@@ -722,12 +742,12 @@ public final class AareAssistant {
             if (then != null) then.run();
             return;
         }
-        VoiceNotes.Player.get(c).say(text, then);
+        VoiceNotes.Player.get(c).say(text, then, locale());
     }
 
     /** Lower case, no accents, no punctuation: for matching. */
     static String plain(String s) {
-        return Normalizer.normalize(s.toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
+        return Normalizer.normalize(s.toLowerCase(Locale.ROOT).replace("ß", "ss"), Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .replaceAll("[^a-z0-9 ]", " ")
                 .replaceAll("\\s+", " ")
@@ -779,8 +799,34 @@ public final class AareAssistant {
         return s.isEmpty() ? s : s.substring(0, 1).toUpperCase(Locale.getDefault()) + s.substring(1);
     }
 
-    private static String phrase(String english, String italian) {
-        return "it".equals(Locale.getDefault().getLanguage()) ? italian : english;
+    /** The assistant's language: the one chosen in Settings, else the phone's (it, de or en). */
+    static String lang() {
+        String chosen = PatchSettings.assistantLanguage();
+        if (!"auto".equals(chosen)) return chosen;
+        String l = Locale.getDefault().getLanguage();
+        return "it".equals(l) || "de".equals(l) ? l : "en";
+    }
+
+    static Locale locale() {
+        switch (lang()) {
+            case "it":
+                return Locale.ITALY;
+            case "de":
+                return "de".equals(Locale.getDefault().getLanguage()) ? Locale.getDefault() : Locale.GERMANY;
+            default:
+                return "en".equals(Locale.getDefault().getLanguage()) ? Locale.getDefault() : Locale.US;
+        }
+    }
+
+    private static String tr(String english, String italian, String german) {
+        switch (lang()) {
+            case "it":
+                return italian;
+            case "de":
+                return german;
+            default:
+                return english;
+        }
     }
 
     // endregion

@@ -364,11 +364,28 @@ public final class VoiceNotes {
 
         /** Speaks [text], then runs [then] (on the main thread) once it was spoken. */
         void say(String text, Runnable then) {
+            say(text, then, null);
+        }
+
+        /** The same, in [language] (null: the phone's). */
+        void say(String text, Runnable then, Locale language) {
             String t = text.trim();
             while (t.startsWith(".") || t.startsWith(":") || t.startsWith(",")) t = t.substring(1).trim();
-            if (!t.isEmpty()) enqueue(t);
+            if (!t.isEmpty()) enqueue(new Spoken(t, language));
             if (then != null) then(then);
         }
+
+        private static final class Spoken {
+            final String text;
+            final Locale language;
+
+            Spoken(String text, Locale language) {
+                this.text = text;
+                this.language = language;
+            }
+        }
+
+        private Locale speaking;
 
         void play(ParcelFileDescriptor recording) {
             enqueue(recording);
@@ -407,26 +424,28 @@ public final class VoiceNotes {
             busy = true;
             requestFocus();
             if (item instanceof ParcelFileDescriptor) playRecording((ParcelFileDescriptor) item);
-            else speak((String) item);
+            else speak(item instanceof Spoken ? (Spoken) item : new Spoken((String) item, null));
         }
 
         private void done() {
             main.post(this::next);
         }
 
-        private void speak(String text) {
+        private void speak(Spoken spoken) {
+            String text = spoken.text;
             if (Boolean.FALSE.equals(ttsReady)) {
                 done();
                 return;
             }
             if (tts == null) {
                 // Started on first use; the text waits until it's ready.
-                queue.addFirst(text);
+                queue.addFirst(spoken);
                 tts = new TextToSpeech(context, status -> main.post(() -> {
                     ttsReady = status == TextToSpeech.SUCCESS;
                     if (ttsReady) {
                         tts.setAudioAttributes(ATTRIBUTES);
                         tts.setLanguage(Locale.getDefault());
+                        speaking = Locale.getDefault();
                         tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                             @Override
                             public void onStart(String id) {
@@ -448,6 +467,11 @@ public final class VoiceNotes {
                     next();
                 }));
                 return;
+            }
+            Locale wanted = spoken.language != null ? spoken.language : Locale.getDefault();
+            if (!wanted.equals(speaking)) {
+                tts.setLanguage(wanted);
+                speaking = wanted;
             }
             String id = "aare-voice-" + (++utterance);
             if (tts.speak(text, TextToSpeech.QUEUE_ADD, new Bundle(), id) != TextToSpeech.SUCCESS) done();

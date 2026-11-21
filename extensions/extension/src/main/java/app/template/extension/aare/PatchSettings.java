@@ -147,9 +147,9 @@ public final class PatchSettings {
                         false, ICON_REPLY),
                 new Feature(AARE_ASSISTANT,
                         phrase("AARE assistant", "Assistente AARE"),
-                        phrase("The voice button opens AARE's own assistant on the car screen: navigation, music, messages "
+                        phrase("The voice button opens AARE's own assistant on the car screen (Italian, German, English): navigation, music, messages "
                                         + "and replies, calls, the time. For anything else it opens Google on the phone.",
-                                "Il tasto vocale apre l'assistente di AARE sullo schermo dell'auto: navigazione, musica, "
+                                "Il tasto vocale apre l'assistente di AARE sullo schermo dell'auto (italiano, tedesco, inglese): navigazione, musica, "
                                         + "messaggi e risposte, chiamate, l'ora. Per il resto apre Google sul telefono."),
                         false, ICON_ASSISTANT),
                 new Feature(CAR_MICROPHONE,
@@ -190,6 +190,19 @@ public final class PatchSettings {
 
     static void setEnabled(Context context, String key, boolean enabled) {
         prefs(context).edit().putBoolean(key, enabled).apply();
+    }
+
+    // endregion
+
+    /** AARE assistant's language: auto (the phone's), it, de or en. */
+    static String assistantLanguage() {
+        Context app = application();
+        if (app == null) return "auto";
+        return prefs(app).getString("assistant_language", "auto");
+    }
+
+    static void setAssistantLanguage(Context context, String language) {
+        prefs(context).edit().putString("assistant_language", language).apply();
     }
 
     // endregion
