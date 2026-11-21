@@ -147,7 +147,16 @@ public final class IntegratedShizuku {
      * secure-settings permission (granted at the first start), AARE switches wireless debugging on
      * for the few seconds this takes, and back off when it was off.
      */
+    /** One start at a time: the car's automatic start and the Start button would kill each other's server. */
+    private static final Object START_LOCK = new Object();
+
     public static Result start(Context context) {
+        synchronized (START_LOCK) {
+            return startLocked(context);
+        }
+    }
+
+    private static Result startLocked(Context context) {
         Result result = startServer(context);
         if (result == Result.STARTED) switchOffWirelessDebugging(context);
         return result;
