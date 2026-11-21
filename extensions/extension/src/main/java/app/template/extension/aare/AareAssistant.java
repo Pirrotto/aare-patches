@@ -235,7 +235,7 @@ public final class AareAssistant {
             return;
         }
         if ((m = CALL.matcher(text)).matches()) {
-            call(m.group(1));
+            call(m.group(1).replaceFirst("^(?:il|lo|la|l|mio|mia|my|the) ", ""));
             return;
         }
 
@@ -734,15 +734,29 @@ public final class AareAssistant {
                 .trim();
     }
 
-    /** The words of [heard] that [plainPart] (from plain(heard)) covers, with their accents and capitals. */
+    /** The words of [heard] that [plainPart] (the end of plain(heard)) covers, with their accents and capitals. */
     private static String original(String heard, String plainPart) {
         String[] words = heard.trim().split("\\s+");
-        int count = plainPart.split(" ").length;
-        if (count >= words.length) return heard.trim();
+        int wanted = plainPart.isEmpty() ? 0 : plainPart.split(" ").length;
+        int covered = 0;
+        int start = words.length;
+        // From the end, whole original words, each worth as many plain words as it gives ("all'ospedale" = 2).
+        while (start > 0 && covered < wanted) {
+            start--;
+            String p = plain(words[start]);
+            covered += p.isEmpty() ? 0 : p.split(" ").length;
+        }
+        if (covered != wanted) return plainPart;
         StringBuilder b = new StringBuilder();
-        for (int i = words.length - count; i < words.length; i++) b.append(i > words.length - count ? " " : "").append(words[i]);
-        String s = b.toString().replaceAll("^[\\p{Punct}]+|[\\p{Punct}]+$", "");
-        return s.isEmpty() ? plainPart : s;
+        for (int k = start; k < words.length; k++) b.append(k > start ? " " : "").append(words[k]);
+        String out = b.toString().replaceAll("^[\\p{Punct}&&[^']]+|[\\p{Punct}]+$", "");
+        // "all'ospedale": the article belongs to the command, not to the place.
+        if (start < words.length && plain(words[start]).contains(" ")) {
+            int apostrophe = out.indexOf('\'');
+            String before = apostrophe > 0 ? plain(out.substring(0, apostrophe)) : "";
+            if (before.matches("l|all|dell|nell|sull|dall|un|d")) out = out.substring(apostrophe + 1);
+        }
+        return out.isEmpty() ? plainPart : out;
     }
 
     private static boolean containsAny(String text, String... parts) {
