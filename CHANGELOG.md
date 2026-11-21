@@ -1,3 +1,9 @@
+## [1.7.1](https://github.com/Pirrotto/aare-patches/compare/v1.7.0...v1.7.1) (2026-11-21)
+
+### 🐛 Bug Fixes
+
+* Integrated Shizuku pairing on phones with Developer options on ([2e572cd](https://github.com/Pirrotto/aare-patches/commit/2e572cdc990d11524d70c11aef90486fde5b8a9e))
+
 ## [1.7.0](https://github.com/Pirrotto/aare-patches/compare/v1.6.0...v1.7.0) (2026-11-21)
 
 ### ✨ New Features
