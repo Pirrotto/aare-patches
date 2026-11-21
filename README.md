@@ -39,6 +39,38 @@ Navigation apps then keep following the car with the phone locked, with no need 
 
 Patching AARE again later (a new AARE version, or another patch) installs over the patched app and keeps its settings, as long as Morphe Manager is the same: keep the same patches selected.
 
+## 🆕 What's new / Novità
+
+**English**
+
+- **1.9 – Integrated Shizuku works reliably**: starts on any Wi-Fi (also where mDNS is filtered), one start at a time, and the server stays up after the start. *Copy diagnostics* in Settings reports its state.
+- **1.9 – AARE assistant in German**, besides Italian and English (language in Settings).
+- **1.8 – AARE assistant**: the voice button opens AARE's own assistant on the car screen (navigation, music, messages and replies, calls, time). Anything else goes to Google on the phone. **Car microphone** for dictation and the assistant.
+- **1.7 – Integrated Shizuku starts by itself** after a restart and when the car connects, also on the car's Wi-Fi.
+- **1.6 – Integrated Shizuku**: no Shizuku app needed, pair once with wireless debugging.
+- **1.5 – Settings** in AARE: one switch per patch.
+- **1.4 – Reply** in the notification centre, reply card for 15 seconds after reading.
+- **1.3 – Voice reply**: dictate the answer, confirm, sent.
+- **1.2 – Voice messages**: WhatsApp voice notes play in the car.
+- **1.0 – Background location**: navigation keeps GPS with the phone locked.
+
+Every release lists its fixes in [the releases](https://github.com/Pirrotto/aare-patches/releases) and in [CHANGELOG.md](CHANGELOG.md).
+
+**Italiano**
+
+- **1.9 – Shizuku integrato affidabile**: parte con qualsiasi Wi-Fi (anche dove gli annunci di rete sono bloccati), un avvio alla volta, e il server resta acceso. In Settings, *Copia diagnostica* ne mostra lo stato.
+- **1.9 – Assistente AARE in tedesco**, oltre a italiano e inglese (lingua in Settings).
+- **1.8 – Assistente AARE**: il tasto vocale apre l'assistente di AARE sullo schermo dell'auto (navigazione, musica, messaggi e risposte, chiamate, ora); il resto va a Google sul telefono. **Microfono dell'auto** per dettatura e assistente.
+- **1.7 – Shizuku integrato si avvia da solo** dopo un riavvio e quando ti colleghi all'auto, anche col Wi-Fi dell'auto.
+- **1.6 – Shizuku integrato**: niente app Shizuku, accoppiamento una volta col debug wireless.
+- **1.5 – Settings** in AARE: un interruttore per ogni patch.
+- **1.4 – Rispondi** nel centro notifiche, scheda di risposta per 15 secondi dopo la lettura.
+- **1.3 – Risposta vocale**: detti la risposta, confermi, inviata.
+- **1.2 – Messaggi vocali**: i vocali WhatsApp si sentono in auto.
+- **1.0 – Posizione in background**: la navigazione mantiene il GPS a telefono bloccato.
+
+Ogni release elenca le correzioni nelle [release](https://github.com/Pirrotto/aare-patches/releases) e nel [CHANGELOG.md](CHANGELOG.md).
+
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
