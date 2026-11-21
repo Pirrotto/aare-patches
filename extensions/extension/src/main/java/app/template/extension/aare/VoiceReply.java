@@ -49,7 +49,7 @@ public final class VoiceReply {
     private static final Handler main = new Handler(Looper.getMainLooper());
 
     /** The cards this class put on the car screen: AARE must not close them after 8 seconds. */
-    private static final Set<Object> sticky = Collections.newSetFromMap(new IdentityHashMap<>());
+    static final Set<Object> sticky = Collections.newSetFromMap(new IdentityHashMap<>());
 
     private enum State { IDLE, OFFERED, DICTATING, CONFIRMING, SENDING }
 
@@ -65,6 +65,7 @@ public final class VoiceReply {
     private static long cardSeq;
 
     private static SpeechRecognizer recognizer;
+    private static CarMic.Handle carMic;
     private static AudioFocusRequest listenFocus;
 
     private static final Set<String> YES = new HashSet<>(Arrays.asList(
@@ -350,6 +351,8 @@ public final class VoiceReply {
                         .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L);
             }
             requestListenFocus(context);
+            closeCarMic();
+            if (CarMic.enabled(context)) carMic = CarMic.attach(runtime.get(), intent);
             recognizer.startListening(intent);
         } catch (Throwable t) {
             Log.w(TAG, "listen", t);
@@ -367,6 +370,13 @@ public final class VoiceReply {
         } catch (Throwable ignored) {
         }
         releaseListenFocus();
+    }
+
+    private static void closeCarMic() {
+        if (carMic != null) {
+            carMic.close();
+            carMic = null;
+        }
     }
 
     private static final class Listener implements RecognitionListener {
@@ -479,6 +489,7 @@ public final class VoiceReply {
     }
 
     private static void releaseListenFocus() {
+        closeCarMic();
         if (listenFocus == null) return;
         Context context = context();
         AudioManager audio = context == null ? null : context.getSystemService(AudioManager.class);
