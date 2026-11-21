@@ -1,3 +1,9 @@
+## [1.10.0](https://github.com/Pirrotto/aare-patches/compare/v1.9.6...v1.10.0) (2026-11-21)
+
+### ✨ New Features
+
+* tunnel navigation – keep the position moving in tunnels with the car's speed, compass and gyroscope ([f292cc6](https://github.com/Pirrotto/aare-patches/commit/f292cc610a02f6a489558a102e8d3257c4a9f551))
+
 ## [1.9.6](https://github.com/Pirrotto/aare-patches/compare/v1.9.5...v1.9.6) (2026-11-21)
 
 ### 🐛 Bug Fixes
