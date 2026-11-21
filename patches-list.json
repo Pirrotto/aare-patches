@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "patches": [
     {
       "name": "Background location",
@@ -40,7 +40,7 @@
     },
     {
       "name": "Integrated Shizuku",
-      "description": "AARE starts its own Shizuku through wireless debugging, without the Shizuku app: pair once from Settings, and AARE starts it again by itself after each restart, on Wi-Fi.",
+      "description": "AARE starts its own Shizuku through wireless debugging, without the Shizuku app: pair once from Settings, and AARE starts it again by itself after a restart and when the car connects, on any Wi-Fi including the car's.",
       "default": true,
       "category": null,
       "compatiblePackages": [

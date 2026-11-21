@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-21T08:29:15",
-  "description": "## [1.6.0](https://github.com/Pirrotto/aare-patches/compare/v1.5.2...v1.6.0) (2026-11-21)\n\n### ✨ New Features\n\n* Integrated Shizuku, without the Shizuku app ([eea4ed4](https://github.com/Pirrotto/aare-patches/commit/eea4ed42ecc5488766fbc8674cab4e2d58f14122))",
-  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.6.0/patches-1.6.0.mpp",
+  "created_at": "2026-11-21T08:44:58",
+  "description": "## [1.7.0](https://github.com/Pirrotto/aare-patches/compare/v1.6.0...v1.7.0) (2026-11-21)\n\n### ✨ New Features\n\n* Start integrated Shizuku when the car connects ([0df9c35](https://github.com/Pirrotto/aare-patches/commit/0df9c35e8bb9bd643451d5656dd7817197b97420))",
+  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.7.0/patches-1.7.0.mpp",
   "signature_download_url": "",
-  "version": "1.6.0"
+  "version": "1.7.0"
 }

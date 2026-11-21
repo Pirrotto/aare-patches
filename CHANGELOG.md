@@ -1,3 +1,9 @@
+## [1.7.0](https://github.com/Pirrotto/aare-patches/compare/v1.6.0...v1.7.0) (2026-11-21)
+
+### ✨ New Features
+
+* Start integrated Shizuku when the car connects ([0df9c35](https://github.com/Pirrotto/aare-patches/commit/0df9c35e8bb9bd643451d5656dd7817197b97420))
+
 ## [1.6.0](https://github.com/Pirrotto/aare-patches/compare/v1.5.2...v1.6.0) (2026-11-21)
 
 ### ✨ New Features
