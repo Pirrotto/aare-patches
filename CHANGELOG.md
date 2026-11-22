@@ -1,3 +1,10 @@
+## [1.10.2](https://github.com/Pirrotto/aare-patches/compare/v1.10.1...v1.10.2) (2026-11-22)
+
+### 🐛 Bug Fixes
+
+* Speak and play voice messages on the car's guidance channel ([1ae0b09](https://github.com/Pirrotto/aare-patches/commit/1ae0b09d29755f41a626b0e357ac23f5b7325cf5))
+* Tunnel navigation follows curves and stays on the road ([55ae193](https://github.com/Pirrotto/aare-patches/commit/55ae193e069b14ca7eb421012eced4fbd0e81ad0))
+
 ## [1.10.1](https://github.com/Pirrotto/aare-patches/compare/v1.10.0...v1.10.1) (2026-11-22)
 
 ### 🐛 Bug Fixes
