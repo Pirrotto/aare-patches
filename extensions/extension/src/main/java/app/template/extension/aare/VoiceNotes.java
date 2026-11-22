@@ -339,8 +339,13 @@ public final class VoiceNotes {
             return instance;
         }
 
+        /**
+         * Assistant usage: AARE sends it on the car's guidance channel, as Android Auto does with its
+         * voice. The car lowers the radio or the music for it and goes back to them afterwards; on the
+         * media channel the car switched its source to Android Auto and stayed there.
+         */
         private static final AudioAttributes ATTRIBUTES = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setUsage(AudioAttributes.USAGE_ASSISTANT)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                 .build();
 
