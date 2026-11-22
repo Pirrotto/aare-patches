@@ -1,3 +1,9 @@
+## [1.10.1](https://github.com/Pirrotto/aare-patches/compare/v1.10.0...v1.10.1) (2026-11-22)
+
+### 🐛 Bug Fixes
+
+* Restart the integrated Shizuku server after AARE is updated ([7b4e6b6](https://github.com/Pirrotto/aare-patches/commit/7b4e6b68fa1f03271ebb935fb7c726e6085f21c0))
+
 ## [1.10.0](https://github.com/Pirrotto/aare-patches/compare/v1.9.6...v1.10.0) (2026-11-21)
 
 ### ✨ New Features
