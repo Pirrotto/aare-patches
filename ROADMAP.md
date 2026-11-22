@@ -23,10 +23,10 @@ Every item is checked against AARE first (see CLAUDE.md): only what AARE doesn't
 - [ ] Mixed Italian + German recognition (German street names)
 - [ ] "Take me home" passed to the navigation app (check that Vela accepts it)
 - [ ] Backup and restore of the patch settings
-- [ ] Tested-cars list in the README
+- [ ] Tested-cars list in the README, from the "Car test" reports
 
 ## Outside the code
 
-- [ ] Discussion on prototux/AARE proposing the features upstream
-- [ ] Reply to mgitp on prototux/AARE#324
+- [x] Discussion on prototux/AARE proposing the features upstream
+- [x] Reply to mgitp on prototux/AARE#324
 - [ ] Car report for the Skoda Octavia 2022 (MIB3)
