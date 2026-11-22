@@ -1,5 +1,17 @@
 # Roadmap
 
+## Now
+
+- [ ] Adapt the patches to AARE 1.6.0 (released 22.11.2026): drop Background location (in AARE since #351);
+      check Car microphone against AARE's "Car microphone for phone apps" (#256); keep the rest working
+- [ ] Test build of AARE with Reply by voice (prototux/AARE#353, for 1.6.1): road test, report in the PR
+- [ ] Tunnel navigation PR for AARE (fork PR #2): opt-in (off by default), frozen-compass fix, honest
+      accuracy, time and distance limit, tests; after the owner's tunnel test with v1.10.2. Same changes
+      in the patch
+- [ ] WhatsApp voice notes PR for AARE: opt-in with Shizuku, received voice notes only
+- [ ] Credits of the patches' sources inside the app (decide where)
+
+
 Every item is checked against AARE first (see CLAUDE.md): only what AARE doesn't do, or does only when parked.
 Each version contains everything before it; the assistant items improve the existing "AARE assistant" patch.
 
