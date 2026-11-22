@@ -49,6 +49,8 @@ public final class IntegratedServer extends IShizukuService.Stub {
     static final String EXTRA_BINDER = "moe.shizuku.privileged.api.intent.extra.BINDER";
     /** Answered with 1, so AARE can tell this server from the real Shizuku. */
     public static final int TRANSACTION_IS_INTEGRATED = 0x00A4A2E5; // within FIRST..LAST_CALL_TRANSACTION
+    /** The AARE APK this server runs from: AARE restarts a server left from an older version. */
+    public static final int TRANSACTION_APK = 0x00A4A2E7;
 
     private static final int SERVER_VERSION = 13;
     private static final int SERVER_PATCH_VERSION = 6;
@@ -164,6 +166,11 @@ public final class IntegratedServer extends IShizukuService.Stub {
             if (reply != null) reply.writeInt(1);
             return true;
         }
+        if (code == TRANSACTION_APK) {
+            enforceApp();
+            if (reply != null) reply.writeString(apk);
+            return true;
+        }
         if (code == TRANSACTION_DIAGNOSTICS) {
             enforceApp();
             if (reply != null) reply.writeString(diagnostics());
@@ -176,6 +183,7 @@ public final class IntegratedServer extends IShizukuService.Stub {
         StringBuilder b = new StringBuilder();
         b.append("server uid=").append(android.os.Process.myUid()).append(" pid=").append(android.os.Process.myPid())
                 .append(" sdk=").append(android.os.Build.VERSION.SDK_INT).append(" se=").append(getSELinuxContext()).append('\n');
+        b.append("server apk exists=").append(new File(apk).exists()).append('\n');
         synchronized (services) {
             for (Record r : services.values()) {
                 b.append("service ").append(r.key).append(" starting=").append(r.starting)
@@ -185,6 +193,23 @@ public final class IntegratedServer extends IShizukuService.Stub {
         b.append(run("ps -A -o PID,USER,NAME | grep -i -e aare -e " + packageName));
         b.append("--- log\n").append(run("tail -n 40 " + LOG));
         return b.toString();
+    }
+
+    /**
+     * AARE's APK now: the one this server started from, or, once AARE was updated (that file is gone),
+     * the installed one. User services load AARE's code from it.
+     */
+    private String currentApk() {
+        if (new File(apk).exists()) return apk;
+        String out = run("pm path " + packageName).trim();
+        for (String line : out.split("\n")) {
+            line = line.trim();
+            if (line.startsWith("package:") && line.endsWith("/base.apk")) {
+                log("AARE was updated: user services load " + line.substring(8), null);
+                return line.substring(8);
+            }
+        }
+        return apk;
     }
 
     private static String run(String command) {
@@ -484,9 +509,11 @@ public final class IntegratedServer extends IShizukuService.Stub {
     private void startUserService(Record record, String className, String suffix) {
         String process = packageName + ":" + (suffix != null ? suffix : "user_service");
         // Output to the log file, never to this process's pipes (which close and would kill it).
-        String cmd = "(CLASSPATH='" + apk + "' /system/bin/app_process /system/bin --nice-name='" + process + "' "
+        String code = currentApk();
+        String cmd = "(CLASSPATH='" + code + "' /system/bin/app_process /system/bin --nice-name='" + process + "' "
                 + UserServiceStarter.class.getName() + " --token='" + record.token + "' --package='" + packageName
-                + "' --class='" + className + "' --uid=" + appUid + " </dev/null >>" + LOG + " 2>&1)&";
+                + "' --class='" + className + "' --uid=" + appUid + " </dev/null >>" + LOG + " 2>&1;"
+                + " echo \"user service process " + process + " ended: $?\" >>" + LOG + ")&";
         log("starting user service " + className + " as " + process, null);
         try {
             java.lang.Process sh = new ProcessBuilder("sh", "-c", cmd)
