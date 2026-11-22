@@ -72,6 +72,7 @@ public final class TunnelNavigation {
             }
 
             learnGyroSign(fix);
+            carCompass(); // follows the compass outside tunnels too, to tell when it freezes
             if (estimate != null) Log.i(TAG, "GPS back after " + (now - lastFixAt) / 1000 + " s, " + (int) fix.distanceTo(estimate) + " m from the estimate");
             lastFix = new Location(fix);
             lastFixAt = now;
@@ -142,7 +143,9 @@ public final class TunnelNavigation {
         next.setSpeed(speed);
         next.setBearing((float) bearing);
         float travelled = (float) (speed * (now - lastMovedAt) / 1000.0);
-        next.setAccuracy(Math.min(200f, 5f + travelled * 0.03f));
+        // A realistic accuracy, not a growing worst case: navigation apps keep a position this close
+        // on the road of the route; with a large one they stop following the road.
+        next.setAccuracy(Math.min(25f, 8f + travelled * 0.005f));
         next.setTime(System.currentTimeMillis());
         next.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
         estimate = next;
@@ -261,16 +264,25 @@ public final class TunnelNavigation {
     }
 
     private static Float lastCompass;
+    private static long compassChangedAt;
+    /** A compass that hasn't moved for this long while estimating is frozen. */
+    private static final long COMPASS_FROZEN_MS = 2500;
 
-    /** The car's compass, only while it changes (a compass the car derives from GPS freezes in tunnels). */
+    /**
+     * The car's compass, only while it moves. Many cars derive it from their GPS: in a tunnel it
+     * freezes on the last heading, and following it the estimate went straight on in curves, off the
+     * outside of the road.
+     */
     private static Float carCompass() {
         try {
             Object c = fresh("getCompass");
             if (c == null) return null;
             float b = (float) c.getClass().getMethod("getBearingDeg").invoke(c);
+            long now = SystemClock.elapsedRealtime();
             Float prev = lastCompass;
             lastCompass = b;
-            if (prev != null && Math.abs(wrap(b - prev)) < 0.01 && Math.abs(wrap(b - bearing)) > 3) return null;
+            if (prev == null || Math.abs(wrap(b - prev)) >= 0.01) compassChangedAt = now;
+            if (now - compassChangedAt > COMPASS_FROZEN_MS) return null;
             return b;
         } catch (Throwable t) {
             return null;
