@@ -22,7 +22,6 @@ Every item is checked against AARE first (see CLAUDE.md): only what AARE doesn't
 - [ ] Telegram / Nekogram voice messages (check where they are stored first)
 - [ ] Mixed Italian + German recognition (German street names)
 - [ ] "Take me home" passed to the navigation app (check that Vela accepts it)
-- [ ] Fuel and tyre alerts from the car data
 - [ ] Backup and restore of the patch settings
 - [ ] Tested-cars list in the README
 
