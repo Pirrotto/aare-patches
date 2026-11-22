@@ -80,6 +80,29 @@ public final class IntegratedShizuku {
         }
     }
 
+    /**
+     * Our server runs from another AARE APK than the installed one (AARE was updated or patched again
+     * since it started): its code is old and AARE's services can't start from it. A server too old to
+     * say which APK it runs from is outdated too.
+     */
+    public static boolean outdated(Context context) {
+        try {
+            IBinder binder = Shizuku.getBinder();
+            Parcel data = Parcel.obtain();
+            Parcel reply = Parcel.obtain();
+            try {
+                if (!binder.transact(IntegratedServer.TRANSACTION_APK, data, reply, 0)) return true;
+                String apk = reply.readString();
+                return apk == null || !apk.equals(context.getApplicationInfo().sourceDir);
+            } finally {
+                data.recycle();
+                reply.recycle();
+            }
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
     public static boolean canWriteSecureSettings(Context context) {
         return context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED;
     }
@@ -187,9 +210,12 @@ public final class IntegratedShizuku {
     }
 
     private static Result startServer(Context context) {
-        if (isRunning()) return Result.ALREADY_RUNNING;
+        boolean ours = isRunning();
+        if (ours && !outdated(context)) return Result.ALREADY_RUNNING;
         // AARE keeps the first Shizuku it gets: with the Shizuku app's running, ours would be ignored.
-        if (anyShizukuRunning()) return Result.SHIZUKU_APP_RUNNING;
+        if (!ours && anyShizukuRunning()) return Result.SHIZUKU_APP_RUNNING;
+        // An outdated server of ours is replaced: the start below stops it first.
+        if (ours) Log.i(TAG, "integrated shizuku: the server is from an older AARE, starting it again");
         if (!isPaired(context)) return Result.NOT_PAIRED;
         // Wireless debugging works on Wi-Fi only.
         if (!onWifi(context)) return Result.NO_WIFI;
@@ -300,7 +326,9 @@ public final class IntegratedShizuku {
                 b.append(" version=").append(Shizuku.getVersion()).append(" uid=").append(Shizuku.getUid())
                         .append(" granted=").append(Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED);
             }
-            b.append(" integrated=").append(isRunning()).append('\n');
+            b.append(" integrated=").append(isRunning());
+            if (isRunning()) b.append(" up to date=").append(!outdated(context));
+            b.append('\n');
         } catch (Throwable t) {
             b.append(" error ").append(t).append('\n');
         }

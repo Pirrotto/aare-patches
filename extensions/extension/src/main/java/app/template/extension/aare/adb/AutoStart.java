@@ -61,7 +61,10 @@ public final class AutoStart {
     private static boolean eligible(Context context) {
         if (!PatchSettings.isEnabled(context, PatchSettings.INTEGRATED_SHIZUKU)) return false;
         if (!IntegratedShizuku.autoStart(context) || !IntegratedShizuku.isPaired(context)) return false;
-        if (IntegratedShizuku.anyShizukuRunning()) return false;
+        // The Shizuku app's server: leave it. Ours: started again only if AARE was updated since.
+        if (IntegratedShizuku.anyShizukuRunning()) {
+            if (!IntegratedShizuku.isRunning() || !IntegratedShizuku.outdated(context)) return false;
+        }
         return IntegratedShizuku.canWriteSecureSettings(context)
                 || Settings.Global.getInt(context.getContentResolver(), "adb_wifi_enabled", 0) == 1;
     }
