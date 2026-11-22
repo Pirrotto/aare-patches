@@ -16,6 +16,8 @@ Each version contains everything before it; the assistant items improve the exis
 - [ ] "What's the weather?" from AARE's own Open-Meteo weather and the car's outside temperature (no new
       connection; if AARE's weather is off, say to turn it on)
 - [ ] Timers by voice, locally (AlarmClock.ACTION_SET_TIMER)
+- [ ] Requirements table in the README: minimum Android version per patch and what the car needs (e.g. car
+      microphone Android 13+, voice messages and integrated Shizuku Android 12+, tunnel navigation a car with GPS)
 
 ## v1.12 – Phase B
 
@@ -37,6 +39,8 @@ Each version contains everything before it; the assistant items improve the exis
 
 ## Later
 
+- [ ] Tunnel navigation without the car's GPS: the phone's last GPS fix plus the car's speed, replacing the
+      phone's position only inside the tunnel (check feasibility first)
 - [ ] Nicknames for contacts in the assistant ("mamma", "amore")
 - [ ] "Where did I park?" (position saved when the car disconnects)
 - [ ] Telegram / Nekogram voice messages (check where they are stored first)
