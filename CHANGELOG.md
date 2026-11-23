@@ -1,3 +1,9 @@
+## [1.10.4](https://github.com/Pirrotto/aare-patches/compare/v1.10.3...v1.10.4) (2026-11-23)
+
+### 🐛 Bug Fixes
+
+* Voice messages play only the matching recording, off by default ([091f7a2](https://github.com/Pirrotto/aare-patches/commit/091f7a298fc79cc47eede77d973f05dd3a8dbc10))
+
 ## [1.10.3](https://github.com/Pirrotto/aare-patches/compare/v1.10.2...v1.10.3) (2026-11-23)
 
 ### 🐛 Bug Fixes
