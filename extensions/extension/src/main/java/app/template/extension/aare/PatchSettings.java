@@ -140,8 +140,10 @@ public final class PatchSettings {
                         ICON_REPLY),
                 new Feature(VOICE_REPLY_BEEP,
                         phrase("Listening beep", "Bip quando ascolta"),
-                        phrase("With Voice reply: a short beep each time it starts listening, so you know when to speak.",
-                                "Con Risposta vocale: un breve bip ogni volta che inizia ad ascoltare, così sai quando parlare."),
+                        phrase("With Voice reply: a short tone going up when it starts listening and going down when it stops, "
+                                        + "as Android Auto's assistant does.",
+                                "Con Risposta vocale: un breve suono che sale quando inizia ad ascoltare e che scende quando "
+                                        + "smette, come l'assistente di Android Auto."),
                         ICON_MIC));
     }
 

@@ -7,18 +7,42 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-/** The short tone of "Listening beep", on the assistant's channel like the voice reply's speech. */
+/**
+ * The tones of "Listening beep", on the assistant's channel like the voice reply's speech, in the
+ * style of Android Auto's assistant: two short notes going up when listening starts, going down when
+ * it stops. Our own tones, not Google's sounds.
+ */
 final class Beep {
-    static final int LENGTH_MS = 120;
+    static final int NOTE_MS = 70;
+    static final int LENGTH_MS = 2 * NOTE_MS;
     private static final int RATE = 16000;
-    private static short[] samples;
+    private static short[] up;
+    private static short[] down;
 
     private Beep() {
     }
 
-    static void play() {
+    /** Listening starts. */
+    static void playStart() {
+        if (up == null) up = concat(tone(RATE, NOTE_MS, 660), tone(RATE, NOTE_MS, 990));
+        play(up);
+    }
+
+    /** Listening stopped: what was said is being handled. */
+    static void playEnd() {
+        if (down == null) down = concat(tone(RATE, NOTE_MS, 990), tone(RATE, NOTE_MS, 660));
+        play(down);
+    }
+
+    static short[] concat(short[] a, short[] b) {
+        short[] out = new short[a.length + b.length];
+        System.arraycopy(a, 0, out, 0, a.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
+    }
+
+    private static void play(short[] samples) {
         try {
-            if (samples == null) samples = tone(RATE, LENGTH_MS, 880);
             AudioTrack track = new AudioTrack.Builder()
                     .setAudioAttributes(new AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_ASSISTANT)

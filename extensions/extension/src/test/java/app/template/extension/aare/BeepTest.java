@@ -16,4 +16,13 @@ public class BeepTest {
         for (short v : t) max = Math.max(max, Math.abs(v));
         assertTrue(max > 10000 && max <= 0.41 * Short.MAX_VALUE);
     }
+
+    @Test
+    public void twoNotesMakeOneTone() {
+        short[] a = Beep.tone(16000, 70, 660);
+        short[] b = Beep.tone(16000, 70, 990);
+        short[] both = Beep.concat(a, b);
+        assertEquals(a.length + b.length, both.length);
+        assertEquals(b[5], both[a.length + 5]);
+    }
 }

@@ -413,6 +413,7 @@ public final class VoiceReply {
 
     private static void onConfirmation(String text) {
         if (state != State.CONFIRMING) return;
+        endTone();
         if (ReplyWords.wantsChange(text)) {
             // "Change message": dictated again from the start, as Android Auto does.
             PatchLog.add("reply", "change message");
@@ -479,6 +480,7 @@ public final class VoiceReply {
     /** The answer to "Do you want to reply?". */
     private static void onAskAnswer(String text) {
         if (state != State.ASKING) return;
+        endTone();
         Boolean answer = ReplyWords.askAnswer(text);
         if (Boolean.TRUE.equals(answer)) {
             PatchLog.add("reply", "asked to reply: yes");
@@ -514,6 +516,11 @@ public final class VoiceReply {
 
     /** "Do you want to reply?" was asked again once already for this message. */
     private static boolean askAskedAgain;
+
+    /** "Listening beep": the tone that says listening stopped. */
+    private static void endTone() {
+        if (PatchSettings.isEnabled(context(), PatchSettings.VOICE_REPLY_BEEP)) Beep.playEnd();
+    }
 
     private static boolean italian() {
         return "it".equals(Locale.getDefault().getLanguage());
@@ -594,7 +601,7 @@ public final class VoiceReply {
         if (firstListen && PatchSettings.isEnabled(context, PatchSettings.VOICE_REPLY_BEEP)) {
             // "Listening beep": a short tone says when to speak; listening starts once it's over,
             // so the recognizer doesn't hear it.
-            Beep.play();
+            Beep.playStart();
             main.postDelayed(() -> {
                 if (state == expected) beginListening(context, expected, noSpeechMs);
             }, Beep.LENGTH_MS + 60);
@@ -662,6 +669,7 @@ public final class VoiceReply {
         if (dictated.isEmpty()) {
             // Nothing but hesitation, or nothing at all: as before.
             releaseListenFocus();
+            endTone();
             onDictated(null);
             return;
         }
@@ -680,6 +688,7 @@ public final class VoiceReply {
         if (state != State.DICTATING) return;
         stopListening();
         if (dictatedPieces > 1) PatchLog.add("reply", "dictation ends after a pause (" + dictatedPieces + " pieces)");
+        endTone();
         onDictated(dictated);
     }
 
