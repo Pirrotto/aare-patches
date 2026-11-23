@@ -26,8 +26,17 @@ public final class TunnelNavigation {
 
     /** No new GPS position for this long while moving: the estimate starts. */
     private static final long STALE_MS = 2500;
-    /** At most this long without GPS: past it, an estimate is too far off to help. */
-    private static final long MAX_MS = 15 * 60_000;
+    /**
+     * Limits of an estimate: past 5 minutes or 5 km without GPS it is too far off to help, and other
+     * apps get this position too, so it stops (the position stays put, as without this feature).
+     */
+    private static final long MAX_MS = 5 * 60_000;
+    static final double MAX_DISTANCE_M = 5000;
+    /**
+     * Honest accuracy: the estimate's error grows with the distance driven without GPS, about 6 %
+     * (heading a few degrees off, speed a few percent), on top of the last fix's own accuracy.
+     */
+    static final double ERROR_PER_M = 0.06;
     private static final float MOVING_MPS = 2f;
 
     private static WeakReference<Object> feed = new WeakReference<>(null);
@@ -40,6 +49,9 @@ public final class TunnelNavigation {
 
     // The estimate.
     private static Location estimate;
+    private static double travelledM;
+    private static float startAccuracy;
+    private static boolean limitLogged;
     private static double bearing = Double.NaN;
     private static long estimateAt;
     private static final ThreadLocal<Boolean> pushingOurs = new ThreadLocal<>();
@@ -119,6 +131,9 @@ public final class TunnelNavigation {
         if (estimate == null) {
             estimate = new Location(lastFix);
             estimateAt = lastMovedAt;
+            travelledM = 0;
+            limitLogged = false;
+            startAccuracy = lastFix.hasAccuracy() ? lastFix.getAccuracy() : 10f;
             if (Double.isNaN(bearing) && lastFix.hasBearing()) bearing = lastFix.getBearing();
             Log.i(TAG, "no GPS while moving: estimating from the last fix");
         }
@@ -139,13 +154,16 @@ public final class TunnelNavigation {
         }
 
         double distance = speed * dt;
+        if (travelledM + distance > MAX_DISTANCE_M) {
+            if (!limitLogged) Log.i(TAG, "estimate stopped after " + (int) travelledM + " m without GPS");
+            limitLogged = true;
+            return;
+        }
+        travelledM += distance;
         Location next = destination(estimate, bearing, distance);
         next.setSpeed(speed);
         next.setBearing((float) bearing);
-        float travelled = (float) (speed * (now - lastMovedAt) / 1000.0);
-        // A realistic accuracy, not a growing worst case: navigation apps keep a position this close
-        // on the road of the route; with a large one they stop following the road.
-        next.setAccuracy(Math.min(25f, 8f + travelled * 0.005f));
+        next.setAccuracy(accuracy(startAccuracy, travelledM));
         next.setTime(System.currentTimeMillis());
         next.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
         estimate = next;
@@ -159,6 +177,11 @@ public final class TunnelNavigation {
         } finally {
             pushingOurs.remove();
         }
+    }
+
+    /** The honest accuracy of an estimate [travelled] metres from a fix of accuracy [start]. */
+    static float accuracy(float start, double travelled) {
+        return (float) (Math.max(start, 3f) + ERROR_PER_M * travelled);
     }
 
     /** Learns which way the gyroscope turns, from the GPS bearing while driving. */
