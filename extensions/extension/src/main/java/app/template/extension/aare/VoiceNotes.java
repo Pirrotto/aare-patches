@@ -405,8 +405,9 @@ public final class VoiceNotes {
                 return;
             }
             if (item instanceof Runnable) {
-                // Not audio: no focus needed. Release it first if nothing else is queued.
-                if (queue.isEmpty()) releaseFocus();
+                // Not audio. Run first, then release the focus once nothing else is queued (next()):
+                // what runs (a voice reply's question) may take its own focus, so the music doesn't
+                // come back for a moment in between.
                 try {
                     ((Runnable) item).run();
                 } catch (Throwable t) {
