@@ -622,6 +622,16 @@ public final class VoiceReply {
 
         @Override
         public void onPartialResults(Bundle partialResults) {
+            if (current() && expected == State.ASKING) {
+                // A clear yes or no while still speaking: no need to wait for the recognizer's silence.
+                String heard = first(partialResults);
+                if (ReplyWords.askAnswer(heard) != null) {
+                    PatchLog.add("reply", "asked to reply: answer heard before the end");
+                    stopListening();
+                    onAskAnswer(heard);
+                }
+                return;
+            }
             if (!current() || expected != State.DICTATING) return;
             if (cardClosed()) {
                 closedOnCar();
