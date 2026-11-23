@@ -555,9 +555,25 @@ public final class VoiceReply {
             PatchLog.add("reply", "no context to listen");
             return;
         }
-        if (dictatedPieces == 0 || expected != State.DICTATING) {
+        boolean firstListen = dictatedPieces == 0 || expected != State.DICTATING;
+        if (firstListen) {
             PatchLog.add("reply", asking ? "asked to reply, listening for yes/no" : confirming ? "listening for yes/no" : "listening for the answer");
         }
+        if (firstListen && PatchSettings.isEnabled(context, PatchSettings.VOICE_REPLY_BEEP)) {
+            // "Listening beep": a short tone says when to speak; listening starts once it's over,
+            // so the recognizer doesn't hear it.
+            Beep.play();
+            main.postDelayed(() -> {
+                if (state == expected) beginListening(context, expected, noSpeechMs);
+            }, Beep.LENGTH_MS + 60);
+            return;
+        }
+        beginListening(context, expected, noSpeechMs);
+    }
+
+    private static void beginListening(Context context, State expected, long noSpeechMs) {
+        boolean confirming = expected == State.CONFIRMING;
+        boolean asking = expected == State.ASKING;
         try {
             if (recognizer == null) {
                 boolean onDevice = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
