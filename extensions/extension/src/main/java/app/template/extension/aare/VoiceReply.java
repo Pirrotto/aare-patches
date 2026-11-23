@@ -268,6 +268,8 @@ public final class VoiceReply {
         state = State.DICTATING;
         draft = "";
         listenStarted = false;
+        dictated = "";
+        dictatedPieces = 0;
         PatchLog.add("reply", "dictation starts");
         showCard(replyTitle(), phrase("Speak now…", "Parla ora…"), action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
         speakingOurs = true;
@@ -291,6 +293,11 @@ public final class VoiceReply {
 
     /** Whether listening started for the current dictation. */
     private static boolean listenStarted;
+
+    /** What was dictated so far: the recognizer stops at short pauses, the dictation goes on. */
+    private static String dictated = "";
+    private static int dictatedPieces;
+    private static long dictationStartedAt;
 
     /** The question or the read-back of this reply is being spoken. */
     private static boolean speakingOurs;
@@ -452,13 +459,21 @@ public final class VoiceReply {
     }
 
     private static void listenFor(State expected) {
-        boolean confirming = expected == State.CONFIRMING;
         boolean asking = expected == State.ASKING;
         if (state != expected) return;
         if (expected == State.DICTATING) {
             if (listenStarted) return;
             listenStarted = true;
+            dictationStartedAt = SystemClock.uptimeMillis();
         }
+        startRecognizer(expected, asking ? ASK_NO_SPEECH_MS : NO_SPEECH_MS);
+    }
+
+    /** Starts the recognizer for [expected], giving up if no speech starts within [noSpeechMs]. */
+    private static void startRecognizer(State expected, long noSpeechMs) {
+        boolean confirming = expected == State.CONFIRMING;
+        boolean asking = expected == State.ASKING;
+        if (state != expected) return;
         if (cardClosed()) {
             PatchLog.add("reply", "card closed before listening" + (card == null ? " (no card)" : runtime.get() == null ? " (no car session)" : ""));
             closedOnCar();
@@ -469,7 +484,9 @@ public final class VoiceReply {
             PatchLog.add("reply", "no context to listen");
             return;
         }
-        PatchLog.add("reply", asking ? "asked to reply, listening for yes/no" : confirming ? "listening for yes/no" : "listening for the answer");
+        if (dictatedPieces == 0 || expected != State.DICTATING) {
+            PatchLog.add("reply", asking ? "asked to reply, listening for yes/no" : confirming ? "listening for yes/no" : "listening for the answer");
+        }
         try {
             if (recognizer == null) {
                 boolean onDevice = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -493,12 +510,14 @@ public final class VoiceReply {
             // With AARE's "Car microphone for phone apps" on, the recognizer hears the car by itself.
             recognizer.startListening(intent);
             listenStartedAt = SystemClock.uptimeMillis();
-            scheduleListenTimeout(expected, asking ? ASK_NO_SPEECH_MS : NO_SPEECH_MS);
+            scheduleListenTimeout(expected, noSpeechMs);
         } catch (Throwable t) {
             Log.w(TAG, "listen", t);
             PatchLog.add("reply", "speech recognition can't start: " + t.getClass().getSimpleName());
             releaseListenFocus();
-            if (asking) {
+            if (expected == State.DICTATING && !dictated.isEmpty()) {
+                finishDictation();
+            } else if (asking) {
                 backToOffer();
             } else if (!confirming) {
                 speaker().say(phrase("Voice input isn't available.", "Il riconoscimento vocale non è disponibile."), null);
@@ -509,6 +528,41 @@ public final class VoiceReply {
 
     /** Longest wait for the user to start talking: the music is paused meanwhile. */
     private static final long NO_SPEECH_MS = 15_000L;
+
+    /** A dictation ends once the user stayed quiet this long after the last words. */
+    private static final long DICTATION_PAUSE_MS = 2_500L;
+
+    /** A piece of the dictation came: keep listening for more, unless the user stays quiet. */
+    private static void onDictationPiece(String text) {
+        if (state != State.DICTATING) return;
+        String piece = DictationText.clean(text);
+        if (!piece.isEmpty()) {
+            dictated = DictationText.join(dictated, piece);
+            dictatedPieces++;
+        }
+        if (dictated.isEmpty()) {
+            // Nothing but hesitation, or nothing at all: as before.
+            releaseListenFocus();
+            onDictated(null);
+            return;
+        }
+        long left = MAX_LISTEN_MS - (SystemClock.uptimeMillis() - dictationStartedAt);
+        if (left <= 0) {
+            finishDictation();
+            return;
+        }
+        showCard(replyTitle(), capitalize(dictated) + " …", action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
+        // The focus stays: the music doesn't come back between two pieces.
+        main.post(() -> startRecognizer(State.DICTATING, Math.min(DICTATION_PAUSE_MS, left)));
+    }
+
+    /** The dictation is over: what was said goes to "Send it?". */
+    private static void finishDictation() {
+        if (state != State.DICTATING) return;
+        stopListening();
+        if (dictatedPieces > 1) PatchLog.add("reply", "dictation ends after a pause (" + dictatedPieces + " pieces)");
+        onDictated(dictated);
+    }
 
     /** After "Do you want to reply?": a short wait, the music is paused meanwhile. */
     private static final long ASK_NO_SPEECH_MS = 6_000L;
@@ -524,9 +578,15 @@ public final class VoiceReply {
         listenTimeout = () -> {
             listenTimeout = null;
             if (state != expected) return;
-            PatchLog.add("reply", "speech recognizer gave no answer in time");
+            if (!(expected == State.DICTATING && !dictated.isEmpty())) {
+                PatchLog.add("reply", "speech recognizer gave no answer in time");
+            }
             if (expected == State.ASKING) {
                 backToOffer();
+                return;
+            }
+            if (expected == State.DICTATING && !dictated.isEmpty()) {
+                finishDictation();
                 return;
             }
             stopListening();
@@ -572,7 +632,8 @@ public final class VoiceReply {
         public void onBeginningOfSpeech() {
             // Speech started: the recognizer ends on the silence after it; only the overall limit stays.
             if (!current()) return;
-            scheduleListenTimeout(expected, MAX_LISTEN_MS - (SystemClock.uptimeMillis() - listenStartedAt));
+            long since = expected == State.DICTATING ? dictationStartedAt : listenStartedAt;
+            scheduleListenTimeout(expected, MAX_LISTEN_MS - (SystemClock.uptimeMillis() - since));
         }
 
         @Override
@@ -590,6 +651,11 @@ public final class VoiceReply {
         @Override
         public void onError(int error) {
             if (current()) cancelListenTimeout();
+            if (current() && expected == State.DICTATING && !dictated.isEmpty()) {
+                // Silence after the last words (or a hiccup): the dictation is what was said so far.
+                finishDictation();
+                return;
+            }
             releaseListenFocus();
             if (!current()) return;
             Log.i(TAG, "recognition error " + error);
@@ -612,11 +678,14 @@ public final class VoiceReply {
         @Override
         public void onResults(Bundle results) {
             if (current()) cancelListenTimeout();
+            if (current() && expected == State.DICTATING) {
+                onDictationPiece(first(results));
+                return;
+            }
             releaseListenFocus();
             if (!current()) return;
             String text = first(results);
             if (expected == State.ASKING) onAskAnswer(text);
-            else if (expected == State.DICTATING) onDictated(text);
             else onConfirmation(text);
         }
 
@@ -637,9 +706,9 @@ public final class VoiceReply {
                 closedOnCar();
                 return;
             }
-            String text = first(partialResults);
-            if (text != null && !text.trim().isEmpty()) {
-                showCard(replyTitle(), capitalize(text.trim()) + " …", action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
+            String text = DictationText.join(dictated, DictationText.clean(first(partialResults)));
+            if (!text.isEmpty()) {
+                showCard(replyTitle(), capitalize(text) + " …", action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
             }
         }
 
