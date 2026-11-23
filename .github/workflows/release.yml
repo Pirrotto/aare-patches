@@ -1,8 +1,11 @@
 name: Release
 
+# Public releases only: main gets dev merged on Thursday evening and Saturday evening / Sunday
+# morning (see CLAUDE.md). Day-to-day work is checked by test-build.yml.
 on:
   workflow_dispatch:
   push:
+    branches: [main]
 
 jobs:
   release:

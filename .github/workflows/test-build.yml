@@ -1,0 +1,58 @@
+name: Test build
+
+# Every branch but main: tests, build, and the patches applied to the official AARE APK.
+# On dev the patches file is kept as a private test build (an artifact, not a release).
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+  pull_request:
+
+jobs:
+  test-build:
+    name: Test, build, apply to AARE
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AARE_VERSION: "1.6.0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Unit tests
+        run: ./gradlew :extensions:extension:test --no-daemon
+
+      - name: Build patches
+        run: ./gradlew :patches:buildAndroid --no-daemon && ls -la patches/build/libs
+
+      - name: Apply to the official AARE APK
+        run: |
+          set -e
+          mkdir -p work
+          gh release download "v$AARE_VERSION" -R prototux/AARE --pattern '*.apk' --dir work
+          gh release download -R MorpheApp/morphe-cli --pattern '*.jar' --dir work/cli
+          ls -la work work/cli
+          CLI=$(ls work/cli/*.jar | head -1)
+          java -jar "$CLI" patch --help | head -60 || true
+          java -jar "$CLI" patch --patches patches/build/libs/patches-*.mpp --out work/patched.apk work/*.apk 2>&1 | tee work/apply.log
+          grep -iE "failed|error|exception" work/apply.log && exit 1 || true
+          ls -la work/patched.apk
+
+      - name: Keep the test build (dev only)
+        if: github.ref == 'refs/heads/dev'
+        uses: actions/upload-artifact@v6
+        with:
+          name: aare-patches-test
+          path: patches/build/libs/patches-*.mpp
+          archive: false
+          retention-days: 14
