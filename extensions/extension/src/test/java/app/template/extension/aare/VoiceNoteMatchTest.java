@@ -15,6 +15,17 @@ public class VoiceNoteMatchTest {
     private static final long T = 1_700_000_000_000L; // message time
 
     @Test
+    public void aRepostedVoiceMessageIsTheSameMessage() {
+        assertTrue(VoiceNoteMatch.sameText("🎤 Messaggio vocale (0:05)", "Messaggio vocale"));
+        assertTrue(VoiceNoteMatch.sameText("Voice message (0:05)", "voice  message"));
+        assertTrue(VoiceNoteMatch.sameText("Ciao", "ciao "));
+        assertFalse(VoiceNoteMatch.sameText("Ciao", "Ciao a tutti"));
+        assertFalse(VoiceNoteMatch.sameText("(0:05)", "🎤"));
+        assertFalse(VoiceNoteMatch.sameText(null, ""));
+        assertEquals("anna. messaggio vocale", VoiceNoteMatch.comparable("Anna. 🎤 Messaggio vocale (1:02)"));
+    }
+
+    @Test
     public void notificationDurations() {
         assertEquals(5000, VoiceNoteMatch.statedMs("🎤 Messaggio vocale (0:05)"));
         assertEquals(754_000, VoiceNoteMatch.statedMs("Voice message (12:34)"));

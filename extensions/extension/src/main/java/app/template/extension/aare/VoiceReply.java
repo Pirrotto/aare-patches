@@ -145,6 +145,7 @@ public final class VoiceReply {
             Method conversations = notificationListener.getClass().getMethod("conversations", String.class);
             List<?> list = (List<?>) conversations.invoke(notificationListener, (Object) null);
             if (list == null) return null;
+            String said = VoiceNoteMatch.comparable(spoken);
             for (Object c : list) {
                 if (!(Boolean) call(c, "getCanReply")) continue;
                 if (spoken.equals(call(c, "spoken"))) return c;
@@ -153,6 +154,12 @@ public final class VoiceReply {
                 Object last = lines.get(lines.size() - 1);
                 String text = (String) call(last, "getText");
                 if (text != null && !text.isEmpty() && spoken.endsWith(text)) return c;
+                // A voice message reposted with its duration added: compared without it.
+                String lastText = VoiceNoteMatch.comparable(text);
+                if (!lastText.isEmpty() && said.endsWith(lastText)) {
+                    PatchLog.add("reply", "conversation found by its message without duration");
+                    return c;
+                }
             }
         } catch (Throwable t) {
             Log.w(TAG, "conversations", t);
@@ -175,7 +182,8 @@ public final class VoiceReply {
             if (lines == null) continue;
             boolean hasText = false;
             for (Object line : lines) {
-                if (noticeText != null && noticeText.equals(call(line, "getText"))) hasText = true;
+                String text = (String) call(line, "getText");
+                if (noticeText != null && (noticeText.equals(text) || VoiceNoteMatch.sameText(noticeText, text))) hasText = true;
             }
             if (!hasText) continue;
             String name = String.valueOf(call(c, "getTitle"));
@@ -200,7 +208,11 @@ public final class VoiceReply {
                 icon = (Bitmap) call(c, "getIcon");
                 draft = "";
                 if (!showCard(title, phrase("Answer by voice?", "Vuoi rispondere?"),
-                        action(phrase("Reply", "Rispondi"), VoiceReply::startDictation))) return;
+                        action(phrase("Reply", "Rispondi"), VoiceReply::startDictation))) {
+                    PatchLog.add("reply", "Reply card could not be shown");
+                    return;
+                }
+                PatchLog.add("reply", "Reply card shown");
                 state = State.OFFERED;
                 expireOffer();
             } catch (Throwable t) {
@@ -216,6 +228,7 @@ public final class VoiceReply {
             Object l = VoiceNotes.listener();
             Object c = l == null ? null : findConversation(l, noticeTitle, noticeText);
             if (c == null) {
+                PatchLog.add("reply", "Reply from the notification centre: conversation not found" + (l == null ? " (no listener)" : ""));
                 if (l != null) {
                     listener = l;
                     speaker().say(phrase("This message can't be answered any more.", "Non si può più rispondere a questo messaggio."), null);
@@ -234,21 +247,42 @@ public final class VoiceReply {
     }
 
     private static void startDictation() {
+        if (context() == null) {
+            PatchLog.add("reply", "Reply tapped but AARE's listener is gone");
+            return;
+        }
         state = State.DICTATING;
         draft = "";
+        listenStarted = false;
+        PatchLog.add("reply", "dictation starts");
         showCard(replyTitle(), phrase("Speak now…", "Parla ora…"), action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
         speaker().say(phrase("What's your answer to " + title + "?", "Cosa vuoi rispondere a " + title + "?"),
                 () -> listen(false));
+        // If the question is never finished (audio stuck after a voice message), listen anyway.
+        main.postDelayed(() -> {
+            if (state == State.DICTATING && !listenStarted) {
+                PatchLog.add("reply", "question not finished after " + PROMPT_MS / 1000 + " s: listening anyway");
+                listen(false);
+            }
+        }, PROMPT_MS);
     }
+
+    /** The longest the question "What's your answer…" can take before listening starts anyway. */
+    private static final long PROMPT_MS = 8_000L;
+
+    /** Whether listening started for the current dictation. */
+    private static boolean listenStarted;
 
     private static void onDictated(String text) {
         if (state != State.DICTATING) return;
         if (text == null || text.trim().isEmpty()) {
+            PatchLog.add("reply", "dictation: nothing recognised");
             speaker().say(phrase("I didn't catch that.", "Non ho capito."), null);
             offerAgain();
             return;
         }
         draft = capitalize(text.trim());
+        PatchLog.add("reply", "dictation recognised, asking to confirm");
         state = State.CONFIRMING;
         showCard(replyTitle(), draft,
                 action(phrase("Send", "Invia"), VoiceReply::send),
@@ -278,6 +312,7 @@ public final class VoiceReply {
         }
         removeCard();
         state = State.IDLE;
+        PatchLog.add("reply", sent ? "sent" : "sending failed");
         speaker().say(sent ? phrase("Message sent.", "Messaggio inviato.")
                 : phrase("The message could not be sent.", "Non sono riuscito a inviare il messaggio."), null);
     }
@@ -286,6 +321,7 @@ public final class VoiceReply {
         stopListening();
         removeCard();
         boolean wasActive = state == State.DICTATING || state == State.CONFIRMING;
+        if (wasActive) PatchLog.add("reply", "cancelled in state " + state);
         state = State.IDLE;
         draft = "";
         if (wasActive) speaker().say(phrase("Cancelled.", "Annullato."), null);
@@ -324,12 +360,21 @@ public final class VoiceReply {
     private static void listen(boolean confirming) {
         State expected = confirming ? State.CONFIRMING : State.DICTATING;
         if (state != expected) return;
+        if (!confirming) {
+            if (listenStarted) return;
+            listenStarted = true;
+        }
         if (cardClosed()) {
+            PatchLog.add("reply", "card closed before listening" + (card == null ? " (no card)" : runtime.get() == null ? " (no car session)" : ""));
             cancel();
             return;
         }
         Context context = context();
-        if (context == null) return;
+        if (context == null) {
+            PatchLog.add("reply", "no context to listen");
+            return;
+        }
+        PatchLog.add("reply", confirming ? "listening for yes/no" : "listening for the answer");
         try {
             if (recognizer == null) {
                 boolean onDevice = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -354,6 +399,7 @@ public final class VoiceReply {
             recognizer.startListening(intent);
         } catch (Throwable t) {
             Log.w(TAG, "listen", t);
+            PatchLog.add("reply", "speech recognition can't start: " + t.getClass().getSimpleName());
             releaseListenFocus();
             if (!confirming) {
                 speaker().say(phrase("Voice input isn't available.", "Il riconoscimento vocale non è disponibile."), null);
@@ -406,6 +452,7 @@ public final class VoiceReply {
             releaseListenFocus();
             if (!current()) return;
             Log.i(TAG, "recognition error " + error);
+            PatchLog.add("reply", "speech recognition error " + error);
             if (expected == State.DICTATING) {
                 if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
                     speaker().say(phrase("Allow AARE to use the microphone.", "Concedi ad AARE il microfono."), null);

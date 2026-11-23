@@ -26,6 +26,23 @@ final class VoiceNoteMatch {
     private VoiceNoteMatch() {
     }
 
+    /**
+     * A message text as compared between a notification and AARE's conversation: WhatsApp reposts a
+     * voice message with the duration or the microphone added once the audio is there, so those,
+     * spacing and case don't count.
+     */
+    static String comparable(String text) {
+        if (text == null) return "";
+        String t = STATED.matcher(text).replaceAll(" ").replace("\uD83C\uDFA4", " ");
+        return t.replaceAll("\\s+", " ").trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /** Whether two message texts are the same message (see [comparable]); empty texts never are. */
+    static boolean sameText(String a, String b) {
+        String x = comparable(a);
+        return !x.isEmpty() && x.equals(comparable(b));
+    }
+
     /** The duration a notification text states, in ms (the last one), or -1 if none. */
     static long statedMs(String text) {
         if (text == null) return -1;
