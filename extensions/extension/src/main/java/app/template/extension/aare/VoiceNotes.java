@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -60,15 +59,6 @@ public final class VoiceNotes {
 
     /** A voice message in a spoken text when it isn't among the records (AARE was restarted). */
     private static final Pattern MIC_SEGMENT = Pattern.compile(MIC + "[^.\\n]*");
-
-    /** "(0:05)": the duration a notification gives for a voice message. */
-    private static final Pattern STATED = Pattern.compile("\\((\\d{1,3}):(\\d{2})\\)");
-    /** A recording's length may differ this much from the stated one (it is rounded to seconds). */
-    private static final long DURATION_SLACK_MS = 1500;
-
-    /** How far a recording's file time may be from the message time. */
-    private static final long BEFORE_MS = 2 * 60_000L;
-    private static final long AFTER_MS = 60 * 60_000L;
 
     private static final int MAX_RECORDS = 200;
 
@@ -167,8 +157,7 @@ public final class VoiceNotes {
     private static void prepare(Context context, Player player, String text, List<Segment> voices, Runnable after) {
         List<Object> items = new ArrayList<>();
         try {
-            List<VoiceNotesAccess.Recording> recordings = VoiceNotesAccess.list(context);
-            if (recordings == null) {
+            if (!VoiceNotesAccess.reachable(context)) {
                 items.add(replaceVoices(text, voices, phrase("voice message", "messaggio vocale")));
                 if (!shizukuHintSpoken) {
                     shizukuHintSpoken = true;
@@ -187,18 +176,13 @@ public final class VoiceNotes {
                         start = v.end;
                         continue;
                     }
-                    ParcelFileDescriptor pfd = null;
-                    for (VoiceNotesAccess.Recording r : candidates(recordings, v.record, used)) {
-                        // Same length as the notification says, else it is another voice note (one
-                        // the user sent, or another chat's): never played.
-                        if (!lengthMatches(context, r, v.record)) continue;
-                        pfd = VoiceNotesAccess.open(context, r.path);
-                        if (pfd != null) {
-                            used.add(r.path);
-                            break;
-                        }
+                    // The helper picks the file saved right after the message and as long as it says
+                    // (VoiceNoteMatch): never one the user sent, nor another chat's.
+                    VoiceNotesAccess.Found found = VoiceNotesAccess.find(context, v.record.timeMs, VoiceNoteMatch.statedMs(v.record.text), used);
+                    if (found != null) {
+                        used.add(found.token);
+                        items.add(found.pfd);
                     }
-                    if (pfd != null) items.add(pfd);
                     else items.add(phrase("Voice message not downloaded yet.", "Messaggio vocale non ancora scaricato."));
                     start = v.end;
                 }
@@ -307,62 +291,6 @@ public final class VoiceNotes {
             start = v.end;
         }
         return b.append(text.substring(start)).toString();
-    }
-
-    /**
-     * The recordings that may be this voice message, best first: voice notes saved from a little
-     * before to an hour after the message time, those saved after it first, closest first.
-     */
-    private static List<VoiceNotesAccess.Recording> candidates(
-            List<VoiceNotesAccess.Recording> recordings, Record record, Set<String> used) {
-        List<VoiceNotesAccess.Recording> out = new ArrayList<>();
-        if (record == null || record.timeMs <= 0) return out;
-        for (VoiceNotesAccess.Recording f : recordings) {
-            if (used.contains(f.path) || f.size == 0) continue;
-            long delta = f.modifiedMs - record.timeMs;
-            if (delta < -BEFORE_MS || delta > AFTER_MS) continue;
-            out.add(f);
-        }
-        out.sort((a, b) -> Long.compare(score(a, record), score(b, record)));
-        if (out.size() > 3) out = new ArrayList<>(out.subList(0, 3));
-        return out;
-    }
-
-    /** A file saved before the message time is a weaker match than one after it. */
-    private static long score(VoiceNotesAccess.Recording f, Record record) {
-        long delta = f.modifiedMs - record.timeMs;
-        return delta >= 0 ? delta : -delta * 10;
-    }
-
-    /** The duration the notification states, in ms, or -1 if it states none. */
-    static long statedMs(String text) {
-        if (text == null) return -1;
-        Matcher m = STATED.matcher(text);
-        long found = -1;
-        while (m.find()) found = (Long.parseLong(m.group(1)) * 60 + Long.parseLong(m.group(2))) * 1000;
-        return found;
-    }
-
-    /**
-     * Whether [r] lasts what the notification says. A recording whose length can't be read doesn't
-     * match; without a stated duration the time match has to do.
-     */
-    private static boolean lengthMatches(Context context, VoiceNotesAccess.Recording r, Record record) {
-        long stated = statedMs(record.text);
-        if (stated < 0) return true;
-        ParcelFileDescriptor pfd = VoiceNotesAccess.open(context, r.path);
-        if (pfd == null) return false;
-        android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
-        try {
-            mmr.setDataSource(pfd.getFileDescriptor());
-            String d = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);
-            return d != null && Math.abs(Long.parseLong(d) - stated) <= DURATION_SLACK_MS;
-        } catch (Throwable t) {
-            return false;
-        } finally {
-            try { mmr.release(); } catch (Throwable ignored) { }
-            try { pfd.close(); } catch (Throwable ignored) { }
-        }
     }
 
     private static String phrase(String english, String italian) {
