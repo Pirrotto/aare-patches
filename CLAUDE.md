@@ -52,6 +52,8 @@ Talk to the owner in **Italian**.
 - Work on a branch and open a pull request; merge only when CI is green.
 - Review every change against the security list above.
 - `feat:` for new features, `fix:` for fixes, `chore:` for anything that must not release.
+- Never put a link to the Claude session (claude.ai/code/session_…) in commits, pull requests,
+  comments or releases, in this repo or in AARE.
 - Update the README (patch description and "What's new / Novità") with every feature.
 - Things CI can't test (car audio, microphone, tunnels) are tested by the owner in the car before being
   recommended to others.
