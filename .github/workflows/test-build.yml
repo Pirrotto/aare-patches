@@ -49,6 +49,7 @@ jobs:
           ls -la work/patched.apk
 
       - name: Name the test build (date, time and change)
+        id: name
         if: github.ref == 'refs/heads/dev'
         run: |
           # A different name for every test build, so they can be told apart on the phone.
@@ -56,11 +57,13 @@ jobs:
           mkdir -p work/test-build
           cp patches/build/libs/patches-*.mpp "work/test-build/$NAME"
           ls -la work/test-build
+          echo "name=${NAME%.mpp}" >> "$GITHUB_OUTPUT"
 
       - name: Keep the test build (dev only)
         if: github.ref == 'refs/heads/dev'
         uses: actions/upload-artifact@v6
         with:
+          name: ${{ steps.name.outputs.name }}
           path: work/test-build/*.mpp
           archive: false
           retention-days: 14
