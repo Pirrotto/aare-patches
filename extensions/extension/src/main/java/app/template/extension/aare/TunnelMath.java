@@ -33,12 +33,22 @@ final class TunnelMath {
     }
 
     /**
-     * [sameSpot]: the fix is where the last one was. While estimating, such a fix is always the
-     * car's stale one: standing in a queue in the tunnel it used to reset the estimate back to the
-     * tunnel's entrance.
+     * Whether a fix [movedM] from the last one is the car's stale position, when driving should have
+     * moved it [expectedM] (speed × time since the last fix). In tunnels some cars repeat their last
+     * fix with a few metres of jitter: a fixed 1 m threshold took those as real and froze the
+     * position. A real fix moves at least a third of the expected distance.
      */
-    static FixAction fixAction(boolean sameSpot, boolean moving, boolean estimating) {
-        if (!sameSpot) return FixAction.USE;
+    static boolean isStale(double movedM, double expectedM) {
+        if (movedM < 1) return true;
+        return expectedM >= 3 && movedM < expectedM / 3;
+    }
+
+    /**
+     * [stale]: see isStale. While estimating, a stale fix is always dropped: standing in a queue in
+     * the tunnel it used to reset the estimate back to the tunnel's entrance.
+     */
+    static FixAction fixAction(boolean stale, boolean moving, boolean estimating) {
+        if (!stale) return FixAction.USE;
         if (estimating) return FixAction.DROP;
         return moving ? FixAction.PASS : FixAction.USE;
     }

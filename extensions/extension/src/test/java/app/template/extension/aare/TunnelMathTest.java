@@ -66,6 +66,18 @@ public class TunnelMathTest {
     }
 
     @Test
+    public void aRepeatedFixWithJitterIsStale() {
+        // Driving 20 m/s, 1 s since the last fix: a real one moved ~20 m.
+        assertFalse(TunnelMath.isStale(19, 20));
+        // The car's tunnel fix repeated with a few metres of jitter: stale (it used to freeze the position).
+        assertTrue(TunnelMath.isStale(4, 20));
+        assertTrue(TunnelMath.isStale(0.5, 20));
+        // Standing still or crawling: only a fix that didn't move at all is the same spot.
+        assertFalse(TunnelMath.isStale(2, 1));
+        assertTrue(TunnelMath.isStale(0.2, 0));
+    }
+
+    @Test
     public void aFrozenCompassIsIgnored() {
         TunnelMath.CompassWatch watch = new TunnelMath.CompassWatch();
         assertEquals(100f, watch.update(100f, 0), 0);

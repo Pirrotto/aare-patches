@@ -44,6 +44,9 @@ public final class TunnelNavigation {
     private static long movingMs;
     private static float startAccuracy;
     private static boolean limitLogged;
+    private static boolean passLogged;
+    // Diagnostics: where the heading came from during the current estimate.
+    private static int compassSteps, gyroSteps, straightSteps, noSpeedSteps;
     private static double bearing = Double.NaN;
     private static long estimateAt;
     private static final ThreadLocal<Boolean> pushingOurs = new ThreadLocal<>();
@@ -69,19 +72,35 @@ public final class TunnelNavigation {
             ensureWorker();
             long now = SystemClock.elapsedRealtime();
 
-            boolean sameSpot = lastFix != null && fix.distanceTo(lastFix) < 1f;
-            switch (TunnelMath.fixAction(sameSpot, moving(), estimate != null)) {
+            boolean stale = false;
+            if (lastFix != null) {
+                Float v = carSpeed();
+                double expected = v == null ? 0 : v * (now - lastFixAt) / 1000.0;
+                stale = TunnelMath.isStale(fix.distanceTo(lastFix), expected);
+            }
+            switch (TunnelMath.fixAction(stale, moving(), estimate != null)) {
                 case DROP: return true; // the car's stale fix: keep the estimate going
-                case PASS: return false; // no GPS yet, no estimate yet: as without the feature
+                case PASS:
+                    if (!passLogged) PatchLog.add("tunnel", "car repeats its fix while driving");
+                    passLogged = true;
+                    return false; // no GPS yet, no estimate yet: as without the feature
                 default: break;
             }
+            passLogged = false;
+            noSpeedSteps = 0;
 
             learnGyroSign(fix);
             carCompass(); // follows the compass outside tunnels too, to tell when it freezes
-            if (estimate != null) Log.i(TAG, "GPS back after " + (now - lastFixAt) / 1000 + " s, " + (int) fix.distanceTo(estimate) + " m from the estimate");
+            if (estimate != null) {
+                String back = "GPS back after " + (now - lastFixAt) / 1000 + " s, " + (int) travelledM + " m estimated, "
+                        + (int) fix.distanceTo(estimate) + " m from the estimate; heading steps compass=" + compassSteps
+                        + " gyro=" + gyroSteps + " straight=" + straightSteps;
+                Log.i(TAG, back);
+                PatchLog.add("tunnel", back);
+            }
             lastFix = new Location(fix);
             lastFixAt = now;
-            if (!sameSpot) lastMovedAt = now;
+            if (!stale) lastMovedAt = now;
             estimate = null;
             if (fix.hasBearing() && fix.hasSpeed() && fix.getSpeed() > MOVING_MPS) bearing = fix.getBearing();
             return false;
@@ -119,7 +138,11 @@ public final class TunnelNavigation {
         long sinceFix = now - Math.max(lastFixAt, lastMovedAt);
         if (sinceFix < STALE_MS) return;
         Float speed = carSpeed();
-        if (speed == null || !connected()) return;
+        if (speed == null || !connected()) {
+            noSpeedSteps++;
+            if (noSpeedSteps == 3) PatchLog.add("tunnel", "no GPS, but " + (speed == null ? "no fresh speed from the car" : "car not connected") + ": no estimate");
+            return;
+        }
 
         if (estimate == null) {
             estimate = new Location(lastFix);
@@ -130,6 +153,10 @@ public final class TunnelNavigation {
             startAccuracy = lastFix.hasAccuracy() ? lastFix.getAccuracy() : 10f;
             if (Double.isNaN(bearing) && lastFix.hasBearing()) bearing = lastFix.getBearing();
             Log.i(TAG, "no GPS while moving: estimating from the last fix");
+            compassSteps = gyroSteps = straightSteps = noSpeedSteps = 0;
+            PatchLog.add("tunnel", "estimate starts; gyro learned=" + (Math.abs(gyroCorrelation) > 2)
+                    + " (correlation " + (int) gyroCorrelation + "), compass "
+                    + (carCompass() != null ? "live" : "frozen or missing") + ", gyro " + (carYawRate() != null ? "sent" : "missing"));
         }
         if (Double.isNaN(bearing)) return;
 
@@ -142,15 +169,23 @@ public final class TunnelNavigation {
         Float yaw = carYawRate();
         if (compass != null) {
             bearing = compass;
+            compassSteps++;
         } else if (yaw != null && Math.abs(gyroCorrelation) > 2) {
             double sign = Math.signum(gyroCorrelation);
             bearing = TunnelMath.turn(bearing, yaw, sign, dt);
+            gyroSteps++;
+        } else {
+            straightSteps++; // no heading source: straight on
         }
 
         double distance = speed * dt;
         long moved = speed > MOVING_MPS ? (long) (dt * 1000) : 0;
         if (!TunnelMath.withinLimits(travelledM + distance, movingMs + moved)) {
-            if (!limitLogged) Log.i(TAG, "estimate stopped after " + (int) travelledM + " m, " + movingMs / 1000 + " s of driving without GPS");
+            if (!limitLogged) {
+                String stop = "estimate stopped at the limit after " + (int) travelledM + " m, " + movingMs / 1000 + " s of driving";
+                Log.i(TAG, stop);
+                PatchLog.add("tunnel", stop);
+            }
             limitLogged = true;
             return;
         }
@@ -185,7 +220,11 @@ public final class TunnelNavigation {
         double rate = Math.toRadians(wrap(fix.getBearing() - prev.getBearing())) / dt; // clockwise, rad/s
         Float yaw = carYawRate();
         if (yaw == null || Math.abs(rate) < 0.03) return;
+        boolean before = Math.abs(gyroCorrelation) > 2;
         gyroCorrelation = Math.max(-50, Math.min(50, gyroCorrelation + Math.signum(rate * yaw)));
+        if (!before && Math.abs(gyroCorrelation) > 2) {
+            PatchLog.add("tunnel", "gyroscope direction learned (" + (gyroCorrelation > 0 ? "as sent" : "reversed") + ")");
+        }
     }
 
     private static Location destination(Location from, double bearingDeg, double meters) {

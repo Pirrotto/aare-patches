@@ -199,7 +199,34 @@ public final class PatchSettingsActivity extends Activity {
                     "Nessuna patch con impostazioni installata."), Type.BODY_SMALL, colors.onSurfaceVariant));
         }
         for (PatchSettings.Feature f : features) card.addView(row(f));
+
+        // Technical state only (see PatchLog): for reporting a problem.
+        TextView copy = text(PatchSettings.phrase("Copy diagnostics", "Copia diagnostica"), Type.LABEL_LARGE, colors.primary);
+        copy.setPadding(0, dp(12), 0, dp(4));
+        copy.setOnClickListener(v -> {
+            android.content.ClipboardManager clipboard = getSystemService(android.content.ClipboardManager.class);
+            if (clipboard != null) clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AARE Patches", diagnostics()));
+            android.widget.Toast.makeText(this, PatchSettings.phrase("Copied", "Copiata"), android.widget.Toast.LENGTH_SHORT).show();
+        });
+        LinearLayout.LayoutParams copyParams = wrap();
+        copyParams.topMargin = dp(8);
+        card.addView(copy, copyParams);
         return card;
+    }
+
+    private String diagnostics() {
+        StringBuilder b = new StringBuilder("AARE Patches diagnostics\n");
+        b.append("sdk=").append(Build.VERSION.SDK_INT);
+        try {
+            b.append(" aare=").append(getPackageManager().getPackageInfo(getPackageName(), 0).versionName);
+        } catch (Throwable ignored) {
+        }
+        b.append('\n');
+        for (PatchSettings.Feature f : PatchSettings.features()) {
+            b.append(f.key).append('=').append(PatchSettings.isEnabled(this, f.key) ? "on" : "off").append('\n');
+        }
+        b.append("--- log\n").append(PatchLog.dump());
+        return b.toString();
     }
 
     /** A row like AARE's AppRow: round icon, title and kind, switch. */
