@@ -21,7 +21,26 @@ final class ReplyWords {
     private static final Set<String> ASK_NO = new HashSet<>(Arrays.asList(
             "niente", "dopo", "later", "nope", "spater", "nachher"));
 
+    /** "Change message" to "Do you want to send it?": dictated again. */
+    private static final Set<String> CHANGE = new HashSet<>(Arrays.asList(
+            "cambia", "cambiare", "cambiamo", "modifica", "modificare", "riscrivi", "correggi",
+            "change", "edit", "rewrite", "andern", "andere", "korrigieren"));
+
     private ReplyWords() {
+    }
+
+    /** True if [text] asks to change the message ("cambia messaggio", "change message", "ändern"). */
+    static boolean wantsChange(String text) {
+        if (text == null) return false;
+        for (String word : plain(text).split("\\s+")) {
+            if (CHANGE.contains(word)) return true;
+        }
+        return false;
+    }
+
+    private static String plain(String text) {
+        return Normalizer.normalize(text.toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").replaceAll("[^a-z ]", " ");
     }
 
     /** To "Send it?": true for a yes, false for a no, null if neither or both were heard. */
@@ -36,8 +55,7 @@ final class ReplyWords {
 
     private static Boolean answer(String text, boolean ask) {
         if (text == null) return null;
-        String plain = Normalizer.normalize(text.toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "").replaceAll("[^a-z ]", " ");
+        String plain = plain(text);
         boolean yes = false;
         boolean no = false;
         for (String word : plain.split("\\s+")) {
