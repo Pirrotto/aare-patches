@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -59,6 +60,11 @@ public final class VoiceNotes {
 
     /** A voice message in a spoken text when it isn't among the records (AARE was restarted). */
     private static final Pattern MIC_SEGMENT = Pattern.compile(MIC + "[^.\\n]*");
+
+    /** "(0:05)": the duration a notification gives for a voice message. */
+    private static final Pattern STATED = Pattern.compile("\\((\\d{1,3}):(\\d{2})\\)");
+    /** A recording's length may differ this much from the stated one (it is rounded to seconds). */
+    private static final long DURATION_SLACK_MS = 1500;
 
     /** How far a recording's file time may be from the message time. */
     private static final long BEFORE_MS = 2 * 60_000L;
@@ -175,14 +181,25 @@ public final class VoiceNotes {
                 int start = 0;
                 for (Segment v : voices) {
                     items.add(text.substring(start, v.start));
-                    VoiceNotesAccess.Recording r = findRecording(recordings, v.record, used);
-                    ParcelFileDescriptor pfd = r == null ? null : VoiceNotesAccess.open(context, r.path);
-                    if (pfd != null) {
-                        used.add(r.path);
-                        items.add(pfd);
-                    } else {
-                        items.add(phrase("Voice message not downloaded yet.", "Messaggio vocale non ancora scaricato."));
+                    if (v.record == null) {
+                        // Unknown message time (AARE restarted since): no guessing which recording it is.
+                        items.add(phrase("voice message", "messaggio vocale"));
+                        start = v.end;
+                        continue;
                     }
+                    ParcelFileDescriptor pfd = null;
+                    for (VoiceNotesAccess.Recording r : candidates(recordings, v.record, used)) {
+                        // Same length as the notification says, else it is another voice note (one
+                        // the user sent, or another chat's): never played.
+                        if (!lengthMatches(context, r, v.record)) continue;
+                        pfd = VoiceNotesAccess.open(context, r.path);
+                        if (pfd != null) {
+                            used.add(r.path);
+                            break;
+                        }
+                    }
+                    if (pfd != null) items.add(pfd);
+                    else items.add(phrase("Voice message not downloaded yet.", "Messaggio vocale non ancora scaricato."));
                     start = v.end;
                 }
                 items.add(text.substring(start));
@@ -293,33 +310,59 @@ public final class VoiceNotes {
     }
 
     /**
-     * The recording of a voice message: the received voice note saved closest after the message
-     * time. Without a record, the newest one of the last day.
+     * The recordings that may be this voice message, best first: voice notes saved from a little
+     * before to an hour after the message time, those saved after it first, closest first.
      */
-    private static VoiceNotesAccess.Recording findRecording(
+    private static List<VoiceNotesAccess.Recording> candidates(
             List<VoiceNotesAccess.Recording> recordings, Record record, Set<String> used) {
-        VoiceNotesAccess.Recording best = null;
-        long bestScore = Long.MAX_VALUE;
-        long now = System.currentTimeMillis();
+        List<VoiceNotesAccess.Recording> out = new ArrayList<>();
+        if (record == null || record.timeMs <= 0) return out;
         for (VoiceNotesAccess.Recording f : recordings) {
             if (used.contains(f.path) || f.size == 0) continue;
-            long score;
-            if (record != null && record.timeMs > 0) {
-                long delta = f.modifiedMs - record.timeMs;
-                if (delta < -BEFORE_MS || delta > AFTER_MS) continue;
-                // A file saved before the message time is a weaker match than one after it.
-                score = delta >= 0 ? delta : -delta * 10;
-            } else {
-                long age = now - f.modifiedMs;
-                if (age < 0 || age > 24 * 60 * 60_000L) continue;
-                score = age;
-            }
-            if (score < bestScore) {
-                bestScore = score;
-                best = f;
-            }
+            long delta = f.modifiedMs - record.timeMs;
+            if (delta < -BEFORE_MS || delta > AFTER_MS) continue;
+            out.add(f);
         }
-        return best;
+        out.sort((a, b) -> Long.compare(score(a, record), score(b, record)));
+        if (out.size() > 3) out = new ArrayList<>(out.subList(0, 3));
+        return out;
+    }
+
+    /** A file saved before the message time is a weaker match than one after it. */
+    private static long score(VoiceNotesAccess.Recording f, Record record) {
+        long delta = f.modifiedMs - record.timeMs;
+        return delta >= 0 ? delta : -delta * 10;
+    }
+
+    /** The duration the notification states, in ms, or -1 if it states none. */
+    static long statedMs(String text) {
+        if (text == null) return -1;
+        Matcher m = STATED.matcher(text);
+        long found = -1;
+        while (m.find()) found = (Long.parseLong(m.group(1)) * 60 + Long.parseLong(m.group(2))) * 1000;
+        return found;
+    }
+
+    /**
+     * Whether [r] lasts what the notification says. A recording whose length can't be read doesn't
+     * match; without a stated duration the time match has to do.
+     */
+    private static boolean lengthMatches(Context context, VoiceNotesAccess.Recording r, Record record) {
+        long stated = statedMs(record.text);
+        if (stated < 0) return true;
+        ParcelFileDescriptor pfd = VoiceNotesAccess.open(context, r.path);
+        if (pfd == null) return false;
+        android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
+        try {
+            mmr.setDataSource(pfd.getFileDescriptor());
+            String d = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);
+            return d != null && Math.abs(Long.parseLong(d) - stated) <= DURATION_SLACK_MS;
+        } catch (Throwable t) {
+            return false;
+        } finally {
+            try { mmr.release(); } catch (Throwable ignored) { }
+            try { pfd.close(); } catch (Throwable ignored) { }
+        }
     }
 
     private static String phrase(String english, String italian) {
