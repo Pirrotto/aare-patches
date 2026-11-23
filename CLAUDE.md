@@ -33,10 +33,23 @@ Talk to the owner in **Italian**.
 - After a release, the owner tests the existing features in the car too, not only the new ones.
 - Previous releases stay on GitHub, so the owner can go back to the last working version at any time.
 
+## Branches and releases
+
+- Day-to-day work: a branch per change, pull request into `dev`, merged when CI is green (unit
+  tests, build, patches applied to the official AARE APK with `--validate`, none skipped).
+- Every push to `dev` keeps the patches file as a private test build (artifact of the "Test build"
+  run). Send the owner the run's link; he loads the file in Morphe (Sources → + → select file).
+- Public releases only from `main`, at most twice a week: Thursday evening, Saturday evening or
+  Sunday morning, and only after the owner tested in the car and said yes. One pull request
+  `dev` → `main` per release; one release with everything since the last.
+- Never push to `main` directly. Don't create releases, tags or extra branches the owner didn't ask
+  for; delete work branches after merging.
+- Patches proposed to AARE are the same code and behaviour as the pull request to AARE, so the
+  owner's car test counts as the road test.
+
 ## Before publishing
 
-- Work on a branch and open a pull request; merge to `main` (which releases) only when CI is green:
-  the patches build, apply to the official AARE APK, tests pass, security checks pass.
+- Work on a branch and open a pull request; merge only when CI is green.
 - Review every change against the security list above.
 - `feat:` for new features, `fix:` for fixes, `chore:` for anything that must not release.
 - Update the README (patch description and "What's new / Novità") with every feature.
