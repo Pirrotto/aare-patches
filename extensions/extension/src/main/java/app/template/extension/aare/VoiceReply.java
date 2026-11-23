@@ -264,7 +264,8 @@ public final class VoiceReply {
                     // "Ask by voice to reply": a spoken yes starts the dictation, as tapping Reply does.
                     setState(State.ASKING);
                     speakingOurs = true;
-                    speaker().say(phrase("Reply?", "Rispondi?"), () -> {
+                    askAskedAgain = false;
+                    speaker().say(ReplyPhrases.askReply(italian()), () -> {
                         speakingOurs = false;
                         listenFor(State.ASKING);
                     });
@@ -320,7 +321,7 @@ public final class VoiceReply {
         PatchLog.add("reply", "dictation starts");
         showCard(replyTitle(), phrase("Speak now…", "Parla ora…"), action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
         speakingOurs = true;
-        speaker().say(phrase("Your reply?", "Cosa rispondo?"),
+        speaker().say(ReplyPhrases.whatMessage(italian()),
                 () -> {
                     speakingOurs = false;
                     listen(false);
@@ -403,7 +404,7 @@ public final class VoiceReply {
                 action(phrase("Send", "Invia"), VoiceReply::send),
                 action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
         speakingOurs = true;
-        speaker().say(phrase(draft + ". Send it?", draft + ". Invio?"),
+        speaker().say(ReplyPhrases.readBack(title, draft, italian()),
                 () -> {
                     speakingOurs = false;
                     listen(true);
@@ -412,6 +413,13 @@ public final class VoiceReply {
 
     private static void onConfirmation(String text) {
         if (state != State.CONFIRMING) return;
+        if (ReplyWords.wantsChange(text)) {
+            // "Change message": dictated again from the start, as Android Auto does.
+            PatchLog.add("reply", "change message");
+            stopListening();
+            startDictation();
+            return;
+        }
         Boolean answer = ReplyWords.yesOrNo(text);
         if (Boolean.TRUE.equals(answer)) send();
         else if (Boolean.FALSE.equals(answer)) cancel();
@@ -435,7 +443,7 @@ public final class VoiceReply {
         confirmAskedAgain = true;
         PatchLog.add("reply", "confirmation not understood: asking once more");
         speakingOurs = true;
-        speaker().say(phrase("Didn't catch that. Send it?", "Non ho capito, invio?"), () -> {
+        speaker().say(ReplyPhrases.sendAgain(italian()), () -> {
             speakingOurs = false;
             listen(true);
         });
@@ -455,8 +463,7 @@ public final class VoiceReply {
         removeCard();
         setState(State.IDLE);
         PatchLog.add("reply", sent ? "sent" : "sending failed");
-        speaker().say(sent ? phrase("Sent.", "Inviato.")
-                : phrase("Not sent.", "Non inviato."), null);
+        speaker().say(sent ? ReplyPhrases.sent(title, italian()) : ReplyPhrases.notSent(italian()), null);
     }
 
     private static void cancel() {
@@ -466,7 +473,7 @@ public final class VoiceReply {
         if (wasActive) PatchLog.add("reply", "cancelled in state " + state);
         setState(State.IDLE);
         draft = "";
-        if (wasActive) speaker().say(phrase("Cancelled.", "Annullato."), null);
+        if (wasActive) speaker().say(ReplyPhrases.cancelled(italian()), null);
     }
 
     /** The answer to "Do you want to reply?". */
@@ -481,10 +488,35 @@ public final class VoiceReply {
             stopListening();
             removeCard();
             setState(State.IDLE);
+        } else if (!askAskedAgain) {
+            askAskedAgain = true;
+            PatchLog.add("reply", "asked to reply: not understood, asking once more");
+            stopListening();
+            speakingOurs = true;
+            speaker().say(ReplyPhrases.askReplyAgain(italian()), () -> {
+                speakingOurs = false;
+                listenFor(State.ASKING);
+            });
         } else {
             PatchLog.add("reply", "asked to reply: not understood, Reply card stays");
             backToOffer();
         }
+    }
+
+    /** [spoken] as Google reads a new message of [conversation]: "Marco says: …". */
+    static String withSays(Object conversation, String spoken) {
+        try {
+            return ReplyPhrases.withSays(spoken, String.valueOf(call(conversation, "getTitle")), italian());
+        } catch (Throwable t) {
+            return spoken;
+        }
+    }
+
+    /** "Do you want to reply?" was asked again once already for this message. */
+    private static boolean askAskedAgain;
+
+    private static boolean italian() {
+        return "it".equals(Locale.getDefault().getLanguage());
     }
 
     /** No spoken answer to "Do you want to reply?": the "Reply" card stays, as without asking. */
@@ -783,7 +815,7 @@ public final class VoiceReply {
             if (current() && expected == State.CONFIRMING) {
                 // A clear yes or no to "Send it?" while still speaking: acted on at once.
                 String heard = first(partialResults);
-                if (ReplyWords.yesOrNo(heard) != null) {
+                if (ReplyWords.wantsChange(heard) || ReplyWords.yesOrNo(heard) != null) {
                     PatchLog.add("reply", "confirmation heard before the end");
                     stopListening();
                     onConfirmation(heard);

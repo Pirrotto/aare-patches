@@ -127,10 +127,13 @@ public final class VoiceNotes {
         try {
             if (text == null) return false;
             // Each feature can be turned off on the Settings screen of the patches.
-            List<Segment> voices = PatchSettings.isEnabled(context, PatchSettings.VOICE_MESSAGES)
-                    ? findVoices(text) : new ArrayList<>();
             // The conversation being read, if it can be answered: a "Reply" card follows the reading.
             Object conversation = VoiceReply.conversationFor(context, text);
+            // Read as Android Auto's Google voice does before "Do you want to reply?": "Marco says: …".
+            final String said = conversation != null && PatchSettings.isEnabled(context, PatchSettings.VOICE_REPLY_ASK)
+                    ? VoiceReply.withSays(conversation, text) : text;
+            List<Segment> voices = PatchSettings.isEnabled(context, PatchSettings.VOICE_MESSAGES)
+                    ? findVoices(said) : new ArrayList<>();
             if (voices.isEmpty() && conversation == null) return false;
             if (!voices.isEmpty()) PatchLog.add("voice", "reading " + voices.size() + " voice message(s); reply offered after: " + (conversation != null));
 
@@ -138,9 +141,9 @@ public final class VoiceNotes {
             Player player = Player.get(app);
             Runnable after = conversation == null ? null : () -> VoiceReply.offer(context, conversation);
             if (voices.isEmpty()) {
-                player.say(text, after);
+                player.say(said, after);
             } else {
-                worker.execute(() -> prepare(app, player, text, voices, after));
+                worker.execute(() -> prepare(app, player, said, voices, after));
             }
             return true;
         } catch (Throwable t) {
