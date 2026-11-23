@@ -1,3 +1,9 @@
+## [1.10.6](https://github.com/Pirrotto/aare-patches/compare/v1.10.5...v1.10.6) (2026-11-23)
+
+### 🐛 Bug Fixes
+
+* Voice messages – the helper picks the recording, AARE sees no other file ([0d93fac](https://github.com/Pirrotto/aare-patches/commit/0d93fac2c2ad6ae91f776dafc303870e9e27db53))
+
 ## [1.10.5](https://github.com/Pirrotto/aare-patches/compare/v1.10.4...v1.10.5) (2026-11-23)
 
 ### 🐛 Bug Fixes
