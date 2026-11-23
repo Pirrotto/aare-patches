@@ -56,11 +56,11 @@ The patches for **AARE 1.5.0** (with the AARE assistant and Integrated Shizuku) 
 
 **English**
 
-- **2.0 – For AARE 1.6.0.** Background location and Car microphone are now in AARE itself. The AARE assistant and Integrated Shizuku are left out. Tunnel navigation: honest accuracy, 5 km / 5 minute limit, queues, tests. Voice messages: the helper picks the one recording, AARE sees no other file. In a tunnel the position no longer freezes when the car repeats its last fix. Settings → "Copy diagnostics" copies a technical log (no position, names or texts) to send when something goes wrong. Reply after a WhatsApp voice message works again.
+- **2.0 – For AARE 1.6.0.** Background location and Car microphone are now in AARE itself. The AARE assistant and Integrated Shizuku are left out. Tunnel navigation: honest accuracy, 5 km / 5 minute limit, queues, tests. Voice messages: the helper picks the one recording, AARE sees no other file. In a tunnel the position no longer freezes when the car repeats its last fix. Settings → "Copy diagnostics" copies a technical log (no position, names or texts; kept in AARE's private storage after AARE closes, newest 1000 lines) to send when something goes wrong. Reply after a WhatsApp voice message works again.
 
 **Italiano**
 
-- **2.0 – Per AARE 1.6.0.** Posizione in background e Microfono dell'auto ora sono in AARE. Assistente AARE e Shizuku integrato non ci sono più. Navigazione in galleria: precisione onesta, limite di 5 km / 5 minuti, code, test. Messaggi vocali: il supporto sceglie il solo vocale giusto, AARE non vede altri file. In galleria la posizione non si blocca più quando l'auto ripete l'ultima posizione. Impostazioni → "Copia diagnostica" copia un registro tecnico (senza posizione, nomi o testi) da inviare quando qualcosa non va. Rispondere dopo un vocale WhatsApp funziona di nuovo.
+- **2.0 – Per AARE 1.6.0.** Posizione in background e Microfono dell'auto ora sono in AARE. Assistente AARE e Shizuku integrato non ci sono più. Navigazione in galleria: precisione onesta, limite di 5 km / 5 minuti, code, test. Messaggi vocali: il supporto sceglie il solo vocale giusto, AARE non vede altri file. In galleria la posizione non si blocca più quando l'auto ripete l'ultima posizione. Impostazioni → "Copia diagnostica" copia un registro tecnico (senza posizione, nomi o testi; resta nella memoria privata di AARE anche dopo la chiusura, ultime 1000 righe) da inviare quando qualcosa non va. Rispondere dopo un vocale WhatsApp funziona di nuovo.
 
 Every release lists its changes in [the releases](https://github.com/Pirrotto/aare-patches/releases) and in [CHANGELOG.md](CHANGELOG.md).
 
