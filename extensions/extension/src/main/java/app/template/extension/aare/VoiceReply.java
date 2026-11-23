@@ -351,6 +351,7 @@ public final class VoiceReply {
         draft = capitalize(text.trim());
         PatchLog.add("reply", "dictation recognised, asking to confirm");
         state = State.CONFIRMING;
+        confirmAskedAgain = false;
         showCard(replyTitle(), draft,
                 action(phrase("Send", "Invia"), VoiceReply::send),
                 action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
@@ -367,7 +368,30 @@ public final class VoiceReply {
         Boolean answer = ReplyWords.yesOrNo(text);
         if (Boolean.TRUE.equals(answer)) send();
         else if (Boolean.FALSE.equals(answer)) cancel();
-        // Not understood: the card with Send and Cancel stays until one is tapped.
+        else confirmNotUnderstood();
+    }
+
+    /** "Send it?" was asked again once already for this reply. */
+    private static boolean confirmAskedAgain;
+
+    /**
+     * No clear yes or no to "Send it?": asked once more, then the card with Send and Cancel stays
+     * until one is tapped.
+     */
+    private static void confirmNotUnderstood() {
+        if (state != State.CONFIRMING) return;
+        stopListening();
+        if (confirmAskedAgain) {
+            PatchLog.add("reply", "confirmation not understood again: Send and Cancel stay");
+            return;
+        }
+        confirmAskedAgain = true;
+        PatchLog.add("reply", "confirmation not understood: asking once more");
+        speakingOurs = true;
+        speaker().say(phrase("I didn't catch that. Send it?", "Non ho capito. Lo invio?"), () -> {
+            speakingOurs = false;
+            listen(true);
+        });
     }
 
     private static void send() {
@@ -593,8 +617,9 @@ public final class VoiceReply {
             if (expected == State.DICTATING) {
                 speaker().say(phrase("I didn't catch that.", "Non ho capito."), null);
                 offerAgain();
+            } else if (expected == State.CONFIRMING) {
+                confirmNotUnderstood();
             }
-            // While confirming, the Send and Cancel buttons stay.
         };
         main.postDelayed(listenTimeout, Math.max(0, afterMs));
     }
@@ -671,8 +696,9 @@ public final class VoiceReply {
                     speaker().say(phrase("I didn't catch that.", "Non ho capito."), null);
                 }
                 offerAgain();
+            } else if (expected == State.CONFIRMING && error != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                confirmNotUnderstood();
             }
-            // While confirming, the Send and Cancel buttons stay.
         }
 
         @Override
@@ -691,6 +717,16 @@ public final class VoiceReply {
 
         @Override
         public void onPartialResults(Bundle partialResults) {
+            if (current() && expected == State.CONFIRMING) {
+                // A clear yes or no to "Send it?" while still speaking: acted on at once.
+                String heard = first(partialResults);
+                if (ReplyWords.yesOrNo(heard) != null) {
+                    PatchLog.add("reply", "confirmation heard before the end");
+                    stopListening();
+                    onConfirmation(heard);
+                }
+                return;
+            }
             if (current() && expected == State.ASKING) {
                 // A clear yes or no while still speaking: no need to wait for the recognizer's silence.
                 String heard = first(partialResults);
