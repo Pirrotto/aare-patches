@@ -1,3 +1,9 @@
+## [1.10.5](https://github.com/Pirrotto/aare-patches/compare/v1.10.4...v1.10.5) (2026-11-23)
+
+### 🐛 Bug Fixes
+
+* Tunnel navigation keeps the estimate in a queue, with unit tests ([516eb2d](https://github.com/Pirrotto/aare-patches/commit/516eb2debbb436873d3ffa4181f05e5ba4a31460))
+
 ## [1.10.4](https://github.com/Pirrotto/aare-patches/compare/v1.10.3...v1.10.4) (2026-11-23)
 
 ### 🐛 Bug Fixes

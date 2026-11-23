@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-23T07:57:16",
-  "description": "## [1.10.4](https://github.com/Pirrotto/aare-patches/compare/v1.10.3...v1.10.4) (2026-11-23)\n\n### 🐛 Bug Fixes\n\n* Voice messages play only the matching recording, off by default ([091f7a2](https://github.com/Pirrotto/aare-patches/commit/091f7a298fc79cc47eede77d973f05dd3a8dbc10))",
-  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.10.4/patches-1.10.4.mpp",
+  "created_at": "2026-11-23T09:14:08",
+  "description": "## [1.10.5](https://github.com/Pirrotto/aare-patches/compare/v1.10.4...v1.10.5) (2026-11-23)\n\n### 🐛 Bug Fixes\n\n* Tunnel navigation keeps the estimate in a queue, with unit tests ([516eb2d](https://github.com/Pirrotto/aare-patches/commit/516eb2debbb436873d3ffa4181f05e5ba4a31460))",
+  "download_url": "https://github.com/Pirrotto/aare-patches/releases/download/v1.10.5/patches-1.10.5.mpp",
   "signature_download_url": "",
-  "version": "1.10.4"
+  "version": "1.10.5"
 }
