@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -256,8 +257,13 @@ public final class VoiceReply {
         listenStarted = false;
         PatchLog.add("reply", "dictation starts");
         showCard(replyTitle(), phrase("Speak now…", "Parla ora…"), action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
+        speakingOurs = true;
         speaker().say(phrase("What's your answer to " + title + "?", "Cosa vuoi rispondere a " + title + "?"),
-                () -> listen(false));
+                () -> {
+                    speakingOurs = false;
+                    listen(false);
+                });
+        watchCard();
         // If the question is never finished (audio stuck after a voice message), listen anyway.
         main.postDelayed(() -> {
             if (state == State.DICTATING && !listenStarted) {
@@ -273,6 +279,47 @@ public final class VoiceReply {
     /** Whether listening started for the current dictation. */
     private static boolean listenStarted;
 
+    /** The question or the read-back of this reply is being spoken. */
+    private static boolean speakingOurs;
+
+    /** Tells the card watcher of an earlier reply to stop. */
+    private static int watchToken;
+
+    /**
+     * While dictating or confirming: the card closed on the car screen (Back, closed, gone) ends the
+     * reply. Nothing listens or sends afterwards, and the question or read-back being spoken stops.
+     */
+    private static void watchCard() {
+        int token = ++watchToken;
+        main.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (token != watchToken || (state != State.DICTATING && state != State.CONFIRMING)) return;
+                if (cardClosed()) {
+                    closedOnCar();
+                    return;
+                }
+                main.postDelayed(this, WATCH_MS);
+            }
+        }, WATCH_MS);
+    }
+
+    private static final long WATCH_MS = 500L;
+
+    /** The reply's card was closed on the car screen: the reply ends, quietly. */
+    private static void closedOnCar() {
+        if (state != State.DICTATING && state != State.CONFIRMING) return;
+        PatchLog.add("reply", "card closed on the car screen in state " + state + ": reply ended");
+        state = State.IDLE;
+        draft = "";
+        stopListening();
+        removeCard();
+        if (speakingOurs) {
+            speakingOurs = false;
+            speaker().stop();
+        }
+    }
+
     private static void onDictated(String text) {
         if (state != State.DICTATING) return;
         if (text == null || text.trim().isEmpty()) {
@@ -287,8 +334,12 @@ public final class VoiceReply {
         showCard(replyTitle(), draft,
                 action(phrase("Send", "Invia"), VoiceReply::send),
                 action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
+        speakingOurs = true;
         speaker().say(phrase("You said: " + draft + ". Send it?", "Ho scritto: " + draft + ". Lo invio?"),
-                () -> listen(true));
+                () -> {
+                    speakingOurs = false;
+                    listen(true);
+                });
     }
 
     private static void onConfirmation(String text) {
@@ -366,7 +417,7 @@ public final class VoiceReply {
         }
         if (cardClosed()) {
             PatchLog.add("reply", "card closed before listening" + (card == null ? " (no card)" : runtime.get() == null ? " (no car session)" : ""));
-            cancel();
+            closedOnCar();
             return;
         }
         Context context = context();
@@ -397,6 +448,8 @@ public final class VoiceReply {
             requestListenFocus(context);
             // With AARE's "Car microphone for phone apps" on, the recognizer hears the car by itself.
             recognizer.startListening(intent);
+            listenStartedAt = SystemClock.uptimeMillis();
+            scheduleListenTimeout(expected, NO_SPEECH_MS);
         } catch (Throwable t) {
             Log.w(TAG, "listen", t);
             PatchLog.add("reply", "speech recognition can't start: " + t.getClass().getSimpleName());
@@ -408,7 +461,38 @@ public final class VoiceReply {
         }
     }
 
+    /** Longest wait for the user to start talking: the music is paused meanwhile. */
+    private static final long NO_SPEECH_MS = 15_000L;
+
+    /** Longest a listening can last once speech started, so a long reply fits but nothing hangs. */
+    private static final long MAX_LISTEN_MS = 60_000L;
+
+    private static long listenStartedAt;
+    private static Runnable listenTimeout;
+
+    private static void scheduleListenTimeout(State expected, long afterMs) {
+        cancelListenTimeout();
+        listenTimeout = () -> {
+            listenTimeout = null;
+            if (state != expected) return;
+            PatchLog.add("reply", "speech recognizer gave no answer in time");
+            stopListening();
+            if (expected == State.DICTATING) {
+                speaker().say(phrase("I didn't catch that.", "Non ho capito."), null);
+                offerAgain();
+            }
+            // While confirming, the Send and Cancel buttons stay.
+        };
+        main.postDelayed(listenTimeout, Math.max(0, afterMs));
+    }
+
+    private static void cancelListenTimeout() {
+        if (listenTimeout != null) main.removeCallbacks(listenTimeout);
+        listenTimeout = null;
+    }
+
     private static void stopListening() {
+        cancelListenTimeout();
         try {
             if (recognizer != null) recognizer.cancel();
         } catch (Throwable ignored) {
@@ -433,6 +517,9 @@ public final class VoiceReply {
 
         @Override
         public void onBeginningOfSpeech() {
+            // Speech started: the recognizer ends on the silence after it; only the overall limit stays.
+            if (!current()) return;
+            scheduleListenTimeout(expected, MAX_LISTEN_MS - (SystemClock.uptimeMillis() - listenStartedAt));
         }
 
         @Override
@@ -449,6 +536,7 @@ public final class VoiceReply {
 
         @Override
         public void onError(int error) {
+            if (current()) cancelListenTimeout();
             releaseListenFocus();
             if (!current()) return;
             Log.i(TAG, "recognition error " + error);
@@ -466,6 +554,7 @@ public final class VoiceReply {
 
         @Override
         public void onResults(Bundle results) {
+            if (current()) cancelListenTimeout();
             releaseListenFocus();
             if (!current()) return;
             String text = first(results);
@@ -477,7 +566,7 @@ public final class VoiceReply {
         public void onPartialResults(Bundle partialResults) {
             if (!current() || expected != State.DICTATING) return;
             if (cardClosed()) {
-                cancel();
+                closedOnCar();
                 return;
             }
             String text = first(partialResults);
