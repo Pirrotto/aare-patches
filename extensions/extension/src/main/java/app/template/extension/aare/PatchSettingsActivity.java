@@ -1,11 +1,8 @@
 package app.template.extension.aare;
 
-import android.Manifest;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.graphics.Canvas;
@@ -19,10 +16,8 @@ import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -34,7 +29,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -95,8 +89,6 @@ public final class PatchSettingsActivity extends Activity {
     }
 
     private Palette colors;
-    private final List<Runnable> refreshers = new ArrayList<>();
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -149,27 +141,8 @@ public final class PatchSettingsActivity extends Activity {
         page.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         content.addView(section());
-        for (PatchSettings.Feature f : PatchSettings.features()) {
-            if (PatchSettings.AARE_ASSISTANT.equals(f.key)) {
-                LinearLayout.LayoutParams params = wrap();
-                params.topMargin = dp(16);
-                content.addView(assistantSection(), params);
-            }
-            if (PatchSettings.INTEGRATED_SHIZUKU.equals(f.key)) {
-                LinearLayout.LayoutParams params = wrap();
-                params.topMargin = dp(16);
-                content.addView(shizukuSection(), params);
-            }
-        }
 
         setContentView(page);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // The location permission may have changed in the system settings.
-        for (Runnable r : refreshers) r.run();
     }
 
     /** Back arrow and title, as at the top of AARE's pages. */
@@ -253,294 +226,14 @@ public final class PatchSettingsActivity extends Activity {
         M3Switch toggle = new M3Switch(this, colors);
         row.addView(toggle, new LinearLayout.LayoutParams(dp(52), dp(32)));
 
-        if (feature.permission) {
-            // Android grants this one: the switch shows it, and the row opens the permission.
-            Runnable refresh = () -> toggle.setChecked(
-                    checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED, false);
-            refreshers.add(refresh);
-            refresh.run();
-            row.setOnClickListener(v -> openAppSettings());
-        } else {
-            toggle.setChecked(PatchSettings.isEnabled(this, feature.key), false);
-            row.setOnClickListener(v -> {
-                boolean on = !toggle.isChecked();
-                toggle.setChecked(on, true);
-                PatchSettings.setEnabled(this, feature.key, on);
-            });
-        }
+        toggle.setChecked(PatchSettings.isEnabled(this, feature.key), false);
+        row.setOnClickListener(v -> {
+            boolean on = !toggle.isChecked();
+            toggle.setChecked(on, true);
+            PatchSettings.setEnabled(this, feature.key, on);
+        });
         toggle.setOnClickListener(v -> row.performClick());
         return row;
-    }
-
-    // region AARE assistant
-
-    private static final String[] LANGUAGES = {"auto", "it", "de", "en"};
-
-    private String languageName(String code) {
-        switch (code) {
-            case "it":
-                return "Italiano";
-            case "de":
-                return "Deutsch";
-            case "en":
-                return "English";
-            default:
-                return PatchSettings.phrase("Same as the phone", "Come il telefono");
-        }
-    }
-
-    /** The assistant's card: its language (the words it understands, its voice and answers). */
-    private View assistantSection() {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable shape = new GradientDrawable();
-        shape.setColor(colors.surfaceContainer);
-        shape.setCornerRadius(dp(24));
-        card.setBackground(shape);
-        card.setClipToOutline(true);
-        card.setPadding(dp(20), dp(20), dp(20), dp(20));
-
-        card.addView(text(PatchSettings.phrase("AARE assistant", "Assistente AARE"), Type.TITLE_MEDIUM, colors.onSurface));
-        TextView hint = text(PatchSettings.phrase(
-                "The language you speak to it. Speech recognition works offline once Android's offline speech for that "
-                        + "language is downloaded (Settings > System > Languages > Speech > On-device recognition).",
-                "La lingua in cui gli parli. Il riconoscimento funziona anche offline dopo aver scaricato la lingua "
-                        + "(Impostazioni > Sistema > Lingue > Voce > Riconoscimento sul dispositivo)."),
-                Type.BODY_SMALL, colors.onSurfaceVariant);
-        LinearLayout.LayoutParams hintParams = wrap();
-        hintParams.topMargin = dp(8);
-        hintParams.bottomMargin = dp(8);
-        card.addView(hint, hintParams);
-
-        TextView[] texts = new TextView[2];
-        card.addView(actionRow(PatchSettings.ICON_ASSISTANT, PatchSettings.phrase("Language", "Lingua"), "", v -> {
-            String current = PatchSettings.assistantLanguage();
-            int i = java.util.Arrays.asList(LANGUAGES).indexOf(current);
-            String next = LANGUAGES[(i + 1) % LANGUAGES.length];
-            PatchSettings.setAssistantLanguage(this, next);
-            texts[1].setText(languageName(next));
-        }, texts));
-        texts[1].setText(languageName(PatchSettings.assistantLanguage()));
-        return card;
-    }
-
-    // endregion
-
-    // region Integrated Shizuku
-
-    /** The card of AARE's integrated Shizuku: state, pairing, start/stop and start after a restart. */
-    private View shizukuSection() {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable shape = new GradientDrawable();
-        shape.setColor(colors.surfaceContainer);
-        shape.setCornerRadius(dp(24));
-        card.setBackground(shape);
-        card.setClipToOutline(true);
-        card.setPadding(dp(20), dp(20), dp(20), dp(20));
-
-        card.addView(text(PatchSettings.phrase("Integrated Shizuku", "Shizuku integrato"), Type.TITLE_MEDIUM, colors.onSurface));
-        TextView hint = text(PatchSettings.phrase(
-                "AARE starts its own Shizuku through wireless debugging: no Shizuku app needed. Pair once; then AARE "
-                        + "starts it by itself after a restart and when the car connects, on any Wi-Fi (the car's too).",
-                "AARE avvia il suo Shizuku tramite il debug wireless: l'app Shizuku non serve. Accoppia una volta; "
-                        + "poi AARE lo avvia da sola dopo un riavvio e quando ti colleghi all'auto, con qualsiasi Wi-Fi "
-                        + "(anche quello dell'auto)."),
-                Type.BODY_SMALL, colors.onSurfaceVariant);
-        LinearLayout.LayoutParams hintParams = wrap();
-        hintParams.topMargin = dp(8);
-        card.addView(hint, hintParams);
-
-        TextView group = text(PatchSettings.phrase("State", "Stato"), Type.LABEL_LARGE, colors.primary);
-        LinearLayout.LayoutParams groupParams = wrap();
-        groupParams.topMargin = dp(16);
-        groupParams.bottomMargin = dp(4);
-        card.addView(group, groupParams);
-
-        TextView[] status = new TextView[2];
-        card.addView(actionRow(PatchSettings.ICON_DEVELOPER, "", "", null, status));
-        status[1].setTextIsSelectable(true); // the last error can be copied
-
-        TextView[] pairTexts = new TextView[2];
-        card.addView(actionRow(PatchSettings.ICON_LINK,
-                PatchSettings.phrase("Pair with wireless debugging", "Accoppia col debug wireless"),
-                PatchSettings.phrase("Once. Opens Wireless debugging: tap \"Pair device with pairing code\", then type the "
-                                + "code in AARE's notification.",
-                        "Una volta sola. Apre il Debug wireless: tocca «Associa dispositivo con codice di accoppiamento», "
-                                + "poi scrivi il codice nella notifica di AARE."),
-                v -> startPairing(), pairTexts));
-
-        TextView[] startTexts = new TextView[2];
-        ImageView[] startIcon = new ImageView[1];
-        View startRow = actionRow(PatchSettings.ICON_PLAY, "", "", v -> {
-            if (app.template.extension.aare.adb.IntegratedShizuku.isRunning()) {
-                app.template.extension.aare.adb.IntegratedShizuku.stop();
-                v.postDelayed(this::refreshAll, 800);
-            } else {
-                askRuntimePermissions();
-                app.template.extension.aare.adb.IntegratedShizukuService.start(this);
-            }
-        }, startTexts);
-        startIcon[0] = (ImageView) ((LinearLayout) startRow).getChildAt(0);
-        card.addView(startRow);
-
-        TextView[] diagTexts = new TextView[2];
-        card.addView(actionRow(PatchSettings.ICON_DEVELOPER,
-                PatchSettings.phrase("Copy diagnostics", "Copia diagnostica"),
-                PatchSettings.phrase("Copies the state and messages of integrated Shizuku, to paste in a chat or an issue.",
-                        "Copia stato e messaggi di Shizuku integrato, da incollare in chat o in una segnalazione."),
-                v -> new Thread(() -> {
-                    String report = app.template.extension.aare.adb.IntegratedShizuku.diagnostics(this);
-                    runOnUiThread(() -> {
-                        android.content.ClipboardManager clip = getSystemService(android.content.ClipboardManager.class);
-                        clip.setPrimaryClip(android.content.ClipData.newPlainText("AARE diagnostics", report));
-                        android.widget.Toast.makeText(this, PatchSettings.phrase("Diagnostics copied.", "Diagnostica copiata."),
-                                android.widget.Toast.LENGTH_SHORT).show();
-                    });
-                }).start(), diagTexts));
-
-        PatchSettings.Feature auto = new PatchSettings.Feature("integrated_shizuku_auto_start",
-                PatchSettings.phrase("Start by itself", "Avvio automatico"),
-                PatchSettings.phrase("After a restart and when the car connects, as soon as the phone is on Wi-Fi.",
-                        "Dopo un riavvio e quando ti colleghi all'auto, appena il telefono è sul Wi-Fi."),
-                false, PatchSettings.ICON_PLAY);
-        View autoRow = row(auto);
-        M3Switch autoSwitch = (M3Switch) ((LinearLayout) autoRow).getChildAt(2);
-        autoSwitch.setChecked(app.template.extension.aare.adb.IntegratedShizuku.autoStart(this), false);
-        autoRow.setOnClickListener(v -> {
-            boolean on = !autoSwitch.isChecked();
-            autoSwitch.setChecked(on, true);
-            app.template.extension.aare.adb.IntegratedShizuku.setAutoStart(this, on);
-        });
-        card.addView(autoRow);
-
-        Runnable refresh = () -> {
-            boolean paired = app.template.extension.aare.adb.IntegratedShizuku.isPaired(this);
-            boolean ours = app.template.extension.aare.adb.IntegratedShizuku.isRunning();
-            boolean other = !ours && app.template.extension.aare.adb.IntegratedShizuku.anyShizukuRunning();
-            status[0].setText(ours ? PatchSettings.phrase("Running", "Attivo")
-                    : other ? PatchSettings.phrase("The Shizuku app is running", "È attiva l'app Shizuku")
-                    : paired ? PatchSettings.phrase("Not running", "Non attivo")
-                    : PatchSettings.phrase("Not paired yet", "Non ancora accoppiato"));
-            status[1].setText(ours ? PatchSettings.phrase("AARE's car audio and voice messages use it now.",
-                    "Audio in auto e vocali di AARE lo usano adesso.")
-                    : other ? PatchSettings.phrase("AARE uses the Shizuku app; the integrated one isn't needed while it runs.",
-                    "AARE usa l'app Shizuku; quello integrato non serve finché è attiva.")
-                    : paired ? PatchSettings.phrase("Tap Start, or it starts by itself after the next restart.",
-                    "Tocca Avvia, oppure parte da solo al prossimo riavvio.")
-                    + (app.template.extension.aare.adb.IntegratedShizuku.lastError(this) != null
-                    ? "\n" + PatchSettings.phrase("Last error: ", "Ultimo errore: ")
-                    + app.template.extension.aare.adb.IntegratedShizuku.lastError(this) : "")
-                    : PatchSettings.phrase("Pair it once, below.", "Accoppialo una volta, qui sotto."));
-            pairTexts[0].setText(paired ? PatchSettings.phrase("Pair again", "Accoppia di nuovo")
-                    : PatchSettings.phrase("Pair with wireless debugging", "Accoppia col debug wireless"));
-            startTexts[0].setText(ours ? PatchSettings.phrase("Stop", "Ferma") : PatchSettings.phrase("Start", "Avvia"));
-            startTexts[1].setText(ours ? PatchSettings.phrase("Car audio falls back to screen capture until the next start.",
-                    "L'audio in auto torna alla cattura schermo fino al prossimo avvio.")
-                    : PatchSettings.phrase("Needs Wi-Fi. Wireless debugging is switched on just for the start.",
-                    "Serve il Wi-Fi. Il debug wireless si accende solo per l'avvio."));
-            startIcon[0].setImageDrawable(new RoundIcon(ours ? PatchSettings.ICON_STOP : PatchSettings.ICON_PLAY,
-                    colors.primaryContainer, colors.onPrimaryContainer, dp(40), dp(24)));
-        };
-        refreshers.add(refresh);
-        refresh.run();
-        return card;
-    }
-
-    private void refreshAll() {
-        for (Runnable r : refreshers) r.run();
-    }
-
-    /** A row like AppRow with a chevron instead of the switch; texts[0..1] get the title and subtitle views. */
-    private View actionRow(String icon, String title, String subtitle, View.OnClickListener onClick, TextView[] texts) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, dp(8), 0, dp(8));
-        if (onClick != null) {
-            row.setBackground(new RippleDrawable(ColorStateList.valueOf(withAlpha(colors.onSurface, 0x1F)), null, null));
-            row.setOnClickListener(onClick);
-        }
-
-        ImageView iconView = new ImageView(this);
-        iconView.setImageDrawable(new RoundIcon(icon, colors.primaryContainer, colors.onPrimaryContainer, dp(40), dp(24)));
-        row.addView(iconView, new LinearLayout.LayoutParams(dp(40), dp(40)));
-
-        LinearLayout column = new LinearLayout(this);
-        column.setOrientation(LinearLayout.VERTICAL);
-        texts[0] = text(title, Type.BODY_LARGE, colors.onSurface);
-        texts[1] = text(subtitle, Type.BODY_SMALL, colors.onSurfaceVariant);
-        column.addView(texts[0]);
-        column.addView(texts[1]);
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        p.leftMargin = dp(12);
-        row.addView(column, p);
-
-        if (onClick != null) {
-            ImageView chevron = new ImageView(this);
-            chevron.setImageDrawable(new RoundIcon("M10,6L8.59,7.41 13.17,12l-4.58,4.59L10,18l6,-6z", 0x00000000,
-                    colors.onSurfaceVariant, dp(24), dp(24)));
-            row.addView(chevron, new LinearLayout.LayoutParams(dp(24), dp(24)));
-        }
-        return row;
-    }
-
-    private void startPairing() {
-        askRuntimePermissions();
-        // Some phones don't report Developer options as on even when they are: just try to open them.
-        app.template.extension.aare.adb.IntegratedShizukuService.pair(this);
-        Intent wireless = new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
-                .putExtra(":settings:fragment_args_key", "toggle_adb_wireless");
-        Bundle args = new Bundle();
-        args.putString(":settings:fragment_args_key", "toggle_adb_wireless");
-        wireless.putExtra(":settings:show_fragment_args", args);
-        try {
-            startActivity(wireless.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        } catch (Throwable t) {
-            // No Developer options yet: they appear after tapping "Build number" seven times.
-            android.widget.Toast.makeText(this, PatchSettings.phrase(
-                    "Turn on Developer options first: tap \"Build number\" seven times.",
-                    "Prima attiva le Opzioni sviluppatore: tocca sette volte «Numero build»."), android.widget.Toast.LENGTH_LONG).show();
-            try {
-                startActivity(new Intent(Settings.ACTION_DEVICE_INFO_SETTINGS));
-            } catch (Throwable ignored) {
-            }
-            return;
-        }
-        android.widget.Toast.makeText(this, PatchSettings.phrase(
-                "Turn on Wireless debugging, tap \"Pair device with pairing code\" and type the code in AARE's notification.",
-                "Attiva il Debug wireless, tocca «Associa dispositivo con codice di accoppiamento» e scrivi il codice nella "
-                        + "notifica di AARE."), android.widget.Toast.LENGTH_LONG).show();
-    }
-
-    /** Notifications for the pairing code, and local-network access for finding wireless debugging. */
-    private void askRuntimePermissions() {
-        List<String> wanted = new ArrayList<>();
-        if (Build.VERSION.SDK_INT >= 33) {
-            wanted.add(Manifest.permission.POST_NOTIFICATIONS);
-            wanted.add(Manifest.permission.NEARBY_WIFI_DEVICES);
-        }
-        wanted.add("android.permission.ACCESS_LOCAL_NETWORK");
-        List<String> missing = new ArrayList<>();
-        for (String p : wanted) {
-            try {
-                String[] declared = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_PERMISSIONS).requestedPermissions;
-                boolean isDeclared = false;
-                if (declared != null) for (String d : declared) if (d.equals(p)) isDeclared = true;
-                if (isDeclared && checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) missing.add(p);
-            } catch (Throwable ignored) {
-            }
-        }
-        if (!missing.isEmpty()) requestPermissions(missing.toArray(new String[0]), 7);
-    }
-
-    // endregion
-
-    private void openAppSettings() {
-        try {
-            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", getPackageName(), null)));
-        } catch (Throwable ignored) {
-        }
     }
 
     // region Helpers

@@ -18,10 +18,8 @@ object Constants {
             "63ef0de1db2c09bb7fb25ce7ea4adc3538af423b885278b59df2889c7f18286f",
         ),
         targets = listOf(
-            // The patch only adds a manifest permission, so it does not depend on the AARE version.
-            AppTarget(version = null),
-            // Version the patch was written against.
-            AppTarget(version = "1.5.0"),
+            // The AARE release the patches are written and checked against (CI applies them to it).
+            AppTarget(version = "1.6.0"),
         ),
     )
 }
