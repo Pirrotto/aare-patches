@@ -26,17 +26,8 @@ public final class TunnelNavigation {
 
     /** No new GPS position for this long while moving: the estimate starts. */
     private static final long STALE_MS = 2500;
-    /**
-     * Limits of an estimate: past 5 minutes or 5 km without GPS it is too far off to help, and other
-     * apps get this position too, so it stops (the position stays put, as without this feature).
-     */
-    private static final long MAX_MS = 5 * 60_000;
-    static final double MAX_DISTANCE_M = 5000;
-    /**
-     * Honest accuracy: the estimate's error grows with the distance driven without GPS, about 6 %
-     * (heading a few degrees off, speed a few percent), on top of the last fix's own accuracy.
-     */
-    static final double ERROR_PER_M = 0.06;
+    // Limits (5 km, 5 minutes of driving) and honest accuracy: TunnelMath. Other apps get this
+    // position too, so past the limits the estimate stops and the position stays put.
     private static final float MOVING_MPS = 2f;
 
     private static WeakReference<Object> feed = new WeakReference<>(null);
@@ -50,6 +41,7 @@ public final class TunnelNavigation {
     // The estimate.
     private static Location estimate;
     private static double travelledM;
+    private static long movingMs;
     private static float startAccuracy;
     private static boolean limitLogged;
     private static double bearing = Double.NaN;
@@ -78,9 +70,10 @@ public final class TunnelNavigation {
             long now = SystemClock.elapsedRealtime();
 
             boolean sameSpot = lastFix != null && fix.distanceTo(lastFix) < 1f;
-            if (sameSpot && moving()) {
-                // The car repeats its last fix while driving: no GPS. Keep the estimate going.
-                return estimate != null;
+            switch (TunnelMath.fixAction(sameSpot, moving(), estimate != null)) {
+                case DROP: return true; // the car's stale fix: keep the estimate going
+                case PASS: return false; // no GPS yet, no estimate yet: as without the feature
+                default: break;
             }
 
             learnGyroSign(fix);
@@ -124,7 +117,7 @@ public final class TunnelNavigation {
         if (f == null || lastFix == null) return;
         long now = SystemClock.elapsedRealtime();
         long sinceFix = now - Math.max(lastFixAt, lastMovedAt);
-        if (sinceFix < STALE_MS || now - lastMovedAt > MAX_MS) return;
+        if (sinceFix < STALE_MS) return;
         Float speed = carSpeed();
         if (speed == null || !connected()) return;
 
@@ -132,6 +125,7 @@ public final class TunnelNavigation {
             estimate = new Location(lastFix);
             estimateAt = lastMovedAt;
             travelledM = 0;
+            movingMs = 0;
             limitLogged = false;
             startAccuracy = lastFix.hasAccuracy() ? lastFix.getAccuracy() : 10f;
             if (Double.isNaN(bearing) && lastFix.hasBearing()) bearing = lastFix.getBearing();
@@ -150,20 +144,22 @@ public final class TunnelNavigation {
             bearing = compass;
         } else if (yaw != null && Math.abs(gyroCorrelation) > 2) {
             double sign = Math.signum(gyroCorrelation);
-            bearing = normalize(bearing + sign * Math.toDegrees(yaw) * dt);
+            bearing = TunnelMath.turn(bearing, yaw, sign, dt);
         }
 
         double distance = speed * dt;
-        if (travelledM + distance > MAX_DISTANCE_M) {
-            if (!limitLogged) Log.i(TAG, "estimate stopped after " + (int) travelledM + " m without GPS");
+        long moved = speed > MOVING_MPS ? (long) (dt * 1000) : 0;
+        if (!TunnelMath.withinLimits(travelledM + distance, movingMs + moved)) {
+            if (!limitLogged) Log.i(TAG, "estimate stopped after " + (int) travelledM + " m, " + movingMs / 1000 + " s of driving without GPS");
             limitLogged = true;
             return;
         }
         travelledM += distance;
+        movingMs += moved;
         Location next = destination(estimate, bearing, distance);
         next.setSpeed(speed);
         next.setBearing((float) bearing);
-        next.setAccuracy(accuracy(startAccuracy, travelledM));
+        next.setAccuracy(TunnelMath.accuracy(startAccuracy, travelledM));
         next.setTime(System.currentTimeMillis());
         next.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
         estimate = next;
@@ -177,11 +173,6 @@ public final class TunnelNavigation {
         } finally {
             pushingOurs.remove();
         }
-    }
-
-    /** The honest accuracy of an estimate [travelled] metres from a fix of accuracy [start]. */
-    static float accuracy(float start, double travelled) {
-        return (float) (Math.max(start, 3f) + ERROR_PER_M * travelled);
     }
 
     /** Learns which way the gyroscope turns, from the GPS bearing while driving. */
@@ -198,29 +189,15 @@ public final class TunnelNavigation {
     }
 
     private static Location destination(Location from, double bearingDeg, double meters) {
-        double r = 6_371_000.0;
-        double lat1 = Math.toRadians(from.getLatitude());
-        double lon1 = Math.toRadians(from.getLongitude());
-        double b = Math.toRadians(bearingDeg);
-        double d = meters / r;
-        double lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(b));
-        double lon2 = lon1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+        double[] to = TunnelMath.destination(from.getLatitude(), from.getLongitude(), bearingDeg, meters);
         Location out = new Location(from);
-        out.setLatitude(Math.toDegrees(lat2));
-        out.setLongitude(Math.toDegrees(lon2));
+        out.setLatitude(to[0]);
+        out.setLongitude(to[1]);
         return out;
     }
 
     private static double wrap(double deg) {
-        double d = deg % 360;
-        if (d > 180) d -= 360;
-        if (d < -180) d += 360;
-        return d;
-    }
-
-    private static double normalize(double deg) {
-        double d = deg % 360;
-        return d < 0 ? d + 360 : d;
+        return TunnelMath.wrap(deg);
     }
 
     // endregion
@@ -286,10 +263,7 @@ public final class TunnelNavigation {
         return null;
     }
 
-    private static Float lastCompass;
-    private static long compassChangedAt;
-    /** A compass that hasn't moved for this long while estimating is frozen. */
-    private static final long COMPASS_FROZEN_MS = 2500;
+    private static final TunnelMath.CompassWatch compassWatch = new TunnelMath.CompassWatch();
 
     /**
      * The car's compass, only while it moves. Many cars derive it from their GPS: in a tunnel it
@@ -301,12 +275,7 @@ public final class TunnelNavigation {
             Object c = fresh("getCompass");
             if (c == null) return null;
             float b = (float) c.getClass().getMethod("getBearingDeg").invoke(c);
-            long now = SystemClock.elapsedRealtime();
-            Float prev = lastCompass;
-            lastCompass = b;
-            if (prev == null || Math.abs(wrap(b - prev)) >= 0.01) compassChangedAt = now;
-            if (now - compassChangedAt > COMPASS_FROZEN_MS) return null;
-            return b;
+            return compassWatch.update(b, SystemClock.elapsedRealtime());
         } catch (Throwable t) {
             return null;
         }
