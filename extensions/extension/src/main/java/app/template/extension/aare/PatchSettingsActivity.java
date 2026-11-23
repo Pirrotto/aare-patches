@@ -199,6 +199,7 @@ public final class PatchSettingsActivity extends Activity {
                     "Nessuna patch con impostazioni installata."), Type.BODY_SMALL, colors.onSurfaceVariant));
         }
         for (PatchSettings.Feature f : features) card.addView(row(f));
+        refreshDependents();
 
         // Technical state only (see PatchLog): for reporting a problem.
         TextView copy = text(PatchSettings.phrase("Copy diagnostics", "Copia diagnostica"), Type.LABEL_LARGE, colors.primary);
@@ -229,12 +230,29 @@ public final class PatchSettingsActivity extends Activity {
         return b.toString();
     }
 
+    /** The rows of the settings that depend on another one, with the key they depend on. */
+    private final java.util.Map<View, String> dependents = new java.util.LinkedHashMap<>();
+
+    /** A setting that depends on one turned off is greyed out and can't be changed. */
+    private void refreshDependents() {
+        for (java.util.Map.Entry<View, String> e : dependents.entrySet()) {
+            boolean on = PatchSettings.isEnabled(this, e.getValue());
+            e.getKey().setEnabled(on);
+            e.getKey().setAlpha(on ? 1f : 0.38f);
+        }
+    }
+
     /** A row like AARE's AppRow: round icon, title and kind, switch. */
     private View row(PatchSettings.Feature feature) {
         LinearLayout row = new LinearLayout(this);
+        if (feature.parent != null) {
+            // Below the setting it depends on, indented.
+            row.setPadding(dp(28), 0, 0, 0);
+            dependents.put(row, feature.parent);
+        }
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, dp(8), 0, dp(8));
+        row.setPadding(row.getPaddingLeft(), dp(8), 0, dp(8));
         row.setBackground(new RippleDrawable(ColorStateList.valueOf(withAlpha(colors.onSurface, 0x1F)), null, null));
 
         ImageView icon = new ImageView(this);
@@ -255,9 +273,11 @@ public final class PatchSettingsActivity extends Activity {
 
         toggle.setChecked(PatchSettings.isEnabled(this, feature.key), false);
         row.setOnClickListener(v -> {
+            if (!row.isEnabled()) return;
             boolean on = !toggle.isChecked();
             toggle.setChecked(on, true);
             PatchSettings.setEnabled(this, feature.key, on);
+            refreshDependents();
         });
         toggle.setOnClickListener(v -> row.performClick());
         return row;
