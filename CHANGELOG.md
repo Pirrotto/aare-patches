@@ -1,3 +1,9 @@
+## [1.10.3](https://github.com/Pirrotto/aare-patches/compare/v1.10.2...v1.10.3) (2026-11-23)
+
+### 🐛 Bug Fixes
+
+* Tunnel navigation off by default, with honest accuracy and limits ([ed3bf78](https://github.com/Pirrotto/aare-patches/commit/ed3bf78cc05c948e08e186b788b123c017b8ec9d))
+
 ## [1.10.2](https://github.com/Pirrotto/aare-patches/compare/v1.10.1...v1.10.2) (2026-11-22)
 
 ### 🐛 Bug Fixes
