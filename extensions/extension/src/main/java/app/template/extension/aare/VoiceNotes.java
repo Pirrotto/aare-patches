@@ -368,6 +368,23 @@ public final class VoiceNotes {
             enqueue(recording);
         }
 
+        /**
+         * Stops what is being said or played and drops what is queued (a voice reply ended on the car
+         * screen), and releases the focus. Main thread.
+         */
+        void stop() {
+            queue.clear();
+            if (tts != null && Boolean.TRUE.equals(ttsReady)) {
+                try {
+                    tts.stop();
+                } catch (Throwable ignored) {
+                }
+            }
+            if (stopRecording != null) stopRecording.run();
+            busy = false;
+            releaseFocus();
+        }
+
         /** Runs [run] on the main thread after everything queued before it. */
         void then(Runnable run) {
             enqueue(run);
@@ -461,6 +478,9 @@ public final class VoiceNotes {
          */
         private MediaPlayer recording;
 
+        /** Stops the recording playing now without going on to the next item, or null. */
+        private Runnable stopRecording;
+
         /** Added to a recording's length before giving up waiting for its end. */
         private static final int END_SLACK_MS = 5_000;
 
@@ -471,17 +491,24 @@ public final class VoiceNotes {
             MediaPlayer player = new MediaPlayer();
             recording = player;
             boolean[] finished = {false};
-            Runnable finish = () -> {
-                if (finished[0]) return;
+            java.util.function.BooleanSupplier release = () -> {
+                if (finished[0]) return false;
                 finished[0] = true;
-                if (recording == player) recording = null;
+                if (recording == player) {
+                    recording = null;
+                    stopRecording = null;
+                }
                 try {
                     player.release();
                 } catch (Throwable ignored) {
                 }
                 closeQuietly(pfd);
-                done();
+                return true;
             };
+            Runnable finish = () -> {
+                if (release.getAsBoolean()) done();
+            };
+            stopRecording = release::getAsBoolean;
             try {
                 player.setAudioAttributes(ATTRIBUTES);
                 player.setDataSource(pfd.getFileDescriptor());
