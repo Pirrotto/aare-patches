@@ -60,6 +60,49 @@ public final class VoiceReply {
     private static String draft = "";
     private static State state = State.IDLE;
 
+    /**
+     * Held from "Do you want to reply?" (or tapping Reply) until the reply ends: the music stays
+     * paused through the questions, the listening and the read-back, instead of coming back for a
+     * moment between each of them.
+     */
+    private static AudioFocusRequest replyFocus;
+
+    private static void setState(State next) {
+        state = next;
+        boolean active = next == State.ASKING || next == State.DICTATING || next == State.CONFIRMING || next == State.SENDING;
+        if (active) holdReplyFocus();
+        else releaseReplyFocus();
+    }
+
+    private static void holdReplyFocus() {
+        if (replyFocus != null) return;
+        Context context = context();
+        AudioManager audio = context == null ? null : context.getSystemService(AudioManager.class);
+        if (audio == null) return;
+        replyFocus = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build())
+                .build();
+        try {
+            audio.requestAudioFocus(replyFocus);
+        } catch (Throwable t) {
+            Log.w(TAG, "reply focus", t);
+            replyFocus = null;
+        }
+    }
+
+    private static void releaseReplyFocus() {
+        if (replyFocus == null) return;
+        AudioFocusRequest held = replyFocus;
+        replyFocus = null;
+        Context context = context();
+        AudioManager audio = context == null ? null : context.getSystemService(AudioManager.class);
+        // After whatever is being queued to say ("Sent.", "Cancelled."): the player takes its own focus for it.
+        if (audio != null) main.post(() -> audio.abandonAudioFocusRequest(held));
+    }
+
     private static Object card;
     private static long cardSeq;
 
@@ -111,7 +154,7 @@ public final class VoiceReply {
         }
         if (state == State.OFFERED || state == State.ASKING) {
             removeCard();
-            state = State.IDLE;
+            setState(State.IDLE);
         }
     }
 
@@ -200,7 +243,9 @@ public final class VoiceReply {
 
     /** After a message was read aloud: offers to answer it with a card that stays. */
     static void offer(Object notificationListener, Object c) {
-        main.post(() -> {
+        // Right away when called on the main thread (after the reading): the reply's focus is taken
+        // before the player gives its own back, so the music doesn't come back in between.
+        Runnable show = () -> {
             if (state == State.DICTATING || state == State.CONFIRMING || state == State.SENDING) return;
             try {
                 listener = notificationListener;
@@ -217,7 +262,7 @@ public final class VoiceReply {
                 if (state == State.ASKING) stopListening();
                 if (PatchSettings.isEnabled(context(), PatchSettings.VOICE_REPLY_ASK)) {
                     // "Ask by voice to reply": a spoken yes starts the dictation, as tapping Reply does.
-                    state = State.ASKING;
+                    setState(State.ASKING);
                     speakingOurs = true;
                     speaker().say(phrase("Do you want to reply?", "Vuoi rispondere?"), () -> {
                         speakingOurs = false;
@@ -225,13 +270,15 @@ public final class VoiceReply {
                     });
                     watchCard();
                 } else {
-                    state = State.OFFERED;
+                    setState(State.OFFERED);
                     expireOffer();
                 }
             } catch (Throwable t) {
                 Log.w(TAG, "offer", t);
             }
-        });
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) show.run();
+        else main.post(show);
     }
 
     /** "Reply" tapped in the notification centre: dictation straight away. */
@@ -265,7 +312,7 @@ public final class VoiceReply {
             return;
         }
         if (state == State.ASKING) stopListening();
-        state = State.DICTATING;
+        setState(State.DICTATING);
         draft = "";
         listenStarted = false;
         dictated = "";
@@ -330,7 +377,7 @@ public final class VoiceReply {
     private static void closedOnCar() {
         if (state != State.ASKING && state != State.DICTATING && state != State.CONFIRMING) return;
         PatchLog.add("reply", "card closed on the car screen in state " + state + ": reply ended");
-        state = State.IDLE;
+        setState(State.IDLE);
         draft = "";
         stopListening();
         removeCard();
@@ -350,7 +397,7 @@ public final class VoiceReply {
         }
         draft = capitalize(text.trim());
         PatchLog.add("reply", "dictation recognised, asking to confirm");
-        state = State.CONFIRMING;
+        setState(State.CONFIRMING);
         confirmAskedAgain = false;
         showCard(replyTitle(), draft,
                 action(phrase("Send", "Invia"), VoiceReply::send),
@@ -396,7 +443,7 @@ public final class VoiceReply {
 
     private static void send() {
         if (state != State.CONFIRMING || draft.isEmpty()) return;
-        state = State.SENDING;
+        setState(State.SENDING);
         stopListening();
         boolean sent = false;
         try {
@@ -406,7 +453,7 @@ public final class VoiceReply {
             Log.w(TAG, "reply", t);
         }
         removeCard();
-        state = State.IDLE;
+        setState(State.IDLE);
         PatchLog.add("reply", sent ? "sent" : "sending failed");
         speaker().say(sent ? phrase("Message sent.", "Messaggio inviato.")
                 : phrase("The message could not be sent.", "Non sono riuscito a inviare il messaggio."), null);
@@ -417,7 +464,7 @@ public final class VoiceReply {
         removeCard();
         boolean wasActive = state == State.DICTATING || state == State.CONFIRMING;
         if (wasActive) PatchLog.add("reply", "cancelled in state " + state);
-        state = State.IDLE;
+        setState(State.IDLE);
         draft = "";
         if (wasActive) speaker().say(phrase("Cancelled.", "Annullato."), null);
     }
@@ -433,7 +480,7 @@ public final class VoiceReply {
             PatchLog.add("reply", "asked to reply: no");
             stopListening();
             removeCard();
-            state = State.IDLE;
+            setState(State.IDLE);
         } else {
             PatchLog.add("reply", "asked to reply: not understood, Reply card stays");
             backToOffer();
@@ -444,14 +491,14 @@ public final class VoiceReply {
     private static void backToOffer() {
         if (state != State.ASKING) return;
         stopListening();
-        state = State.OFFERED;
+        setState(State.OFFERED);
         expireOffer();
     }
 
     /** After a failed dictation: the "Reply" card again, to try once more. */
     private static void offerAgain() {
         stopListening();
-        state = State.OFFERED;
+        setState(State.OFFERED);
         showCard(title, phrase("Answer by voice?", "Vuoi rispondere?"),
                 action(phrase("Reply", "Rispondi"), VoiceReply::startDictation));
         expireOffer();
@@ -465,7 +512,7 @@ public final class VoiceReply {
         main.postDelayed(() -> {
             if (state == State.OFFERED && card == offered) {
                 removeCard();
-                state = State.IDLE;
+                setState(State.IDLE);
             }
         }, OFFER_MS);
     }
