@@ -4,7 +4,6 @@ import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.methodCall
 import app.morphe.patcher.patch.patch
 import app.morphe.patcher.util.smali.ExternalLabel
 import app.template.patches.shared.Constants.COMPATIBILITY_AARE
@@ -19,12 +18,6 @@ internal object SpeakFingerprint : Fingerprint(
     name = "speak",
     returnType = "V",
     parameters = listOf("Ljava/lang/String;"),
-    filters = listOf(
-        methodCall(
-            definingClass = "Landroid/speech/tts/TextToSpeech;",
-            name = "speak",
-        ),
-    ),
 )
 
 /** CarNotificationListener.onNotificationPosted(StatusBarNotification). */

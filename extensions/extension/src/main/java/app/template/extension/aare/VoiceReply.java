@@ -65,7 +65,6 @@ public final class VoiceReply {
     private static long cardSeq;
 
     private static SpeechRecognizer recognizer;
-    private static CarMic.Handle carMic;
     private static AudioFocusRequest listenFocus;
 
     private static final Set<String> YES = new HashSet<>(Arrays.asList(
@@ -351,8 +350,7 @@ public final class VoiceReply {
                         .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L);
             }
             requestListenFocus(context);
-            closeCarMic();
-            if (CarMic.enabled(context)) carMic = CarMic.attach(runtime.get(), intent, confirming ? 1000 : 2000);
+            // With AARE's "Car microphone for phone apps" on, the recognizer hears the car by itself.
             recognizer.startListening(intent);
         } catch (Throwable t) {
             Log.w(TAG, "listen", t);
@@ -370,13 +368,6 @@ public final class VoiceReply {
         } catch (Throwable ignored) {
         }
         releaseListenFocus();
-    }
-
-    private static void closeCarMic() {
-        if (carMic != null) {
-            carMic.close();
-            carMic = null;
-        }
     }
 
     private static final class Listener implements RecognitionListener {
@@ -489,7 +480,6 @@ public final class VoiceReply {
     }
 
     private static void releaseListenFocus() {
-        closeCarMic();
         if (listenFocus == null) return;
         Context context = context();
         AudioManager audio = context == null ? null : context.getSystemService(AudioManager.class);

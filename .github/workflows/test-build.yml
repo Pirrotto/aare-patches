@@ -43,9 +43,9 @@ jobs:
           gh release download -R MorpheApp/morphe-cli --pattern '*.jar' --dir work/cli
           ls -la work work/cli
           CLI=$(ls work/cli/*.jar | head -1)
-          java -jar "$CLI" patch --help | head -60 || true
-          java -jar "$CLI" patch --patches patches/build/libs/patches-*.mpp --out work/patched.apk work/*.apk 2>&1 | tee work/apply.log
-          grep -iE "failed|error|exception" work/apply.log && exit 1 || true
+          java -jar "$CLI" patch --validate -p patches/build/libs/patches-*.mpp -o work/patched.apk work/aare-*.apk 2>&1 | tee work/apply.log
+          # Every patch must apply: none skipped as incompatible, none failed.
+          if grep -iE "skipping|failed|severe|exception" work/apply.log; then exit 1; fi
           ls -la work/patched.apk
 
       - name: Keep the test build (dev only)
