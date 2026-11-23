@@ -31,6 +31,8 @@ public final class PatchSettings {
     public static final String VOICE_MESSAGES = "voice_messages";
     public static final String VOICE_REPLY = "voice_reply";
     public static final String TUNNEL_NAVIGATION = "tunnel_navigation";
+    /** A setting of the Voice reply patch: after the reading, "Do you want to reply?" by voice. */
+    public static final String VOICE_REPLY_ASK = "voice_reply_ask";
 
     /** One switch of the screen. */
     static final class Feature {
@@ -89,7 +91,9 @@ public final class PatchSettings {
         load();
         List<Feature> list = new ArrayList<>();
         for (Feature f : known()) {
-            if (registered.contains(f.key)) list.add(f);
+            // "Ask by voice to reply" comes with the Voice reply patch.
+            String patch = VOICE_REPLY_ASK.equals(f.key) ? VOICE_REPLY : f.key;
+            if (registered.contains(patch)) list.add(f);
         }
         return list;
     }
@@ -122,6 +126,15 @@ public final class PatchSettings {
                                 "Dopo la lettura mostra «Rispondi» per 15 secondi e nel centro notifiche: "
                                         + "detti la risposta e confermi l'invio. Con «Microfono dell'auto per le app» "
                                         + "di AARE attivo, ascolta dal microfono dell'auto."),
+                        ICON_REPLY),
+                new Feature(VOICE_REPLY_ASK,
+                        phrase("Ask by voice to reply", "Chiedi a voce se rispondere"),
+                        phrase("With Voice reply: after reading a message that can be answered, asks \"Do you want to reply?\" "
+                                        + "and listens a few seconds (the music pauses meanwhile). Say \"yes\" to dictate, "
+                                        + "\"no\" to close; otherwise the Reply card stays.",
+                                "Con Risposta vocale: dopo la lettura di un messaggio a cui si può rispondere chiede "
+                                        + "«Vuoi rispondere?» e ascolta qualche secondo (intanto la musica va in pausa). "
+                                        + "Di' «sì» per dettare, «no» per chiudere; altrimenti resta la scheda Rispondi."),
                         ICON_REPLY));
     }
 
@@ -138,7 +151,7 @@ public final class PatchSettings {
      * Features off until the user turns them on, as AARE would ship them: they change what other apps
      * get (tunnel navigation's estimated position) or read another app's files (voice messages).
      */
-    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES));
+    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY_ASK));
 
     public static boolean isEnabled(Context context, String key) {
         try {

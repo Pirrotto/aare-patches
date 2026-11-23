@@ -19,11 +19,9 @@ import android.util.Log;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -52,7 +50,7 @@ public final class VoiceReply {
     /** The cards this class put on the car screen: AARE must not close them after 8 seconds. */
     static final Set<Object> sticky = Collections.newSetFromMap(new IdentityHashMap<>());
 
-    private enum State { IDLE, OFFERED, DICTATING, CONFIRMING, SENDING }
+    private enum State { IDLE, OFFERED, ASKING, DICTATING, CONFIRMING, SENDING }
 
     private static WeakReference<Object> runtime = new WeakReference<>(null);
     private static Object listener;
@@ -67,12 +65,6 @@ public final class VoiceReply {
 
     private static SpeechRecognizer recognizer;
     private static AudioFocusRequest listenFocus;
-
-    private static final Set<String> YES = new HashSet<>(Arrays.asList(
-            "si", "invia", "inviala", "invialo", "manda", "mandala", "mandalo", "ok", "okay", "certo", "conferma",
-            "yes", "yeah", "send", "sure", "ja", "jawohl", "genau", "klar", "senden", "schick", "schicken", "gerne"));
-    private static final Set<String> NO = new HashSet<>(Arrays.asList(
-            "no", "annulla", "cancella", "lascia", "stop", "basta", "cancel", "dont", "nein", "abbrechen", "nicht", "stopp"));
 
     private VoiceReply() {
     }
@@ -109,7 +101,15 @@ public final class VoiceReply {
      */
     public static void onNotice(Object carRuntime) {
         onRuntime(carRuntime);
-        if (state == State.OFFERED) {
+        if (state == State.ASKING) {
+            PatchLog.add("reply", "asked, another card came: reply question dropped");
+            stopListening();
+            if (speakingOurs) {
+                speakingOurs = false;
+                speaker().stop();
+            }
+        }
+        if (state == State.OFFERED || state == State.ASKING) {
             removeCard();
             state = State.IDLE;
         }
@@ -214,8 +214,20 @@ public final class VoiceReply {
                     return;
                 }
                 PatchLog.add("reply", "Reply card shown");
-                state = State.OFFERED;
-                expireOffer();
+                if (state == State.ASKING) stopListening();
+                if (PatchSettings.isEnabled(context(), PatchSettings.VOICE_REPLY_ASK)) {
+                    // "Ask by voice to reply": a spoken yes starts the dictation, as tapping Reply does.
+                    state = State.ASKING;
+                    speakingOurs = true;
+                    speaker().say(phrase("Do you want to reply?", "Vuoi rispondere?"), () -> {
+                        speakingOurs = false;
+                        listenFor(State.ASKING);
+                    });
+                    watchCard();
+                } else {
+                    state = State.OFFERED;
+                    expireOffer();
+                }
             } catch (Throwable t) {
                 Log.w(TAG, "offer", t);
             }
@@ -252,6 +264,7 @@ public final class VoiceReply {
             PatchLog.add("reply", "Reply tapped but AARE's listener is gone");
             return;
         }
+        if (state == State.ASKING) stopListening();
         state = State.DICTATING;
         draft = "";
         listenStarted = false;
@@ -294,7 +307,7 @@ public final class VoiceReply {
         main.postDelayed(new Runnable() {
             @Override
             public void run() {
-                if (token != watchToken || (state != State.DICTATING && state != State.CONFIRMING)) return;
+                if (token != watchToken || (state != State.ASKING && state != State.DICTATING && state != State.CONFIRMING)) return;
                 if (cardClosed()) {
                     closedOnCar();
                     return;
@@ -308,7 +321,7 @@ public final class VoiceReply {
 
     /** The reply's card was closed on the car screen: the reply ends, quietly. */
     private static void closedOnCar() {
-        if (state != State.DICTATING && state != State.CONFIRMING) return;
+        if (state != State.ASKING && state != State.DICTATING && state != State.CONFIRMING) return;
         PatchLog.add("reply", "card closed on the car screen in state " + state + ": reply ended");
         state = State.IDLE;
         draft = "";
@@ -344,7 +357,7 @@ public final class VoiceReply {
 
     private static void onConfirmation(String text) {
         if (state != State.CONFIRMING) return;
-        Boolean answer = yesOrNo(text);
+        Boolean answer = ReplyWords.yesOrNo(text);
         if (Boolean.TRUE.equals(answer)) send();
         else if (Boolean.FALSE.equals(answer)) cancel();
         // Not understood: the card with Send and Cancel stays until one is tapped.
@@ -378,6 +391,32 @@ public final class VoiceReply {
         if (wasActive) speaker().say(phrase("Cancelled.", "Annullato."), null);
     }
 
+    /** The answer to "Do you want to reply?". */
+    private static void onAskAnswer(String text) {
+        if (state != State.ASKING) return;
+        Boolean answer = ReplyWords.askAnswer(text);
+        if (Boolean.TRUE.equals(answer)) {
+            PatchLog.add("reply", "asked to reply: yes");
+            startDictation();
+        } else if (Boolean.FALSE.equals(answer)) {
+            PatchLog.add("reply", "asked to reply: no");
+            stopListening();
+            removeCard();
+            state = State.IDLE;
+        } else {
+            PatchLog.add("reply", "asked to reply: not understood, Reply card stays");
+            backToOffer();
+        }
+    }
+
+    /** No spoken answer to "Do you want to reply?": the "Reply" card stays, as without asking. */
+    private static void backToOffer() {
+        if (state != State.ASKING) return;
+        stopListening();
+        state = State.OFFERED;
+        expireOffer();
+    }
+
     /** After a failed dictation: the "Reply" card again, to try once more. */
     private static void offerAgain() {
         stopListening();
@@ -409,9 +448,14 @@ public final class VoiceReply {
     // region Speech recognition
 
     private static void listen(boolean confirming) {
-        State expected = confirming ? State.CONFIRMING : State.DICTATING;
+        listenFor(confirming ? State.CONFIRMING : State.DICTATING);
+    }
+
+    private static void listenFor(State expected) {
+        boolean confirming = expected == State.CONFIRMING;
+        boolean asking = expected == State.ASKING;
         if (state != expected) return;
-        if (!confirming) {
+        if (expected == State.DICTATING) {
             if (listenStarted) return;
             listenStarted = true;
         }
@@ -425,7 +469,7 @@ public final class VoiceReply {
             PatchLog.add("reply", "no context to listen");
             return;
         }
-        PatchLog.add("reply", confirming ? "listening for yes/no" : "listening for the answer");
+        PatchLog.add("reply", asking ? "asked to reply, listening for yes/no" : confirming ? "listening for yes/no" : "listening for the answer");
         try {
             if (recognizer == null) {
                 boolean onDevice = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -440,7 +484,7 @@ public final class VoiceReply {
                     .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                     .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-            if (!confirming) {
+            if (expected == State.DICTATING) {
                 // Let the user pause between words while dictating.
                 intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
                         .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L);
@@ -449,12 +493,14 @@ public final class VoiceReply {
             // With AARE's "Car microphone for phone apps" on, the recognizer hears the car by itself.
             recognizer.startListening(intent);
             listenStartedAt = SystemClock.uptimeMillis();
-            scheduleListenTimeout(expected, NO_SPEECH_MS);
+            scheduleListenTimeout(expected, asking ? ASK_NO_SPEECH_MS : NO_SPEECH_MS);
         } catch (Throwable t) {
             Log.w(TAG, "listen", t);
             PatchLog.add("reply", "speech recognition can't start: " + t.getClass().getSimpleName());
             releaseListenFocus();
-            if (!confirming) {
+            if (asking) {
+                backToOffer();
+            } else if (!confirming) {
                 speaker().say(phrase("Voice input isn't available.", "Il riconoscimento vocale non è disponibile."), null);
                 offerAgain();
             }
@@ -463,6 +509,9 @@ public final class VoiceReply {
 
     /** Longest wait for the user to start talking: the music is paused meanwhile. */
     private static final long NO_SPEECH_MS = 15_000L;
+
+    /** After "Do you want to reply?": a short wait, the music is paused meanwhile. */
+    private static final long ASK_NO_SPEECH_MS = 6_000L;
 
     /** Longest a listening can last once speech started, so a long reply fits but nothing hangs. */
     private static final long MAX_LISTEN_MS = 60_000L;
@@ -476,6 +525,10 @@ public final class VoiceReply {
             listenTimeout = null;
             if (state != expected) return;
             PatchLog.add("reply", "speech recognizer gave no answer in time");
+            if (expected == State.ASKING) {
+                backToOffer();
+                return;
+            }
             stopListening();
             if (expected == State.DICTATING) {
                 speaker().say(phrase("I didn't catch that.", "Non ho capito."), null);
@@ -541,6 +594,10 @@ public final class VoiceReply {
             if (!current()) return;
             Log.i(TAG, "recognition error " + error);
             PatchLog.add("reply", "speech recognition error " + error);
+            if (expected == State.ASKING) {
+                backToOffer();
+                return;
+            }
             if (expected == State.DICTATING) {
                 if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
                     speaker().say(phrase("Allow AARE to use the microphone.", "Concedi ad AARE il microfono."), null);
@@ -558,7 +615,8 @@ public final class VoiceReply {
             releaseListenFocus();
             if (!current()) return;
             String text = first(results);
-            if (expected == State.DICTATING) onDictated(text);
+            if (expected == State.ASKING) onAskAnswer(text);
+            else if (expected == State.DICTATING) onDictated(text);
             else onConfirmation(text);
         }
 
@@ -584,21 +642,6 @@ public final class VoiceReply {
             ArrayList<String> list = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
             return list == null || list.isEmpty() ? null : list.get(0);
         }
-    }
-
-    /** True for a yes, false for a no, null if neither or both were heard. */
-    static Boolean yesOrNo(String text) {
-        if (text == null) return null;
-        String plain = Normalizer.normalize(text.toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "").replaceAll("[^a-z ]", " ");
-        boolean yes = false;
-        boolean no = false;
-        for (String word : plain.split("\\s+")) {
-            if (YES.contains(word)) yes = true;
-            if (NO.contains(word)) no = true;
-        }
-        if (yes == no) return null;
-        return yes;
     }
 
     /** Pauses the music while the microphone listens. */
