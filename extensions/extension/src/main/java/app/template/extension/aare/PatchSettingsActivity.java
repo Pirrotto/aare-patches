@@ -236,9 +236,6 @@ public final class PatchSettingsActivity extends Activity {
         return row;
     }
 
-
-    }
-
     // region Helpers
 
     private TextView text(String value, Type type, int color) {
