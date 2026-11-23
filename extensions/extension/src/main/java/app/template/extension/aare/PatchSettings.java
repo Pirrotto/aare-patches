@@ -31,7 +31,7 @@ public final class PatchSettings {
     public static final String VOICE_MESSAGES = "voice_messages";
     public static final String VOICE_REPLY = "voice_reply";
     public static final String TUNNEL_NAVIGATION = "tunnel_navigation";
-    /** A setting of the Voice reply patch: after the reading, "Do you want to reply?" by voice. */
+    /** A setting of the Voice reply patch: after the reading, "Reply?" by voice. */
     public static final String VOICE_REPLY_ASK = "voice_reply_ask";
 
     /** One switch of the screen. */
@@ -129,11 +129,11 @@ public final class PatchSettings {
                         ICON_REPLY),
                 new Feature(VOICE_REPLY_ASK,
                         phrase("Ask by voice to reply", "Chiedi a voce se rispondere"),
-                        phrase("With Voice reply: after reading a message that can be answered, asks \"Do you want to reply?\" "
+                        phrase("With Voice reply: after reading a message that can be answered, asks \"Reply?\" "
                                         + "and listens a few seconds (the music pauses meanwhile). Say \"yes\" to dictate, "
                                         + "\"no\" to close; otherwise the Reply card stays.",
                                 "Con Risposta vocale: dopo la lettura di un messaggio a cui si può rispondere chiede "
-                                        + "«Vuoi rispondere?» e ascolta qualche secondo (intanto la musica va in pausa). "
+                                        + "«Rispondi?» e ascolta qualche secondo (intanto la musica va in pausa). "
                                         + "Di' «sì» per dettare, «no» per chiudere; altrimenti resta la scheda Rispondi."),
                         ICON_REPLY));
     }

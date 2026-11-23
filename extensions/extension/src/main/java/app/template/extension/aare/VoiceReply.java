@@ -264,7 +264,7 @@ public final class VoiceReply {
                     // "Ask by voice to reply": a spoken yes starts the dictation, as tapping Reply does.
                     setState(State.ASKING);
                     speakingOurs = true;
-                    speaker().say(phrase("Do you want to reply?", "Vuoi rispondere?"), () -> {
+                    speaker().say(phrase("Reply?", "Rispondi?"), () -> {
                         speakingOurs = false;
                         listenFor(State.ASKING);
                     });
@@ -291,7 +291,7 @@ public final class VoiceReply {
                 PatchLog.add("reply", "Reply from the notification centre: conversation not found" + (l == null ? " (no listener)" : ""));
                 if (l != null) {
                     listener = l;
-                    speaker().say(phrase("This message can't be answered any more.", "Non si può più rispondere a questo messaggio."), null);
+                    speaker().say(phrase("Can't reply to this any more.", "Non si può più rispondere."), null);
                 }
                 return;
             }
@@ -320,7 +320,7 @@ public final class VoiceReply {
         PatchLog.add("reply", "dictation starts");
         showCard(replyTitle(), phrase("Speak now…", "Parla ora…"), action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
         speakingOurs = true;
-        speaker().say(phrase("What's your answer to " + title + "?", "Cosa vuoi rispondere a " + title + "?"),
+        speaker().say(phrase("Your reply?", "Cosa rispondo?"),
                 () -> {
                     speakingOurs = false;
                     listen(false);
@@ -403,7 +403,7 @@ public final class VoiceReply {
                 action(phrase("Send", "Invia"), VoiceReply::send),
                 action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
         speakingOurs = true;
-        speaker().say(phrase("You said: " + draft + ". Send it?", "Ho scritto: " + draft + ". Lo invio?"),
+        speaker().say(phrase(draft + ". Send it?", draft + ". Invio?"),
                 () -> {
                     speakingOurs = false;
                     listen(true);
@@ -435,7 +435,7 @@ public final class VoiceReply {
         confirmAskedAgain = true;
         PatchLog.add("reply", "confirmation not understood: asking once more");
         speakingOurs = true;
-        speaker().say(phrase("I didn't catch that. Send it?", "Non ho capito. Lo invio?"), () -> {
+        speaker().say(phrase("Didn't catch that. Send it?", "Non ho capito, invio?"), () -> {
             speakingOurs = false;
             listen(true);
         });
@@ -455,8 +455,8 @@ public final class VoiceReply {
         removeCard();
         setState(State.IDLE);
         PatchLog.add("reply", sent ? "sent" : "sending failed");
-        speaker().say(sent ? phrase("Message sent.", "Messaggio inviato.")
-                : phrase("The message could not be sent.", "Non sono riuscito a inviare il messaggio."), null);
+        speaker().say(sent ? phrase("Sent.", "Inviato.")
+                : phrase("Not sent.", "Non inviato."), null);
     }
 
     private static void cancel() {
