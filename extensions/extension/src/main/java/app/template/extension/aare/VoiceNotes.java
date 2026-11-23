@@ -132,6 +132,7 @@ public final class VoiceNotes {
             // The conversation being read, if it can be answered: a "Reply" card follows the reading.
             Object conversation = VoiceReply.conversationFor(context, text);
             if (voices.isEmpty() && conversation == null) return false;
+            if (!voices.isEmpty()) PatchLog.add("voice", "reading " + voices.size() + " voice message(s); reply offered after: " + (conversation != null));
 
             Context app = context.getApplicationContext();
             Player player = Player.get(app);
@@ -453,26 +454,59 @@ public final class VoiceNotes {
             if (tts.speak(text, TextToSpeech.QUEUE_ADD, new Bundle(), id) != TextToSpeech.SUCCESS) done();
         }
 
+        /**
+         * The recording playing now. Held here: a MediaPlayer nothing refers to can be collected while
+         * it plays, and then it never reports the end, so nothing queued after it (the "Reply" question)
+         * would ever be spoken.
+         */
+        private MediaPlayer recording;
+
+        /** Added to a recording's length before giving up waiting for its end. */
+        private static final int END_SLACK_MS = 5_000;
+
+        /** The longest a recording is waited for when its length is unknown. */
+        private static final int MAX_RECORDING_MS = 15 * 60_000;
+
         private void playRecording(ParcelFileDescriptor pfd) {
             MediaPlayer player = new MediaPlayer();
+            recording = player;
+            boolean[] finished = {false};
             Runnable finish = () -> {
-                player.release();
+                if (finished[0]) return;
+                finished[0] = true;
+                if (recording == player) recording = null;
+                try {
+                    player.release();
+                } catch (Throwable ignored) {
+                }
                 closeQuietly(pfd);
                 done();
             };
             try {
                 player.setAudioAttributes(ATTRIBUTES);
                 player.setDataSource(pfd.getFileDescriptor());
-                player.setOnPreparedListener(MediaPlayer::start);
+                player.setOnPreparedListener(p -> {
+                    p.start();
+                    int length = p.getDuration();
+                    int wait = length > 0 ? length + END_SLACK_MS : MAX_RECORDING_MS;
+                    main.postDelayed(() -> {
+                        if (!finished[0]) {
+                            PatchLog.add("voice", "voice message end not reported: going on");
+                            finish.run();
+                        }
+                    }, wait);
+                });
                 player.setOnCompletionListener(p -> finish.run());
                 player.setOnErrorListener((p, what, extra) -> {
                     Log.w(TAG, "cannot play voice message: " + what + "/" + extra);
+                    PatchLog.add("voice", "voice message can't play: " + what + "/" + extra);
                     finish.run();
                     return true;
                 });
                 player.prepareAsync();
             } catch (Throwable t) {
                 Log.w(TAG, "cannot play voice message", t);
+                PatchLog.add("voice", "voice message can't open: " + t.getClass().getSimpleName());
                 finish.run();
             }
         }
