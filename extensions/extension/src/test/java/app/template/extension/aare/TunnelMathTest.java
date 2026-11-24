@@ -116,4 +116,15 @@ public class TunnelMathTest {
         double[] straight = TunnelMath.destination(46.0, 8.0, 30, 1200);
         assertTrue(distance(truth, straight) > 400);
     }
+
+    @Test
+    public void aShortGapInTheCarSpeedIsFilled() {
+        TunnelMath.SpeedHold hold = new TunnelMath.SpeedHold();
+        assertNull(hold.update(null, 0));
+        assertEquals(15f, hold.update(15f, 1_000), 0f);
+        assertEquals(15f, hold.update(null, 3_000), 0f);
+        assertEquals(15f, hold.update(null, 6_000), 0f);
+        assertNull(hold.update(null, 6_001));
+        assertEquals(12f, hold.update(12f, 7_000), 0f);
+    }
 }
