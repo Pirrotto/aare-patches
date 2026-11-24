@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.1.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.1.0)" variant="all" version="9.1.0">
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 26 (current min is 23): `android.media.AudioAttributes#USAGE_ASSISTANT`"
+        errorLine1="                            .setUsage(AudioAttributes.USAGE_ASSISTANT)"
+        errorLine2="                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/Beep.java"
+            line="48"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 24 (current min is 23): `android.app.Notification#EXTRA_MESSAGES`"
+        errorLine1="            Parcelable[] messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES);"
+        errorLine2="                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceNotes.java"
+            line="106"
+            column="63"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 26 (current min is 23): `android.media.AudioAttributes#USAGE_ASSISTANT`"
+        errorLine1="                .setUsage(AudioAttributes.USAGE_ASSISTANT)"
+        errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceNotes.java"
+            line="323"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 26 (current min is 23): `android.media.AudioAttributes#USAGE_ASSISTANT`"
+        errorLine1="                        .setUsage(AudioAttributes.USAGE_ASSISTANT)"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="84"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 26 (current min is 23): `android.media.AudioAttributes#USAGE_ASSISTANT`"
+        errorLine1="                        .setUsage(AudioAttributes.USAGE_ASSISTANT)"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="909"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24, or core library desugaring (current min is 23): `java.util.List#sort`"
+        errorLine1="        out.sort((a, b) -> Long.compare(score(modifiedMs[a], messageTimeMs), score(modifiedMs[b], messageTimeMs)));"
+        errorLine2="            ~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceNoteMatch.java"
+            line="68"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24, or core library desugaring (current min is 23): `java.util.function.BooleanSupplier#getAsBoolean`"
+        errorLine1="                if (release.getAsBoolean()) done();"
+        errorLine2="                            ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceNotes.java"
+            line="513"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Method reference requires API level 24, or core library desugaring (current min is 23): `release::getAsBoolean`"
+        errorLine1="            stopRecording = release::getAsBoolean;"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceNotes.java"
+            line="515"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `new android.media.AudioFocusRequest.Builder`"
+        errorLine1="            focus = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceNotes.java"
+            line="557"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioFocusRequest.Builder#setAudioAttributes`"
+        errorLine1="                    .setAudioAttributes(ATTRIBUTES)"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceNotes.java"
+            line="558"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioFocusRequest.Builder#build`"
+        errorLine1="                    .build();"
+        errorLine2="                     ~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceNotes.java"
+            line="559"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioManager#requestAudioFocus`"
+        errorLine1="            audio.requestAudioFocus(focus);"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceNotes.java"
+            line="560"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioManager#abandonAudioFocusRequest`"
+        errorLine1="            if (audio != null) audio.abandonAudioFocusRequest(focus);"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceNotes.java"
+            line="566"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `new android.media.AudioFocusRequest.Builder`"
+        errorLine1="        replyFocus = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="82"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioFocusRequest.Builder#setAudioAttributes`"
+        errorLine1="                .setAudioAttributes(new AudioAttributes.Builder()"
+        errorLine2="                 ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="83"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioFocusRequest.Builder#build`"
+        errorLine1="                .build();"
+        errorLine2="                 ~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="87"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioManager#requestAudioFocus`"
+        errorLine1="            audio.requestAudioFocus(replyFocus);"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="89"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioManager#abandonAudioFocusRequest`"
+        errorLine1="        if (audio != null) main.post(() -> audio.abandonAudioFocusRequest(held));"
+        errorLine2="                                                 ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="103"
+            column="50"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `new android.media.AudioFocusRequest.Builder`"
+        errorLine1="        listenFocus = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)"
+        errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="907"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioFocusRequest.Builder#setAudioAttributes`"
+        errorLine1="                .setAudioAttributes(new AudioAttributes.Builder()"
+        errorLine2="                 ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="908"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioFocusRequest.Builder#build`"
+        errorLine1="                .build();"
+        errorLine2="                 ~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="912"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioManager#requestAudioFocus`"
+        errorLine1="        audio.requestAudioFocus(listenFocus);"
+        errorLine2="              ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="913"
+            column="15"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 23): `android.media.AudioManager#abandonAudioFocusRequest`"
+        errorLine1="        if (audio != null) audio.abandonAudioFocusRequest(listenFocus);"
+        errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceReply.java"
+            line="920"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="PrivateApi"
+        message="Accessing internal APIs via reflection is not supported and may not work on all devices or in the future"
+        errorLine1="            Object app = Class.forName(&quot;android.app.ActivityThread&quot;).getMethod(&quot;currentApplication&quot;).invoke(null);"
+        errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/PatchLog.java"
+            line="116"
+            column="26"/>
+    </issue>
+
+    <issue
+        id="DiscouragedApi"
+        message="Use of this function is discouraged because resource reflection makes it harder to perform build optimizations and compile-time verification of code. It is much more efficient to retrieve resources by identifier (e.g. `R.foo.bar`) than by name (e.g. `getIdentifier(&quot;bar&quot;, &quot;foo&quot;, null)`)."
+        errorLine1="        return app.getResources().getIdentifier(name, &quot;string&quot;, app.getPackageName());"
+        errorLine2="                                  ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/PatchSettings.java"
+            line="215"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `Player` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="        private static Player instance;"
+        errorLine2="                ~~~~~~">
+        <location
+            file="src/main/java/app/template/extension/aare/VoiceNotes.java"
+            line="310"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    compileOnly(&quot;dev.rikka.shizuku:api:13.1.5&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="15"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    testImplementation(&quot;junit:junit:4.13.2&quot;)"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="20"
+            column="24"/>
+    </issue>
+
+</issues>
