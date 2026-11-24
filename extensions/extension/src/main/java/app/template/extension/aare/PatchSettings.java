@@ -140,10 +140,10 @@ public final class PatchSettings {
                         phrase("Voice reply", "Risposta vocale"),
                         phrase("After reading a message, shows \"Reply\" for 15 seconds and in the notification centre: "
                                         + "dictate the answer, then confirm to send it. With AARE's Car microphone for "
-                                        + "phone apps on, it listens through the car.",
+                                        + "phone apps on, it listens through the car. Off by default.",
                                 "Dopo la lettura mostra «Rispondi» per 15 secondi e nel centro notifiche: "
                                         + "detti la risposta e confermi l'invio. Con «Microfono dell'auto per le app» "
-                                        + "di AARE attivo, ascolta dal microfono dell'auto."),
+                                        + "di AARE attivo, ascolta dal microfono dell'auto. Disattivata di default."),
                         ICON_REPLY),
                 new Feature(VOICE_REPLY_ASK,
                         phrase("Ask by voice to reply", "Chiedi a voce se rispondere"),
@@ -176,12 +176,17 @@ public final class PatchSettings {
      * Features off until the user turns them on, as AARE would ship them: they change what other apps
      * get (tunnel navigation's estimated position) or read another app's files (voice messages).
      */
-    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY_ASK, VOICE_REPLY_BEEP));
+    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP));
 
     /**
      * The voice features use Android 8's audio focus requests; AARE also runs on Android 6 and 7,
      * where they stay off (and are shown as such on the Settings screen).
      */
+    /** Whether [key] starts off until the user switches it on (new features are opt-in, as AARE wants). */
+    static boolean offByDefault(String key) {
+        return OFF_BY_DEFAULT.contains(key);
+    }
+
     private static final Set<String> NEEDS_ANDROID_8 = new HashSet<>(Arrays.asList(
             VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP));
 
@@ -194,11 +199,11 @@ public final class PatchSettings {
         if (!available(key)) return false;
         try {
             if (context == null) context = application();
-            if (context == null) return !OFF_BY_DEFAULT.contains(key);
-            return prefs(context).getBoolean(key, !OFF_BY_DEFAULT.contains(key));
+            if (context == null) return !offByDefault(key);
+            return prefs(context).getBoolean(key, !offByDefault(key));
         } catch (Throwable t) {
             Log.w(TAG, "isEnabled", t);
-            return !OFF_BY_DEFAULT.contains(key);
+            return !offByDefault(key);
         }
     }
 

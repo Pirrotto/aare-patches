@@ -52,7 +52,7 @@ val voiceReplyPatch = patch(
         "hour). Replying lets you dictate the answer, shown live on the car screen; it is read back and sent only " +
         "after a spoken \"yes\" or \"Send\" (\"change message\" dictates it again). Optional in the patches' Settings: " +
         "\"Do you want to reply?\" asked by voice, and listening tones. Uses the phone's speech recognition. " +
-        "Android 8 or later.",
+        "Off by default: switch it on in the patches' Settings. Android 8 or later.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)
