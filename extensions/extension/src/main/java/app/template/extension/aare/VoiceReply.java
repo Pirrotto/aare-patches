@@ -401,7 +401,7 @@ public final class VoiceReply {
         setState(State.CONFIRMING);
         confirmAskedAgain = false;
         showCard(replyTitle(), draft,
-                action(phrase("Send", "Invia"), VoiceReply::send),
+                action(phrase("Send", "Invia"), () -> send(false)),
                 action(phrase("Cancel", "Annulla"), VoiceReply::cancel));
         speakingOurs = true;
         speaker().say(ReplyPhrases.readBack(title, draft, italian()),
@@ -422,7 +422,7 @@ public final class VoiceReply {
             return;
         }
         Boolean answer = ReplyWords.yesOrNo(text);
-        if (Boolean.TRUE.equals(answer)) send();
+        if (Boolean.TRUE.equals(answer)) send(true);
         else if (Boolean.FALSE.equals(answer)) cancel();
         else confirmNotUnderstood();
     }
@@ -450,7 +450,8 @@ public final class VoiceReply {
         });
     }
 
-    private static void send() {
+    /** [byVoice]: a spoken yes, else the Send button. Only these two ever send. */
+    private static void send(boolean byVoice) {
         if (state != State.CONFIRMING || draft.isEmpty()) return;
         setState(State.SENDING);
         stopListening();
@@ -463,7 +464,7 @@ public final class VoiceReply {
         }
         removeCard();
         setState(State.IDLE);
-        PatchLog.add("reply", sent ? "sent" : "sending failed");
+        PatchLog.add("reply", (sent ? "sent" : "sending failed") + (byVoice ? " (spoken yes)" : " (Send tapped)"));
         speaker().say(sent ? ReplyPhrases.sent(title, italian()) : ReplyPhrases.notSent(italian()), null);
     }
 

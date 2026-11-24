@@ -27,7 +27,8 @@ import java.util.concurrent.Executors;
  *
  * Kept in a file in AARE's own private storage (no other app can read it, not backed up), so it is
  * still there after AARE closed: the newest [MAX] lines, across drives, oldest dropped first. Each
- * start of AARE adds a line, so the drives can be told apart.
+ * run of AARE adds a line when the patches first log something (not AARE's start), so the drives
+ * can be told apart.
  */
 final class PatchLog {
     private static final String TAG = "AarePatchLog";
@@ -87,7 +88,7 @@ final class PatchLog {
         } catch (Throwable t) {
             Log.w(TAG, "load", t);
         }
-        String start = new SimpleDateFormat("dd.MM HH:mm:ss", Locale.ROOT).format(new Date()) + " === AARE started";
+        String start = new SimpleDateFormat("dd.MM HH:mm:ss", Locale.ROOT).format(new Date()) + " === patches' log opened (when the patches first logged in this run of AARE, not when AARE started)";
         keep(start);
         final File f = file;
         if (f != null) {
