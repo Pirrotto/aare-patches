@@ -37,6 +37,8 @@ public final class PatchSettings {
     public static final String VOICE_REPLY_ASK = "voice_reply_ask";
     /** A setting of the Voice reply patch: a short tone each time it starts listening. */
     public static final String VOICE_REPLY_BEEP = "voice_reply_beep";
+    /** Pause the car's radio while AARE speaks (Car radio pause patch). */
+    public static final String RADIO_PAUSE = "radio_pause";
 
     /** One switch of the screen. */
     static final class Feature {
@@ -110,13 +112,14 @@ public final class PatchSettings {
     }
 
     // Material icons (Apache License 2.0): navigation, reply, graphic_eq, record_voice_over,
-    // notifications_active.
+    // notifications_active, volume_down.
     static final String ICON_TUNNEL = "M12,2L4.5,20.29l0.71,0.71L12,18l6.79,3 0.71,-0.71z";
     private static final String ICON_REPLY = "M10,9V5l-7,7 7,7v-4.1c5,0 8.5,1.6 11,5.1 -1,-5 -4,-10 -11,-11z";
     private static final String ICON_VOICE_MESSAGE = "M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z";
     private static final String ICON_ASK = "M9 13c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2"
             + "c0-2.66-5.33-4-8-4zm7.76-9.64l-1.68 1.69c.84 1.18.84 2.71 0 3.89l1.68 1.69c2.02-2.02 2.02-5.07 0-7.27z"
             + "M20.07 2l-1.63 1.63c2.77 3.02 2.77 7.56 0 10.74L20.07 16c3.9-3.89 3.91-9.95 0-14z";
+    private static final String ICON_RADIO_PAUSE = "M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z";
     private static final String ICON_BEEP = "M7.58 4.08L6.15 2.65C3.75 4.48 2.17 7.3 2.03 10.5h2c.15-2.65 1.51-4.97 3.55-6.42z"
             + "m12.39 6.42h2c-.15-3.2-1.73-6.02-4.12-7.85l-1.42 1.43c2.02 1.45 3.39 3.77 3.54 6.42z"
             + "M18 11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2v-5z"
@@ -162,7 +165,16 @@ public final class PatchSettings {
                                         + "as Android Auto's assistant does.",
                                 "Con Risposta vocale: un breve suono che sale quando inizia ad ascoltare e che scende quando "
                                         + "smette, come l'assistente di Android Auto."),
-                        ICON_BEEP, VOICE_REPLY));
+                        ICON_BEEP, VOICE_REPLY),
+                new Feature(RADIO_PAUSE,
+                        phrase("Pause the car's radio while AARE speaks", "Pausa della radio dell'auto quando AARE parla"),
+                        phrase("While a message is read aloud and during a voice reply, the car's own sound (radio) pauses "
+                                        + "instead of only getting lower, and stays paused until AARE is done, as with Android "
+                                        + "Auto's assistant. Navigation prompts are unchanged.",
+                                "Mentre AARE legge un messaggio e durante la risposta vocale, il suono dell'auto (radio) va "
+                                        + "in pausa invece di abbassarsi solo un po', e resta in pausa finché AARE ha finito, come "
+                                        + "con l'assistente di Android Auto. Le indicazioni stradali restano come prima."),
+                        ICON_RADIO_PAUSE));
     }
 
     // endregion
@@ -178,7 +190,7 @@ public final class PatchSettings {
      * Features off until the user turns them on, as AARE would ship them: they change what other apps
      * get (tunnel navigation's estimated position) or read another app's files (voice messages).
      */
-    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP));
+    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE));
 
     /**
      * The voice features use Android 8's audio focus requests; AARE also runs on Android 6 and 7,
@@ -190,7 +202,7 @@ public final class PatchSettings {
     }
 
     private static final Set<String> NEEDS_ANDROID_8 = new HashSet<>(Arrays.asList(
-            VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP));
+            VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE));
 
     /** Whether [key]'s feature can run on this phone's Android version. */
     public static boolean available(String key) {
