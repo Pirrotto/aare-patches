@@ -310,7 +310,8 @@ public final class TunnelNavigation {
         }
     }
 
-    private static boolean connected() {
+    /** Whether a car is connected now (AARE's CarData). Also used by the voice reply. */
+    static boolean connected() {
         try {
             Object s = state();
             return s != null && (boolean) s.getClass().getMethod("getConnected").invoke(s);

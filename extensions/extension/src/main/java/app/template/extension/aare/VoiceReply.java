@@ -133,6 +133,7 @@ public final class VoiceReply {
             // Kept with the Reply action: WhatsApp may take its notification away (read on the
             // phone, or after a while) while the message is still in the car's notification centre.
             Kept kept = new Kept(found, SystemClock.elapsedRealtime(), carRuntime);
+            main.post(() -> keep(kept));
             List<Object> withReply = new ArrayList<>(actions == null ? Collections.emptyList() : actions);
             withReply.add(action(phrase("Reply", "Rispondi"), () -> replyFromHistory(noticeTitle, noticeText, kept)));
             return withReply;
@@ -289,10 +290,10 @@ public final class VoiceReply {
     /** "Reply" tapped in the notification centre: dictation straight away. */
     /**
      * A conversation as it was when its message entered the notification centre, with its reply
-     * action: in memory only, for [KEPT_MS] and the same car session.
+     * action: in memory only, for [KEPT_MS] and the same car session, wiped when the car disconnects.
      */
     private static final class Kept {
-        final Object conversation;
+        private Object conversation;
         final long at;
         final WeakReference<Object> session;
 
@@ -304,14 +305,47 @@ public final class VoiceReply {
 
         /** The kept conversation if still usable now, else null. */
         Object usable() {
-            if (SystemClock.elapsedRealtime() - at > KEPT_MS) return null;
+            if (SystemClock.elapsedRealtime() - at > KEPT_MS) {
+                conversation = null;
+                return null;
+            }
             Object now = runtime.get();
             return now != null && now == session.get() ? conversation : null;
+        }
+
+        void wipe() {
+            conversation = null;
         }
     }
 
     /** How long a message in the notification centre can be answered after its notification went. */
-    private static final long KEPT_MS = 2 * 60 * 60 * 1000L;
+    private static final long KEPT_MS = 60 * 60 * 1000L;
+
+    /** Every reply kept and not yet wiped (main thread). */
+    private static final List<Kept> allKept = new ArrayList<>();
+
+    /** How often, while replies are kept, it checks whether they must be wiped. */
+    private static final long KEPT_CHECK_MS = 30_000L;
+
+    private static void keep(Kept kept) {
+        allKept.add(kept);
+        if (allKept.size() == 1) main.postDelayed(VoiceReply::checkKept, KEPT_CHECK_MS);
+    }
+
+    /** Wipes the kept replies once the car is disconnected, its session changed, or they expired. */
+    private static void checkKept() {
+        boolean ended = !TunnelNavigation.connected();
+        Object now = runtime.get();
+        for (java.util.Iterator<Kept> it = allKept.iterator(); it.hasNext(); ) {
+            Kept k = it.next();
+            if (ended || now == null || now != k.session.get() || k.usable() == null) {
+                k.wipe();
+                it.remove();
+            }
+        }
+        if (ended) PatchLog.add("reply", "car disconnected: kept replies wiped");
+        if (!allKept.isEmpty()) main.postDelayed(VoiceReply::checkKept, KEPT_CHECK_MS);
+    }
 
     private static void replyFromHistory(String noticeTitle, String noticeText, Kept kept) {
         if (state == State.DICTATING || state == State.CONFIRMING || state == State.SENDING) return;
