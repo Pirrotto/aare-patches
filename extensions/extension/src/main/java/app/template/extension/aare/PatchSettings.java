@@ -39,6 +39,8 @@ public final class PatchSettings {
     public static final String VOICE_REPLY_BEEP = "voice_reply_beep";
     /** Pause the car's radio while AARE speaks (Car radio pause patch). */
     public static final String RADIO_PAUSE = "radio_pause";
+    /** Test diagnostics: whether AARE and the navigation apps may read the location (Tunnel navigation patch). */
+    public static final String LOCATION_CHECK = "location_check";
 
     /** One switch of the screen. */
     static final class Feature {
@@ -105,20 +107,22 @@ public final class PatchSettings {
         List<Feature> list = new ArrayList<>();
         for (Feature f : known()) {
             // "Ask by voice to reply" comes with the Voice reply patch.
-            String patch = VOICE_REPLY_ASK.equals(f.key) || VOICE_REPLY_BEEP.equals(f.key) ? VOICE_REPLY : f.key;
+            String patch = VOICE_REPLY_ASK.equals(f.key) || VOICE_REPLY_BEEP.equals(f.key) ? VOICE_REPLY
+                    : LOCATION_CHECK.equals(f.key) ? TUNNEL_NAVIGATION : f.key;
             if (registered.contains(patch)) list.add(f);
         }
         return list;
     }
 
     // Material icons (Apache License 2.0): navigation, reply, graphic_eq, record_voice_over,
-    // notifications_active, volume_down.
+    // notifications_active, volume_down, place.
     static final String ICON_TUNNEL = "M12,2L4.5,20.29l0.71,0.71L12,18l6.79,3 0.71,-0.71z";
     private static final String ICON_REPLY = "M10,9V5l-7,7 7,7v-4.1c5,0 8.5,1.6 11,5.1 -1,-5 -4,-10 -11,-11z";
     private static final String ICON_VOICE_MESSAGE = "M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z";
     private static final String ICON_ASK = "M9 13c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2"
             + "c0-2.66-5.33-4-8-4zm7.76-9.64l-1.68 1.69c.84 1.18.84 2.71 0 3.89l1.68 1.69c2.02-2.02 2.02-5.07 0-7.27z"
             + "M20.07 2l-1.63 1.63c2.77 3.02 2.77 7.56 0 10.74L20.07 16c3.9-3.89 3.91-9.95 0-14z";
+    private static final String ICON_LOCATION_CHECK = "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z";
     private static final String ICON_RADIO_PAUSE = "M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z";
     private static final String ICON_BEEP = "M7.58 4.08L6.15 2.65C3.75 4.48 2.17 7.3 2.03 10.5h2c.15-2.65 1.51-4.97 3.55-6.42z"
             + "m12.39 6.42h2c-.15-3.2-1.73-6.02-4.12-7.85l-1.42 1.43c2.02 1.45 3.39 3.77 3.54 6.42z"
@@ -136,6 +140,13 @@ public final class PatchSettings {
                                         + "velocità, bussola e giroscopio dell'auto, finché torna il GPS. Ricorda ciò che impara di ogni auto e lo "
                                         + "cancella quando la spegni."),
                         ICON_TUNNEL),
+                new Feature(LOCATION_CHECK,
+                        phrase("Location check (test)", "Controllo posizione (prova)"),
+                        phrase("Diagnostics only: for 5 minutes after the car connects, notes every 15 s whether AARE and the "
+                                        + "navigation apps may read the location (needs Shizuku). For the black map at the start.",
+                                "Solo diagnostica: per 5 minuti dopo il collegamento annota ogni 15 s se AARE e le app di "
+                                        + "navigazione possono leggere la posizione (serve Shizuku). Per la mappa nera all'avvio."),
+                        ICON_LOCATION_CHECK, TUNNEL_NAVIGATION),
                 new Feature(VOICE_MESSAGES,
                         phrase("Voice messages", "Messaggi vocali"),
                         phrase("Plays WhatsApp voice messages in the car when AARE reads a message. Needs Shizuku running.",
@@ -190,7 +201,7 @@ public final class PatchSettings {
      * Features off until the user turns them on, as AARE would ship them: they change what other apps
      * get (tunnel navigation's estimated position) or read another app's files (voice messages).
      */
-    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE));
+    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, LOCATION_CHECK));
 
     /**
      * The voice features use Android 8's audio focus requests; AARE also runs on Android 6 and 7,
