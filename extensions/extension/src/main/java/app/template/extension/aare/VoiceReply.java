@@ -824,7 +824,7 @@ public final class VoiceReply {
             if (current() && expected == State.CONFIRMING) {
                 // A clear yes or no to "Send it?" while still speaking: acted on at once.
                 String heard = first(partialResults);
-                if (ReplyWords.wantsChange(heard) || ReplyWords.yesOrNo(heard) != null) {
+                if (ReplyWords.actEarlyOnConfirmation(heard)) {
                     PatchLog.add("reply", "confirmation heard before the end");
                     stopListening();
                     onConfirmation(heard);

@@ -29,6 +29,15 @@ final class ReplyWords {
     private ReplyWords() {
     }
 
+    /**
+     * Whether a partial answer to "Do you want to send it?" can be acted on before the user stops
+     * talking: a yes, or "change". A "no" waits for the end, as it may be "no, change the message",
+     * which dictates the message again instead of cancelling it.
+     */
+    static boolean actEarlyOnConfirmation(String partial) {
+        return wantsChange(partial) || Boolean.TRUE.equals(yesOrNo(partial));
+    }
+
     /** True if [text] asks to change the message ("cambia messaggio", "change message", "ändern"). */
     static boolean wantsChange(String text) {
         if (text == null) return false;
