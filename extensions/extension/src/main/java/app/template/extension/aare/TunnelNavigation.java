@@ -57,6 +57,8 @@ public final class TunnelNavigation {
     private static long movingMs;
     private static float startAccuracy;
     private static boolean limitLogged;
+    /** "May be off the road" was logged for this estimate. */
+    private static boolean wideLogged;
     private static boolean passLogged;
     // Diagnostics: where the heading came from during the current estimate.
     private static int compassSteps, gyroSteps, straightSteps, noSpeedSteps;
@@ -165,6 +167,7 @@ public final class TunnelNavigation {
             travelledM = 0;
             movingMs = 0;
             limitLogged = false;
+            wideLogged = false;
             startAccuracy = lastFix.hasAccuracy() ? lastFix.getAccuracy() : 10f;
             if (Double.isNaN(bearing) && lastFix.hasBearing()) bearing = lastFix.getBearing();
             Log.i(TAG, "no GPS while moving: estimating from the last fix");
@@ -212,7 +215,13 @@ public final class TunnelNavigation {
         Location next = destination(estimate, bearing, distance);
         next.setSpeed((float) speedNow);
         next.setBearing((float) bearing);
-        next.setAccuracy(TunnelMath.accuracy(startAccuracy, travelledM));
+        float accuracy = TunnelMath.accuracy(startAccuracy, travelledM);
+        if (!wideLogged && accuracy > TunnelMath.ROUTE_SNAP_M) {
+            wideLogged = true;
+            PatchLog.add("tunnel", "estimate may now be more than " + (int) TunnelMath.ROUTE_SNAP_M
+                    + " m off the road after " + (int) travelledM + " m (apps snap to their route only within that)");
+        }
+        next.setAccuracy(TunnelMath.reportedAccuracy(accuracy));
         next.setTime(System.currentTimeMillis());
         next.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
         estimate = next;

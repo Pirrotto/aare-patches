@@ -165,4 +165,16 @@ public class TunnelMathTest {
         for (int i = 0; i < 10; i++) bearing = TunnelMath.turn(bearing, realRate * 0.7 * (1 / 0.7), 1, 1);
         assertEquals(90, bearing, 0.001);
     }
+
+    @Test
+    public void theReportedAccuracyStaysWhereNavigationAppsStillUseIt() {
+        // Honest growth: 5 m + 6 % of the distance; 50 m is passed after 750 m.
+        assertTrue(TunnelMath.accuracy(5, 800) > 50);
+        // What the apps get stays under their 50 m cut-off, the whole way.
+        assertEquals(45, TunnelMath.reportedAccuracy(TunnelMath.accuracy(5, 800)), 1e-6);
+        assertEquals(45, TunnelMath.reportedAccuracy(TunnelMath.accuracy(5, TunnelMath.MAX_DISTANCE_M)), 1e-6);
+        assertTrue(TunnelMath.reportedAccuracy(TunnelMath.accuracy(5, 5000)) < 50);
+        // Short of the cap it is the honest value.
+        assertEquals(17, TunnelMath.reportedAccuracy(TunnelMath.accuracy(5, 200)), 1e-3);
+    }
 }
