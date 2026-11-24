@@ -255,8 +255,12 @@ public final class PatchSettingsActivity extends Activity {
     private final java.util.Map<View, String> dependents = new java.util.LinkedHashMap<>();
 
     /** A setting that depends on one turned off is greyed out and can't be changed. */
+    /** Rows of features this phone's Android version can't run: always greyed out. */
+    private final java.util.Set<View> unavailable = new java.util.HashSet<>();
+
     private void refreshDependents() {
         for (java.util.Map.Entry<View, String> e : dependents.entrySet()) {
+            if (unavailable.contains(e.getKey())) continue;
             boolean on = PatchSettings.isEnabled(this, e.getValue());
             e.getKey().setEnabled(on);
             e.getKey().setAlpha(on ? 1f : 0.38f);
@@ -284,6 +288,11 @@ public final class PatchSettingsActivity extends Activity {
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.addView(text(feature.title, Type.BODY_LARGE, colors.onSurface));
         texts.addView(text(feature.summary, Type.BODY_SMALL, colors.onSurfaceVariant));
+        boolean available = PatchSettings.available(feature.key);
+        if (!available) {
+            texts.addView(text(PatchSettings.phrase("Needs Android 8 or later.", "Richiede Android 8 o successivo."),
+                    Type.BODY_SMALL, colors.onSurface));
+        }
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         textParams.leftMargin = dp(12);
         textParams.rightMargin = dp(12);
@@ -301,6 +310,11 @@ public final class PatchSettingsActivity extends Activity {
             refreshDependents();
         });
         toggle.setOnClickListener(v -> row.performClick());
+        if (!available) {
+            unavailable.add(row);
+            row.setEnabled(false);
+            row.setAlpha(0.38f);
+        }
         return row;
     }
 

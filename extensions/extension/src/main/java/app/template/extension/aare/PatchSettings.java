@@ -4,11 +4,13 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.util.Log;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -176,7 +178,20 @@ public final class PatchSettings {
      */
     private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY_ASK, VOICE_REPLY_BEEP));
 
+    /**
+     * The voice features use Android 8's audio focus requests; AARE also runs on Android 6 and 7,
+     * where they stay off (and are shown as such on the Settings screen).
+     */
+    private static final Set<String> NEEDS_ANDROID_8 = new HashSet<>(Arrays.asList(
+            VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP));
+
+    /** Whether [key]'s feature can run on this phone's Android version. */
+    public static boolean available(String key) {
+        return !NEEDS_ANDROID_8.contains(key) || Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
+    }
+
     public static boolean isEnabled(Context context, String key) {
+        if (!available(key)) return false;
         try {
             if (context == null) context = application();
             if (context == null) return !OFF_BY_DEFAULT.contains(key);

@@ -126,6 +126,8 @@ public final class VoiceNotes {
         if (context != null && listenerRef.get() != context) listenerRef = new java.lang.ref.WeakReference<>(context);
         try {
             if (text == null) return false;
+            // The voice features need Android 8 (audio focus requests): below, AARE reads as usual.
+            if (!PatchSettings.available(PatchSettings.VOICE_MESSAGES)) return false;
             // Each feature can be turned off on the Settings screen of the patches.
             // The conversation being read, if it can be answered: a "Reply" card follows the reading.
             Object conversation = VoiceReply.conversationFor(context, text);
@@ -495,8 +497,9 @@ public final class VoiceNotes {
             MediaPlayer player = new MediaPlayer();
             recording = player;
             boolean[] finished = {false};
-            java.util.function.BooleanSupplier release = () -> {
-                if (finished[0]) return false;
+            // Releases the player once; plain Runnables, as AARE runs on Android 6 too.
+            Runnable release = () -> {
+                if (finished[0]) return;
                 finished[0] = true;
                 if (recording == player) {
                     recording = null;
@@ -507,12 +510,13 @@ public final class VoiceNotes {
                 } catch (Throwable ignored) {
                 }
                 closeQuietly(pfd);
-                return true;
             };
             Runnable finish = () -> {
-                if (release.getAsBoolean()) done();
+                boolean already = finished[0];
+                release.run();
+                if (!already) done();
             };
-            stopRecording = release::getAsBoolean;
+            stopRecording = release;
             try {
                 player.setAudioAttributes(ATTRIBUTES);
                 player.setDataSource(pfd.getFileDescriptor());
