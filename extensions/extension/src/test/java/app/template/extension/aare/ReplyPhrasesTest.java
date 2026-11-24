@@ -36,6 +36,9 @@ public class ReplyPhrasesTest {
         assertTrue(ReplyWords.wantsChange("Cambia messaggio"));
         assertTrue(ReplyWords.wantsChange("no, modifica"));
         assertTrue(ReplyWords.wantsChange("ändern"));
+        // "No, cambia messaggio" is a change, not a no: checked before yes/no.
+        assertTrue(ReplyWords.wantsChange("No, cambia messaggio"));
+        assertEquals(Boolean.FALSE, ReplyWords.yesOrNo("No"));
         assertFalse(ReplyWords.wantsChange("sì mandalo"));
         assertFalse(ReplyWords.wantsChange(null));
     }

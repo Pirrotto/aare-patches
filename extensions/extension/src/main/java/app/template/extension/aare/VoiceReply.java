@@ -822,9 +822,10 @@ public final class VoiceReply {
         @Override
         public void onPartialResults(Bundle partialResults) {
             if (current() && expected == State.CONFIRMING) {
-                // A clear yes or no to "Send it?" while still speaking: acted on at once.
+                // A clear yes, or "change message", while still speaking: acted on at once. A no waits
+                // for the end: "no, cambia messaggio" begins with "no" and must not cancel.
                 String heard = first(partialResults);
-                if (ReplyWords.wantsChange(heard) || ReplyWords.yesOrNo(heard) != null) {
+                if (ReplyWords.wantsChange(heard) || Boolean.TRUE.equals(ReplyWords.yesOrNo(heard))) {
                     PatchLog.add("reply", "confirmation heard before the end");
                     stopListening();
                     onConfirmation(heard);
