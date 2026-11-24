@@ -4,6 +4,10 @@ extension {
 
 android {
     namespace = "app.template.extension"
+    lint {
+        // The issues found when lint was added are listed here; only new ones fail the build.
+        baseline = file("lint-baseline.xml")
+    }
 }
 
 dependencies {
