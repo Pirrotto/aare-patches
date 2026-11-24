@@ -63,6 +63,17 @@ final class PatchLog {
         }
     }
 
+    /** Deletes the log, in memory and in its file (the user's "Delete diagnostics"). */
+    static void clear() {
+        synchronized (lines) {
+            load();
+            lines.clear();
+            appendedSinceTrim = 0;
+            final File f = file;
+            if (f != null) writer.execute(() -> write(f, java.util.Collections.emptyList(), false));
+        }
+    }
+
     static String dump() {
         StringBuilder b = new StringBuilder();
         synchronized (lines) {
