@@ -62,6 +62,22 @@ final class TunnelMath {
         return (float) (Math.max(start, 3f) + ERROR_PER_M * travelledM);
     }
 
+    /**
+     * The accuracy reported to the apps, at most this. Navigation apps ignore fixes worse than 50 m
+     * (Vela on the car screen does: VelaCarSession, CarMapRenderer), so past about 750 m of tunnel
+     * the estimate was dropped and the arrow stopped. The estimate still stops at its limits
+     * (MAX_DISTANCE_M, MAX_MOVING_MS).
+     */
+    static final float REPORTED_ACCURACY_MAX_M = 45f;
+
+    /** The accuracy to report for [accuracy]: never worse than [REPORTED_ACCURACY_MAX_M]. */
+    static float reportedAccuracy(float accuracy) {
+        return Math.min(accuracy, REPORTED_ACCURACY_MAX_M);
+    }
+
+    /** A navigation app keeps the position on its route only within about this distance of it. */
+    static final float ROUTE_SNAP_M = 40f;
+
     /** The heading after [dtS] seconds turning at [yawRadS], the gyroscope's sign learned as [sign]. */
     static double turn(double bearingDeg, double yawRadS, double sign, double dtS) {
         return normalize(bearingDeg + sign * Math.toDegrees(yawRadS) * dtS);
