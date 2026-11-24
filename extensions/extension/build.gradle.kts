@@ -36,5 +36,5 @@ val generatePatchVersion = tasks.register("generatePatchVersion") {
         )
     }
 }
-android.sourceSets.getByName("main").java.srcDir(patchVersionDir)
+android.sourceSets.getByName("main").java.srcDir(patchVersionDir.get().asFile)
 tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(generatePatchVersion) }
