@@ -126,4 +126,46 @@ final class TunnelMath {
             return null;
         }
     }
+
+    /**
+     * Learns how much a car reading must be scaled to match the GPS (least squares through zero,
+     * recent measures weighing more): measured ≈ gain × reported. Until [minSamples] measures it
+     * answers 1, i.e. the reading as the car sends it; the gain stays within [min, max].
+     */
+    static final class GainLearner {
+        private final double min;
+        private final double max;
+        private final int minSamples;
+        private final double forget;
+        private double sxy;
+        private double sxx;
+        private int samples;
+
+        GainLearner(double min, double max, int minSamples, double forget) {
+            this.min = min;
+            this.max = max;
+            this.minSamples = minSamples;
+            this.forget = forget;
+        }
+
+        void add(double measured, double reported) {
+            if (Double.isNaN(measured) || Double.isNaN(reported) || Double.isInfinite(measured) || Double.isInfinite(reported)) return;
+            sxy = sxy * forget + measured * reported;
+            sxx = sxx * forget + reported * reported;
+            samples++;
+        }
+
+        boolean ready() {
+            return samples >= minSamples && sxx > 1e-9;
+        }
+
+        int samples() {
+            return samples;
+        }
+
+        double gain() {
+            if (!ready()) return 1;
+            return Math.max(min, Math.min(max, sxy / sxx));
+        }
+    }
 }
