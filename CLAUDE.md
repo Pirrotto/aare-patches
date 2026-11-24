@@ -65,6 +65,42 @@ placeholder, dead code or secret · builds and passes the checks · new behaviou
 broken · backward compatible (or the break stated) · clear description with risks and tests · what wasn't
 verified said plainly.
 
+## Privacy and security in every change (OWASP MASVS, OpenSSF, F-Droid, Android guidelines)
+
+- **Least data:** use only the data a feature needs; ask only for the permissions it needs, when it needs
+  them, saying why. Location is never stored in history or logs and never leaves the phone; background
+  location only while a car is connected or a navigation runs. Microphone open only while needed, closed
+  right after, always with a visible or audible sign. No persistent user or device identifiers.
+- **No tracking:** no analytics, crash reporting, ads or third-party tracking libraries; no undeclared network
+  connection (any connection documented and switchable off); no downloaded executable code without explicit,
+  optional consent.
+- **Logs and diagnostics:** never message text or audio, contact names or numbers, coordinates, passwords or
+  tokens; network identifiers (MAC, BSSID, SSID) shortened or anonymised; logs stay on the phone and are shared
+  only by an explicit action of the user, who sees what is shared; automatic rotation by size or age; detailed
+  protocol logs off by default; an export or copy keeps the newest lines.
+- **Storage:** sensitive data only in the app's private storage, never shared storage; keys and certificates in
+  the Android Keystore; sensitive data excluded from backup; caches of messages (such as reply actions) expire
+  soon and are emptied when the car session ends.
+- **Network and crypto:** TLS only (cleartext forbidden by network security config); never disable certificate
+  checks; only the platform's standard cryptography; verify the head unit's identity and warn if it changes.
+- **System:** components not exported unless needed, and then protected by a permission; every intent or data
+  from other apps or the car is untrusted and validated; Shizuku and elevated privileges only for what truly
+  needs them, least privilege, never exposed to other apps; no action with external effects without explicit
+  confirmation (with silence or an error nothing is sent).
+- **Code and dependencies:** before adding a dependency, ask whether it can be avoided; then check it is
+  maintained, trustworthy, correctly named; prefer open source; update vulnerable ones quickly. No secrets in the
+  repository, with an automatic check. Automatic tests including negative ones (the wrong thing does NOT
+  happen). Linter and static analysis in CI; release builds without debug. Every change reviewed before merging.
+- **Transparency:** tell the user plainly which data is used and why; the user can see, export and delete their
+  data (logs, settings); reproducible builds and signed releases; a SECURITY.md on how to report
+  vulnerabilities; the published code matches the distributed binary exactly.
+
+Privacy checklist before every delivery: no new permission or data without real need · background location
+only with consent and only during the session · no tracking, analytics or undeclared connection · no messages,
+contacts, positions or identifiers in clear in logs · sensitive data and keys stored safely and out of backup ·
+no external action without explicit confirmation · components not exported, external input validated · new
+dependencies weighed and needed.
+
 ## Branches and releases
 
 - Day-to-day work: a branch per change, pull request into `dev`, merged when CI is green (unit
