@@ -127,4 +127,42 @@ public class TunnelMathTest {
         assertNull(hold.update(null, 6_001));
         assertEquals(12f, hold.update(12f, 7_000), 0f);
     }
+
+    @Test
+    public void aGyroscopeSendingTooLittleIsScaledUp() {
+        TunnelMath.GainLearner g = new TunnelMath.GainLearner(0.5, 3, 20, 0.99);
+        // Until enough curves: as sent.
+        for (int i = 0; i < 19; i++) g.add(0.1, 0.07);
+        assertFalse(g.ready());
+        assertEquals(1.0, g.gain(), 0);
+        // The car sends 70 % of the real turn, with noise.
+        java.util.Random r = new java.util.Random(1);
+        for (int i = 0; i < 200; i++) {
+            double real = 0.05 + r.nextDouble() * 0.3;
+            g.add(real + r.nextGaussian() * 0.01, real * 0.7);
+        }
+        assertTrue(g.ready());
+        assertEquals(1 / 0.7, g.gain(), 0.05);
+    }
+
+    @Test
+    public void aLearnedGainStaysWithinItsLimits() {
+        TunnelMath.GainLearner g = new TunnelMath.GainLearner(0.8, 1.25, 30, 0.995);
+        for (int i = 0; i < 50; i++) g.add(30, 10); // 3x: out of range
+        assertEquals(1.25, g.gain(), 0);
+        g = new TunnelMath.GainLearner(0.8, 1.25, 30, 0.995);
+        for (int i = 0; i < 50; i++) g.add(5, 10);
+        assertEquals(0.8, g.gain(), 0);
+        g.add(Double.NaN, 1);
+        assertEquals(0.8, g.gain(), 0);
+    }
+
+    @Test
+    public void theTurnWithTheGainCoversTheWholeCurve() {
+        // A 90 degree curve in 10 s; the car reports 70 %, the learned gain 1/0.7 restores it.
+        double bearing = 0;
+        double realRate = Math.toRadians(9);
+        for (int i = 0; i < 10; i++) bearing = TunnelMath.turn(bearing, realRate * 0.7 * (1 / 0.7), 1, 1);
+        assertEquals(90, bearing, 0.001);
+    }
 }

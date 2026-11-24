@@ -31,6 +31,18 @@ public final class TunnelNavigation {
     private static final float MOVING_MPS = 2f;
     private static final TunnelMath.SpeedHold speedHold = new TunnelMath.SpeedHold();
 
+    /**
+     * How much to scale the car's gyroscope (turn) and speed to match its GPS, learned outside
+     * tunnels: in the 24.11 test the estimate turned too little in curves and ended up on their
+     * outside. Until enough measures, 1 (as sent).
+     */
+    private static final TunnelMath.GainLearner turnGain = new TunnelMath.GainLearner(0.5, 3, 20, 0.99);
+    private static final TunnelMath.GainLearner speedGain = new TunnelMath.GainLearner(0.8, 1.25, 30, 0.995);
+    /** The car's yaw rate at the previous fix, to average it over the interval. */
+    private static Float previousYaw;
+    /** A fix this precise or better (m) is used to learn the gains. */
+    private static final float LEARN_ACCURACY_M = 15f;
+
     private static WeakReference<Object> feed = new WeakReference<>(null);
     private static Handler worker;
 
@@ -159,7 +171,9 @@ public final class TunnelNavigation {
             compassSteps = gyroSteps = straightSteps = noSpeedSteps = 0;
             PatchLog.add("tunnel", "estimate starts; gyro learned=" + (Math.abs(gyroCorrelation) > 2)
                     + " (correlation " + (int) gyroCorrelation + "), compass "
-                    + (carCompass() != null ? "live" : "frozen or missing") + ", gyro " + (carYawRate() != null ? "sent" : "missing"));
+                    + (carCompass() != null ? "live" : "frozen or missing") + ", gyro " + (carYawRate() != null ? "sent" : "missing")
+                    + "; turn gain " + String.format(java.util.Locale.ROOT, "%.2f", turnGain.gain()) + " (" + turnGain.samples() + " curves)"
+                    + ", speed gain " + String.format(java.util.Locale.ROOT, "%.2f", speedGain.gain()));
         }
         if (Double.isNaN(bearing)) return;
 
@@ -175,13 +189,14 @@ public final class TunnelNavigation {
             compassSteps++;
         } else if (yaw != null && Math.abs(gyroCorrelation) > 2) {
             double sign = Math.signum(gyroCorrelation);
-            bearing = TunnelMath.turn(bearing, yaw, sign, dt);
+            bearing = TunnelMath.turn(bearing, yaw * turnGain.gain(), sign, dt);
             gyroSteps++;
         } else {
             straightSteps++; // no heading source: straight on
         }
 
-        double distance = speed * dt;
+        double speedNow = speed * speedGain.gain();
+        double distance = speedNow * dt;
         long moved = speed > MOVING_MPS ? (long) (dt * 1000) : 0;
         if (!TunnelMath.withinLimits(travelledM + distance, movingMs + moved)) {
             if (!limitLogged) {
@@ -195,7 +210,7 @@ public final class TunnelNavigation {
         travelledM += distance;
         movingMs += moved;
         Location next = destination(estimate, bearing, distance);
-        next.setSpeed(speed);
+        next.setSpeed((float) speedNow);
         next.setBearing((float) bearing);
         next.setAccuracy(TunnelMath.accuracy(startAccuracy, travelledM));
         next.setTime(System.currentTimeMillis());
@@ -213,21 +228,44 @@ public final class TunnelNavigation {
         }
     }
 
-    /** Learns which way the gyroscope turns, from the GPS bearing while driving. */
+    /**
+     * Learns from the GPS while driving which way the gyroscope turns, then how much (turnGain),
+     * and how the car's speed compares with the GPS one (speedGain).
+     */
     private static void learnGyroSign(Location fix) {
         Location prev = previousFix;
         previousFix = new Location(fix);
+        Float yaw = carYawRate();
+        Float yawBefore = previousYaw;
+        previousYaw = yaw;
+        boolean precise = fix.hasAccuracy() && fix.getAccuracy() <= LEARN_ACCURACY_M;
+        learnSpeedGain(fix, precise);
         if (prev == null || !fix.hasBearing() || !prev.hasBearing() || fix.getSpeed() < 5) return;
         double dt = (fix.getElapsedRealtimeNanos() - prev.getElapsedRealtimeNanos()) / 1e9;
         if (dt <= 0.2 || dt > 3) return;
         double rate = Math.toRadians(wrap(fix.getBearing() - prev.getBearing())) / dt; // clockwise, rad/s
-        Float yaw = carYawRate();
         if (yaw == null || Math.abs(rate) < 0.03) return;
         boolean before = Math.abs(gyroCorrelation) > 2;
         gyroCorrelation = Math.max(-50, Math.min(50, gyroCorrelation + Math.signum(rate * yaw)));
         if (!before && Math.abs(gyroCorrelation) > 2) {
             PatchLog.add("tunnel", "gyroscope direction learned (" + (gyroCorrelation > 0 ? "as sent" : "reversed") + ")");
         }
+        // How much it turns, once the direction is known: the GPS turn over the interval against
+        // the gyroscope's mean over it.
+        if (Math.abs(gyroCorrelation) > 2 && precise && yawBefore != null) {
+            boolean ready = turnGain.ready();
+            turnGain.add(rate, (yawBefore + yaw) / 2.0 * Math.signum(gyroCorrelation));
+            if (!ready && turnGain.ready()) {
+                PatchLog.add("tunnel", "turn gain learned: " + String.format(java.util.Locale.ROOT, "%.2f", turnGain.gain()));
+            }
+        }
+    }
+
+    /** The car's speed against the GPS one, while driving with a precise fix. */
+    private static void learnSpeedGain(Location fix, boolean precise) {
+        Float v = carSpeed();
+        if (!precise || v == null || v < 5 || !fix.hasSpeed() || fix.getSpeed() < 5) return;
+        speedGain.add(fix.getSpeed(), v);
     }
 
     private static Location destination(Location from, double bearingDeg, double meters) {
