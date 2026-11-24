@@ -40,6 +40,11 @@ public final class TunnelNavigation {
      */
     private static final TunnelMath.GainLearner turnGain = new TunnelMath.GainLearner(0.5, 3, 20, 0.99);
     private static final TunnelMath.GainLearner speedGain = new TunnelMath.GainLearner(0.8, 1.25, 30, 0.995);
+    /**
+     * The gyroscope's zero offset (rad/s, as the car sends it), learned on GPS straights: after a
+     * minute of them, and never more than 0.02 rad/s (about 1 degree a second).
+     */
+    private static final TunnelMath.BiasLearner gyroBias = new TunnelMath.BiasLearner(0.02, 60, 0.995);
     /** The car's yaw rate at the previous fix, to average it over the interval. */
     private static Float previousYaw;
     /** A fix this precise or better (m) is used to learn the gains. */
@@ -118,7 +123,11 @@ public final class TunnelNavigation {
             }
             carCompass(); // follows the compass outside tunnels too, to tell when it freezes
             if (estimate != null) {
-                String back = "GPS back after " + (now - lastFixAt) / 1000 + " s, " + (int) travelledM + " m estimated, "
+                // How far the estimated heading had turned from the real one: tells a heading drift
+                // (gyroscope offset) from a distance error (speed).
+                String headingOff = fix.hasBearing() && fix.getSpeed() > MOVING_MPS && !Double.isNaN(bearing)
+                        ? ", heading " + Math.round(wrap(bearing - fix.getBearing())) + " deg off" : "";
+                String back = "GPS back after " + (now - lastFixAt) / 1000 + " s, " + (int) travelledM + " m estimated" + headingOff + ", "
                         + (int) fix.distanceTo(estimate) + " m from the estimate; heading steps compass=" + compassSteps
                         + " gyro=" + gyroSteps + " straight=" + straightSteps;
                 Log.i(TAG, back);
@@ -209,7 +218,8 @@ public final class TunnelNavigation {
                     + " (correlation " + (int) gyroCorrelation + "), compass "
                     + (carCompass() != null ? "live" : "frozen or missing") + ", gyro " + (carYawRate() != null ? "sent" : "missing")
                     + "; turn gain " + String.format(java.util.Locale.ROOT, "%.2f", turnGain.gain()) + " (" + turnGain.samples() + " curves)"
-                    + ", speed gain " + String.format(java.util.Locale.ROOT, "%.2f", speedGain.gain()));
+                    + ", speed gain " + String.format(java.util.Locale.ROOT, "%.2f", speedGain.gain())
+                    + ", gyro offset " + String.format(java.util.Locale.ROOT, "%.4f", gyroBias.bias()));
         }
         if (Double.isNaN(bearing)) return;
 
@@ -225,7 +235,7 @@ public final class TunnelNavigation {
             compassSteps++;
         } else if (yaw != null && Math.abs(gyroCorrelation) > 2) {
             double sign = Math.signum(gyroCorrelation);
-            bearing = TunnelMath.turn(bearing, yaw * turnGain.gain(), sign, dt);
+            bearing = TunnelMath.turn(bearing, (yaw - gyroBias.bias()) * turnGain.gain(), sign, dt);
             gyroSteps++;
         } else {
             straightSteps++; // no heading source: straight on
@@ -286,6 +296,15 @@ public final class TunnelNavigation {
         double dt = (fix.getElapsedRealtimeNanos() - prev.getElapsedRealtimeNanos()) / 1e9;
         if (dt <= 0.2 || dt > 3) return;
         double rate = Math.toRadians(wrap(fix.getBearing() - prev.getBearing())) / dt; // clockwise, rad/s
+        // Straight on by the GPS: what the gyroscope says now is its offset.
+        if (yaw != null && yawBefore != null && precise && fix.getSpeed() >= 8 && Math.abs(rate) < 0.01) {
+            boolean ready = gyroBias.ready();
+            gyroBias.add((yawBefore + yaw) / 2.0);
+            if (!ready && gyroBias.ready()) {
+                PatchLog.add("tunnel", "gyroscope offset learned: " + String.format(java.util.Locale.ROOT, "%.4f", gyroBias.bias()) + " rad/s");
+                saveLearned();
+            }
+        }
         if (yaw == null || Math.abs(rate) < 0.03) return;
         boolean before = Math.abs(gyroCorrelation) > 2;
         gyroCorrelation = Math.max(-50, Math.min(50, gyroCorrelation + Math.signum(rate * yaw)));
@@ -299,7 +318,7 @@ public final class TunnelNavigation {
         // the gyroscope's mean over it.
         if (Math.abs(gyroCorrelation) > 2 && precise && yawBefore != null) {
             boolean ready = turnGain.ready();
-            turnGain.add(rate, (yawBefore + yaw) / 2.0 * Math.signum(gyroCorrelation));
+            turnGain.add(rate, ((yawBefore + yaw) / 2.0 - gyroBias.bias()) * Math.signum(gyroCorrelation));
             if (!ready && turnGain.ready()) {
                 PatchLog.add("tunnel", "turn gain learned: " + String.format(java.util.Locale.ROOT, "%.2f", turnGain.gain()));
                 saveLearned();
@@ -402,7 +421,7 @@ public final class TunnelNavigation {
         learnedCar = car;
         gyroLogged = false;
         SharedPreferences prefs = learnedPrefs();
-        double corr = TunnelMath.Learned.decode(prefs == null ? null : prefs.getString(CAR_PREFIX + car, null), turnGain, speedGain);
+        double corr = TunnelMath.Learned.decode(prefs == null ? null : prefs.getString(CAR_PREFIX + car, null), turnGain, speedGain, gyroBias);
         if (Double.isNaN(corr)) {
             gyroCorrelation = 0;
             PatchLog.add("tunnel", "nothing learned yet for this car: learning from the GPS");
@@ -411,18 +430,19 @@ public final class TunnelNavigation {
         gyroCorrelation = corr;
         PatchLog.add("tunnel", "learned values for this car restored: gyroscope " + (Math.abs(corr) > 2 ? "known" : "not known yet")
                 + ", turn gain " + String.format(java.util.Locale.ROOT, "%.2f", turnGain.gain()) + " (" + turnGain.samples() + " curves)"
-                + ", speed gain " + String.format(java.util.Locale.ROOT, "%.2f", speedGain.gain()));
+                + ", speed gain " + String.format(java.util.Locale.ROOT, "%.2f", speedGain.gain())
+                + ", gyro offset " + String.format(java.util.Locale.ROOT, "%.4f", gyroBias.bias()));
     }
 
     /** Saves what was learned for the current car, if anything (call with learnedLock held). */
     private static void saveLearned() {
-        if (learnedCar == null || (turnGain.samples() == 0 && speedGain.samples() == 0 && gyroCorrelation == 0)) return;
+        if (learnedCar == null || (turnGain.samples() == 0 && speedGain.samples() == 0 && gyroBias.samples() == 0 && gyroCorrelation == 0)) return;
         SharedPreferences prefs = learnedPrefs();
         if (prefs == null) return;
         try {
             SharedPreferences.Editor edit = prefs.edit();
             edit.putString(CAR_PREFIX + learnedCar,
-                    TunnelMath.Learned.encode(System.currentTimeMillis(), gyroCorrelation, turnGain, speedGain));
+                    TunnelMath.Learned.encode(System.currentTimeMillis(), gyroCorrelation, turnGain, speedGain, gyroBias));
             // Keep at most MAX_CARS: drop the ones saved longest ago, never the current one.
             java.util.List<java.util.Map.Entry<String, ?>> others = new java.util.ArrayList<>();
             for (java.util.Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
@@ -442,6 +462,7 @@ public final class TunnelNavigation {
         synchronized (learnedLock) {
             turnGain.reset();
             speedGain.reset();
+            gyroBias.reset();
             gyroCorrelation = 0;
             gyroLogged = false;
             learnedCar = null;

@@ -279,6 +279,78 @@ final class TunnelMath {
         }
     }
 
+    /**
+     * The car gyroscope's zero offset: what it reports while the GPS shows the car going straight.
+     * Even a small offset turns the estimate a few degrees in a long tunnel (24.11 evening: 340 m off
+     * after 3.4 km, on the road for the first 2.4 km). A forgetting mean, applied once it has
+     * [minSamples], never beyond [max].
+     */
+    static final class BiasLearner {
+        private final double max;
+        private final int minSamples;
+        private final double forget;
+        private double sum;
+        private double weight;
+        private int samples;
+
+        BiasLearner(double max, int minSamples, double forget) {
+            this.max = max;
+            this.minSamples = minSamples;
+            this.forget = forget;
+        }
+
+        void add(double reported) {
+            if (!finite(reported)) return;
+            sum = sum * forget + reported;
+            weight = weight * forget + 1;
+            samples++;
+        }
+
+        boolean ready() {
+            return samples >= minSamples && weight > 1e-9;
+        }
+
+        int samples() {
+            return samples;
+        }
+
+        /** The offset to subtract from what the gyroscope reports; 0 until ready. */
+        double bias() {
+            if (!ready()) return 0;
+            return Math.max(-max, Math.min(max, sum / weight));
+        }
+
+        void reset() {
+            sum = 0;
+            weight = 0;
+            samples = 0;
+        }
+
+        String save() {
+            return sum + "," + weight + "," + samples;
+        }
+
+        /** Takes back what [save] wrote; anything malformed leaves it at nothing learned. */
+        boolean restore(String saved) {
+            reset();
+            if (saved == null) return false;
+            String[] p = saved.split(",", -1);
+            if (p.length != 3) return false;
+            try {
+                double s = Double.parseDouble(p[0]);
+                double w = Double.parseDouble(p[1]);
+                int n = Integer.parseInt(p[2]);
+                if (!finite(s) || !finite(w) || w < 0 || n < 0) return false;
+                sum = s;
+                weight = w;
+                samples = n;
+                return true;
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+    }
+
     private static boolean finite(double d) {
         return !Double.isNaN(d) && !Double.isInfinite(d);
     }
@@ -288,13 +360,16 @@ final class TunnelMath {
      * (its correlation with GPS turns) and the two gains. No position, only the car's own scales.
      */
     static final class Learned {
-        /** Format of [encode]: a different one is ignored, so an update can change it safely. */
-        static final String VERSION = "1";
+        /**
+         * Format of [encode]. "2" adds the gyroscope offset; "1" (before) is still read, with the
+         * offset to learn. Any other is ignored, so an update can change it safely.
+         */
+        static final String VERSION = "2";
         /** Same bound as while learning. */
         static final double MAX_CORRELATION = 50;
 
-        static String encode(long savedAtMs, double gyroCorrelation, GainLearner turn, GainLearner speed) {
-            return VERSION + ";" + savedAtMs + ";" + gyroCorrelation + ";" + turn.save() + ";" + speed.save();
+        static String encode(long savedAtMs, double gyroCorrelation, GainLearner turn, GainLearner speed, BiasLearner bias) {
+            return VERSION + ";" + savedAtMs + ";" + gyroCorrelation + ";" + turn.save() + ";" + speed.save() + ";" + bias.save();
         }
 
         /**
@@ -302,19 +377,23 @@ final class TunnelMath {
          * (with both learners at nothing learned) if [saved] is missing, malformed or of another
          * version.
          */
-        static double decode(String saved, GainLearner turn, GainLearner speed) {
+        static double decode(String saved, GainLearner turn, GainLearner speed, BiasLearner bias) {
             turn.reset();
             speed.reset();
+            bias.reset();
             if (saved == null) return Double.NaN;
             String[] p = saved.split(";", -1);
-            if (p.length != 5 || !VERSION.equals(p[0])) return Double.NaN;
+            boolean v1 = "1".equals(p[0]) && p.length == 5;
+            boolean v2 = VERSION.equals(p[0]) && p.length == 6;
+            if (!v1 && !v2) return Double.NaN;
             try {
                 Long.parseLong(p[1]);
                 double corr = Double.parseDouble(p[2]);
                 if (!finite(corr) || Math.abs(corr) > MAX_CORRELATION) return Double.NaN;
-                if (!turn.restore(p[3]) || !speed.restore(p[4])) {
+                if (!turn.restore(p[3]) || !speed.restore(p[4]) || (v2 && !bias.restore(p[5]))) {
                     turn.reset();
                     speed.reset();
+                    bias.reset();
                     return Double.NaN;
                 }
                 return corr;
