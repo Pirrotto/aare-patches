@@ -212,11 +212,18 @@ public final class PatchSettingsActivity extends Activity {
         LinearLayout.LayoutParams copyParams = wrap();
         copyParams.topMargin = dp(8);
         card.addView(copy, copyParams);
+
+        // Which patches these are: the release, or the test build's date, time and change.
+        TextView version = text(PatchSettings.phrase("Patches: ", "Patch: ") + PatchVersion.LABEL, Type.BODY_SMALL, colors.onSurfaceVariant);
+        LinearLayout.LayoutParams versionParams = wrap();
+        versionParams.topMargin = dp(12);
+        card.addView(version, versionParams);
         return card;
     }
 
     private String diagnostics() {
         StringBuilder b = new StringBuilder("AARE Patches diagnostics\n");
+        b.append("patches=").append(PatchVersion.LABEL).append('\n');
         b.append("sdk=").append(Build.VERSION.SDK_INT);
         try {
             b.append(" aare=").append(getPackageManager().getPackageInfo(getPackageName(), 0).versionName);
