@@ -352,6 +352,7 @@ public final class TunnelNavigation {
         if (startSummaries >= START_SUMMARY_MS.length) return;
         startStats.add(now, fix.hasAccuracy() ? fix.getAccuracy() : Float.NaN);
         if (startStats.fixes() == 1) {
+            LocationCheck.sessionStarted();
             PatchLog.add("tunnel", "car GPS, first fix of the session: " + (fix.hasAccuracy() ? Math.round(fix.getAccuracy()) + " m" : "no accuracy")
                     + (fix.hasSpeed() ? ", speed" : ", no speed") + (fix.hasBearing() ? ", bearing" : ", no bearing"));
         } else if (startStats.sinceFirst(now) >= START_SUMMARY_MS[startSummaries]) {
