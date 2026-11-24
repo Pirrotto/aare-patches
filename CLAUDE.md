@@ -33,6 +33,38 @@ Talk to the owner in **Italian**.
 - After a release, the owner tests the existing features in the car too, not only the new ones.
 - Previous releases stay on GitHub, so the owner can go back to the last working version at any time.
 
+## How to work on code (every change)
+
+- **Understand, design, write, verify.** Never code on guesses: look in the code; if it isn't there, ask.
+- **Before touching code:** read what exists and reuse or extend it instead of duplicating; list every place
+  that uses what you change (callers, references, settings, tests); follow the project's conventions; say in
+  2–3 lines what the code does today and what it will do after; use only APIs and libraries of the versions
+  the project uses.
+- **Design first:** for any change that isn't trivial, show the owner the plan (files, approach, risks,
+  alternatives left out and why) and wait for his OK. Weigh at least two approaches and take the simplest
+  robust one; no over-engineering. Think of edge cases (empty, null, malformed, extremes, concurrency, I/O
+  errors, permissions, first run, update from an older version) and of the user (clear messages, no silent
+  failure, no surprise). Backward compatible by default; a break is stated, explained and migrated.
+- **Writing:** minimal, targeted changes; no drive-by refactoring or reformatting. Don't remove or alter
+  working code without understanding why it's there. Complete code: no TODOs, placeholders or empty
+  functions. Clear names; comments for the why, not the what. Handle errors explicitly, never swallow them
+  silently. No hard-coded values that should be settings. No secrets, validate external input, least
+  privilege. No dead code, forgotten debugging or noisy logs. Same style as the project.
+- **Verify before delivering:** reread the whole diff as a strict outside reviewer; it must build, start and
+  pass the checks (here CI builds the Android code: say so when a check fails, and never call something done
+  before it's green); test the new behaviour and its edge cases; check that what was touched, directly or
+  not, still works; recheck every place listed above. Say plainly what could not be verified (car audio,
+  microphone, tunnels, other Android versions): never say "it works" without having tried it.
+- **Delivering:** every pull request says what changes, why, the files, what could be affected and how it
+  was checked, the risks and how to test it. Raise doubts instead of hiding them. Bugs found outside the task
+  are reported separately, not fixed on the side. One pull request, one goal. Be honest about compromises.
+
+Checklist before every delivery: existing code read and reused · every affected place listed · simplest
+robust approach, alternatives weighed · edge cases and errors handled · project style · no TODO,
+placeholder, dead code or secret · builds and passes the checks · new behaviour tested · nothing existing
+broken · backward compatible (or the break stated) · clear description with risks and tests · what wasn't
+verified said plainly.
+
 ## Branches and releases
 
 - Day-to-day work: a branch per change, pull request into `dev`, merged when CI is green (unit
