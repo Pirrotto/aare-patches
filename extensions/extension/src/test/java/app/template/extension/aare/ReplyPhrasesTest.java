@@ -32,6 +32,18 @@ public class ReplyPhrasesTest {
     }
 
     @Test
+    public void aNoWaitsForTheEndOfTheAnswer() {
+        assertFalse(ReplyWords.actEarlyOnConfirmation("No"));
+        assertTrue(ReplyWords.actEarlyOnConfirmation("No, cambia messaggio"));
+        assertTrue(ReplyWords.actEarlyOnConfirmation("Sì"));
+        assertFalse(ReplyWords.actEarlyOnConfirmation("sì no"));
+        assertFalse(ReplyWords.actEarlyOnConfirmation(null));
+        // The final answer: "no, change" changes, a plain "no" cancels.
+        assertTrue(ReplyWords.wantsChange("no, cambia messaggio"));
+        assertEquals(Boolean.FALSE, ReplyWords.yesOrNo("no"));
+    }
+
+    @Test
     public void changeMessage() {
         assertTrue(ReplyWords.wantsChange("Cambia messaggio"));
         assertTrue(ReplyWords.wantsChange("no, modifica"));
