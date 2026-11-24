@@ -598,6 +598,7 @@ public final class VoiceNotes {
                     .setAudioAttributes(ATTRIBUTES)
                     .build();
             audio.requestAudioFocus(focus);
+            CarRadioFocus.speaking(CarRadioFocus.Source.PLAYER, true);
         }
 
         private void releaseFocus() {
@@ -605,6 +606,7 @@ public final class VoiceNotes {
             AudioManager audio = context.getSystemService(AudioManager.class);
             if (audio != null) audio.abandonAudioFocusRequest(focus);
             focus = null;
+            CarRadioFocus.speaking(CarRadioFocus.Source.PLAYER, false);
         }
     }
 

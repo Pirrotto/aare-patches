@@ -87,6 +87,7 @@ public final class VoiceReply {
                 .build();
         try {
             audio.requestAudioFocus(replyFocus);
+            CarRadioFocus.speaking(CarRadioFocus.Source.REPLY, true);
         } catch (Throwable t) {
             Log.w(TAG, "reply focus", t);
             replyFocus = null;
@@ -100,7 +101,11 @@ public final class VoiceReply {
         Context context = context();
         AudioManager audio = context == null ? null : context.getSystemService(AudioManager.class);
         // After whatever is being queued to say ("Sent.", "Cancelled."): the player takes its own focus for it.
-        if (audio != null) main.post(() -> audio.abandonAudioFocusRequest(held));
+        main.post(() -> {
+            if (audio != null) audio.abandonAudioFocusRequest(held);
+            // After the last phrase was queued: the player says it holds the car's sound for it.
+            CarRadioFocus.speaking(CarRadioFocus.Source.REPLY, false);
+        });
     }
 
     private static Object card;
