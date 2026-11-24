@@ -50,7 +50,7 @@ val voiceReplyPatch = patch(
     description = "After a message is read aloud, shows a \"Reply\" card on the car screen for 15 seconds, and adds " +
         "\"Reply\" to the messages of the notification centre (also after the app removed its notification, for an " +
         "hour). Replying lets you dictate the answer, shown live on the car screen; it is read back and sent only " +
-        "after a spoken \"yes\" or \"Send\" (\"change message\" dictates it again). Optional in the patches' Settings: " +
+        "after a spoken \"yes\" or \"Send\" (\"change message\", \"retry\" and the like dictate it again). Optional in the patches' Settings: " +
         "\"Do you want to reply?\" asked by voice, and listening tones. Uses the phone's speech recognition. " +
         "Off by default: switch it on in the patches' Settings. Android 8 or later.",
     default = true,

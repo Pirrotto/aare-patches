@@ -141,10 +141,10 @@ public final class PatchSettings {
                 new Feature(VOICE_REPLY,
                         phrase("Voice reply", "Risposta vocale"),
                         phrase("After reading a message, shows \"Reply\" for 15 seconds and in the notification centre: "
-                                        + "dictate the answer, then confirm to send it. With AARE's Car microphone for "
+                                        + "dictate the answer, then confirm to send it (\"retry\" dictates it again). With AARE's Car microphone for "
                                         + "phone apps on, it listens through the car. Off by default.",
                                 "Dopo la lettura mostra «Rispondi» per 15 secondi e nel centro notifiche: "
-                                        + "detti la risposta e confermi l'invio. Con «Microfono dell'auto per le app» "
+                                        + "detti la risposta e confermi l'invio («riprova» la fa dettare di nuovo). Con «Microfono dell'auto per le app» "
                                         + "di AARE attivo, ascolta dal microfono dell'auto. Disattivata di default."),
                         ICON_REPLY),
                 new Feature(VOICE_REPLY_ASK,

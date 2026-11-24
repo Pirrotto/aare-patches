@@ -21,10 +21,15 @@ final class ReplyWords {
     private static final Set<String> ASK_NO = new HashSet<>(Arrays.asList(
             "niente", "dopo", "later", "nope", "spater", "nachher"));
 
-    /** "Change message" to "Do you want to send it?": dictated again. */
+    /**
+     * "Change message" to "Do you want to send it?": dictated again. Not "ripeti" (it may mean
+     * "read it again") nor "nuovo" (it may be in an ordinary message).
+     */
     private static final Set<String> CHANGE = new HashSet<>(Arrays.asList(
             "cambia", "cambiare", "cambiamo", "modifica", "modificare", "riscrivi", "correggi",
-            "change", "edit", "rewrite", "andern", "andere", "korrigieren"));
+            "riprova", "riprovare", "rifai", "rifallo", "ricomincia", "ricominciare", "daccapo", "ridetta", "sbagliato",
+            "change", "edit", "rewrite", "retry", "redo", "again", "wrong",
+            "andern", "andere", "korrigieren", "nochmal", "falsch", "neu"));
 
     private ReplyWords() {
     }
@@ -38,7 +43,7 @@ final class ReplyWords {
         return wantsChange(partial) || Boolean.TRUE.equals(yesOrNo(partial));
     }
 
-    /** True if [text] asks to change the message ("cambia messaggio", "change message", "ändern"). */
+    /** True if [text] asks to change the message ("cambia messaggio", "riprova", "change message", "nochmal"). */
     static boolean wantsChange(String text) {
         if (text == null) return false;
         for (String word : plain(text).split("\\s+")) {
