@@ -9,6 +9,23 @@ Talk to the owner in **Italian**.
   doing by voice while driving what AARE only allows by touch when parked).
 - Changes must work for every car, not only the owner's Skoda.
 
+## What AARE's maintainer accepts (prototux, Discussion #339)
+
+The patches follow these too, since they must match what is proposed to AARE.
+
+- **Every proposal to AARE:** one pull request per feature, off by default, with a short entry in
+  `docs/decisions.md`. No need to translate: AARE does a translation pass before each release.
+- **Tunnel navigation:** proposed only after the owner's road test, as an opt-in. Other navigation apps
+  receive this position, so the estimate stops after a time or distance limit and always reports an honest
+  accuracy (never lowered to get an app to accept it). The maths is covered by unit tests.
+- **Car microphone for dictation:** hangs off AARE's existing setting from #256 (car microphone for phone
+  apps), not a new switch.
+- **Voice reply:** opt-in at first, working alongside AARE's existing message reply.
+- **WhatsApp voice notes:** maybe, as an opt-in with Shizuku, limited to received voice notes; the maintainer
+  reviews that part carefully.
+- **Not to propose:** an assistant inside AARE (it belongs in a separate app using the car tools AARE
+  exposes) and Shizuku integrated into AARE (the Shizuku app already does it).
+
 ## Security and privacy (never relax these)
 
 - No internet connections added by the patches.
