@@ -10,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The helper Shizuku runs with shell rights for the location check (test diagnostics, see
@@ -67,7 +66,7 @@ public class LocationCheckShell extends Binder {
             try (BufferedReader r = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 found = ProcessCaps.parse(r, packages);
             }
-            process.waitFor(5, TimeUnit.SECONDS);
+            // The whole output was read: dumpsys is done (destroyed below in any case).
             return found;
         } catch (Exception e) {
             return new java.util.LinkedHashMap<>();
