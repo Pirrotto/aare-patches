@@ -70,6 +70,8 @@ public final class TunnelNavigation {
 
     // Gyroscope sign, learned from GPS bearings: sum of yaw-rate × bearing-rate.
     private static double gyroCorrelation;
+    /** "Gyroscope direction learned" was logged for the current car. */
+    private static boolean gyroLogged;
     private static Location previousFix;
 
     private TunnelNavigation() {
@@ -85,6 +87,8 @@ public final class TunnelNavigation {
         try {
             if (pushingOurs.get() != null) return false; // our estimate, on its way
             if (!PatchSettings.isEnabled(null, KEY)) return false;
+            // AARE makes a new feed for every car session: the last trip's position no longer holds.
+            if (locationFeed != feed.get() && lastFix != null) forgetTrip("new car session");
             feed = new WeakReference<>(locationFeed);
             ensureWorker();
             long now = SystemClock.elapsedRealtime();
@@ -135,6 +139,23 @@ public final class TunnelNavigation {
 
     // region Estimate
 
+    /**
+     * Forgets the last trip's position and estimate: the car disconnected, or a new session began.
+     * Otherwise the next session would start an estimate from where the car was before (in the
+     * 24.11 test: "GPS back after 1210 s", and 197 m off after the link dropped for 3 s).
+     * What was learned about the car stays.
+     */
+    private static void forgetTrip(String why) {
+        if (lastFix == null && estimate == null) return;
+        lastFix = null;
+        estimate = null;
+        previousFix = null;
+        previousYaw = null;
+        bearing = Double.NaN;
+        passLogged = false;
+        PatchLog.add("tunnel", why + ": last position dropped");
+    }
+
     private static synchronized void ensureWorker() {
         if (worker != null) return;
         HandlerThread thread = new HandlerThread("aare-tunnel");
@@ -153,8 +174,14 @@ public final class TunnelNavigation {
     }
 
     private static void step() {
+        if (lastFix == null) return;
+        // Checked every second, before the stale wait, so even a short drop of the link is seen.
+        if (!connected()) {
+            forgetTrip("car disconnected");
+            return;
+        }
         Object f = feed.get();
-        if (f == null || lastFix == null) return;
+        if (f == null) return;
         long now = SystemClock.elapsedRealtime();
         long sinceFix = now - Math.max(lastFixAt, lastMovedAt);
         if (sinceFix < STALE_MS) return;
@@ -261,7 +288,9 @@ public final class TunnelNavigation {
         if (yaw == null || Math.abs(rate) < 0.03) return;
         boolean before = Math.abs(gyroCorrelation) > 2;
         gyroCorrelation = Math.max(-50, Math.min(50, gyroCorrelation + Math.signum(rate * yaw)));
-        if (!before && Math.abs(gyroCorrelation) > 2) {
+        // Logged once per car: near the threshold the correlation can cross it back and forth.
+        if (!before && Math.abs(gyroCorrelation) > 2 && !gyroLogged) {
+            gyroLogged = true;
             PatchLog.add("tunnel", "gyroscope direction learned (" + (gyroCorrelation > 0 ? "as sent" : "reversed") + ")");
             saveLearned();
         }
@@ -337,6 +366,7 @@ public final class TunnelNavigation {
 
     private static void loadLearned(String car) {
         learnedCar = car;
+        gyroLogged = false;
         SharedPreferences prefs = learnedPrefs();
         double corr = TunnelMath.Learned.decode(prefs == null ? null : prefs.getString(CAR_PREFIX + car, null), turnGain, speedGain);
         if (Double.isNaN(corr)) {
@@ -379,6 +409,7 @@ public final class TunnelNavigation {
             turnGain.reset();
             speedGain.reset();
             gyroCorrelation = 0;
+            gyroLogged = false;
             learnedCar = null;
             try {
                 context.getApplicationContext().getSharedPreferences(LEARNED_PREFS, Context.MODE_PRIVATE).edit().clear().apply();
