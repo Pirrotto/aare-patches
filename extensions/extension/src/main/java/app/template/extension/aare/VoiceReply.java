@@ -128,9 +128,13 @@ public final class VoiceReply {
         try {
             Object l = VoiceNotes.listener();
             if (!PatchSettings.isEnabled(VoiceNotes.listener(), PatchSettings.VOICE_REPLY)) return actions;
-            if (l == null || findConversation(l, noticeTitle, noticeText) == null) return actions;
+            Object found = l == null ? null : findConversation(l, noticeTitle, noticeText);
+            if (found == null) return actions;
+            // Kept with the Reply action: WhatsApp may take its notification away (read on the
+            // phone, or after a while) while the message is still in the car's notification centre.
+            Kept kept = new Kept(found, SystemClock.elapsedRealtime(), carRuntime);
             List<Object> withReply = new ArrayList<>(actions == null ? Collections.emptyList() : actions);
-            withReply.add(action(phrase("Reply", "Rispondi"), () -> replyFromHistory(noticeTitle, noticeText)));
+            withReply.add(action(phrase("Reply", "Rispondi"), () -> replyFromHistory(noticeTitle, noticeText, kept)));
             return withReply;
         } catch (Throwable t) {
             Log.w(TAG, "withReply", t);
@@ -283,11 +287,42 @@ public final class VoiceReply {
     }
 
     /** "Reply" tapped in the notification centre: dictation straight away. */
-    private static void replyFromHistory(String noticeTitle, String noticeText) {
+    /**
+     * A conversation as it was when its message entered the notification centre, with its reply
+     * action: in memory only, for [KEPT_MS] and the same car session.
+     */
+    private static final class Kept {
+        final Object conversation;
+        final long at;
+        final WeakReference<Object> session;
+
+        Kept(Object conversation, long at, Object session) {
+            this.conversation = conversation;
+            this.at = at;
+            this.session = new WeakReference<>(session);
+        }
+
+        /** The kept conversation if still usable now, else null. */
+        Object usable() {
+            if (SystemClock.elapsedRealtime() - at > KEPT_MS) return null;
+            Object now = runtime.get();
+            return now != null && now == session.get() ? conversation : null;
+        }
+    }
+
+    /** How long a message in the notification centre can be answered after its notification went. */
+    private static final long KEPT_MS = 2 * 60 * 60 * 1000L;
+
+    private static void replyFromHistory(String noticeTitle, String noticeText, Kept kept) {
         if (state == State.DICTATING || state == State.CONFIRMING || state == State.SENDING) return;
         try {
             Object l = VoiceNotes.listener();
+            // The notification as it is now if still there (the newest), else the one kept.
             Object c = l == null ? null : findConversation(l, noticeTitle, noticeText);
+            if (c == null && l != null && kept != null) {
+                c = kept.usable();
+                if (c != null) PatchLog.add("reply", "Reply from the notification centre: notification gone, using the reply kept");
+            }
             if (c == null) {
                 PatchLog.add("reply", "Reply from the notification centre: conversation not found" + (l == null ? " (no listener)" : ""));
                 if (l != null) {
