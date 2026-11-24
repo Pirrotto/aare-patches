@@ -23,9 +23,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.WeakHashMap;
 
 import kotlin.Pair;
 import kotlin.Unit;
@@ -133,6 +135,7 @@ public final class VoiceReply {
             // Kept with the Reply action: WhatsApp may take its notification away (read on the
             // phone, or after a while) while the message is still in the car's notification centre.
             Kept kept = new Kept(found, SystemClock.elapsedRealtime(), carRuntime);
+            main.post(() -> keep(kept));
             List<Object> withReply = new ArrayList<>(actions == null ? Collections.emptyList() : actions);
             withReply.add(action(phrase("Reply", "Rispondi"), () -> replyFromHistory(noticeTitle, noticeText, kept)));
             return withReply;
@@ -289,10 +292,10 @@ public final class VoiceReply {
     /** "Reply" tapped in the notification centre: dictation straight away. */
     /**
      * A conversation as it was when its message entered the notification centre, with its reply
-     * action: in memory only, for [KEPT_MS] and the same car session.
+     * action: in memory only, for [KEPT_MS] and the same car session, emptied when it ends.
      */
     private static final class Kept {
-        final Object conversation;
+        Object conversation;
         final long at;
         final WeakReference<Object> session;
 
@@ -302,16 +305,49 @@ public final class VoiceReply {
             this.session = new WeakReference<>(session);
         }
 
+        boolean expired() {
+            Object now = runtime.get();
+            return conversation == null || SystemClock.elapsedRealtime() - at > KEPT_MS
+                    || now == null || now != session.get() || !TunnelNavigation.connected();
+        }
+
         /** The kept conversation if still usable now, else null. */
         Object usable() {
-            if (SystemClock.elapsedRealtime() - at > KEPT_MS) return null;
-            Object now = runtime.get();
-            return now != null && now == session.get() ? conversation : null;
+            if (expired()) conversation = null;
+            return conversation;
         }
     }
 
     /** How long a message in the notification centre can be answered after its notification went. */
-    private static final long KEPT_MS = 2 * 60 * 60 * 1000L;
+    private static final long KEPT_MS = 60 * 60 * 1000L;
+
+    /** The conversations kept for the notification centre, emptied when they expire or the car disconnects. */
+    private static final Set<Kept> keptReplies = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final long KEPT_CHECK_MS = 60_000L;
+    private static boolean keptCheckScheduled;
+
+    private static void keep(Kept k) {
+        keptReplies.add(k);
+        if (keptCheckScheduled) return;
+        keptCheckScheduled = true;
+        main.postDelayed(VoiceReply::emptyExpiredKept, KEPT_CHECK_MS);
+    }
+
+    /** Every minute while something is kept: what expired or belongs to an ended session goes. */
+    private static void emptyExpiredKept() {
+        keptCheckScheduled = false;
+        for (Iterator<Kept> it = keptReplies.iterator(); it.hasNext(); ) {
+            Kept k = it.next();
+            if (k.expired()) {
+                k.conversation = null;
+                it.remove();
+            }
+        }
+        if (!keptReplies.isEmpty()) {
+            keptCheckScheduled = true;
+            main.postDelayed(VoiceReply::emptyExpiredKept, KEPT_CHECK_MS);
+        }
+    }
 
     private static void replyFromHistory(String noticeTitle, String noticeText, Kept kept) {
         if (state == State.DICTATING || state == State.CONFIRMING || state == State.SENDING) return;
