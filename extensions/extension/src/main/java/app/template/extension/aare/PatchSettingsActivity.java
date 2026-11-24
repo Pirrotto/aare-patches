@@ -213,6 +213,20 @@ public final class PatchSettingsActivity extends Activity {
         copyParams.topMargin = dp(8);
         card.addView(copy, copyParams);
 
+        // The user's own data: it can be seen (copied) and deleted.
+        TextView clear = text(PatchSettings.phrase("Delete diagnostics", "Cancella diagnostica"), Type.LABEL_LARGE, colors.primary);
+        clear.setPadding(0, dp(12), 0, dp(4));
+        clear.setOnClickListener(v -> new android.app.AlertDialog.Builder(this)
+                .setMessage(PatchSettings.phrase("Delete the patches' diagnostics on this phone?",
+                        "Cancellare la diagnostica delle patch su questo telefono?"))
+                .setPositiveButton(PatchSettings.phrase("Delete", "Cancella"), (d, w) -> {
+                    PatchLog.clear();
+                    android.widget.Toast.makeText(this, PatchSettings.phrase("Deleted", "Cancellata"), android.widget.Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(PatchSettings.phrase("Cancel", "Annulla"), null)
+                .show());
+        card.addView(clear, wrap());
+
         // Which patches these are: the release, or the test build's date, time and change.
         TextView version = text(PatchSettings.phrase("Patches: ", "Patch: ") + PatchVersion.LABEL, Type.BODY_SMALL, colors.onSurfaceVariant);
         LinearLayout.LayoutParams versionParams = wrap();
