@@ -1,6 +1,7 @@
 package app.template.extension.aare;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -65,7 +66,8 @@ final class VoiceNoteMatch {
             if (delta < -BEFORE_MS || delta > AFTER_MS) continue;
             out.add(i);
         }
-        out.sort((a, b) -> Long.compare(score(modifiedMs[a], messageTimeMs), score(modifiedMs[b], messageTimeMs)));
+        // Collections.sort, not List.sort: AARE runs on Android 6 too (List.sort is Android 7).
+        Collections.sort(out, (a, b) -> Long.compare(score(modifiedMs[a], messageTimeMs), score(modifiedMs[b], messageTimeMs)));
         return out.size() > MAX_CHECKED ? new ArrayList<>(out.subList(0, MAX_CHECKED)) : out;
     }
 
