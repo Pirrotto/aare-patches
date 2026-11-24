@@ -79,9 +79,9 @@ public class LocationCheckShell extends Binder {
         try {
             android.os.Bundle options = null;
             if (android.os.Build.VERSION.SDK_INT >= 34) {
-                // The sender must opt in to lend its background-start right (1: ALLOWED, 3: ALLOW_ALWAYS from 36).
+                // The sender must opt in to lend its background-start right, as AARE's MediaWidgets does.
                 options = android.app.ActivityOptions.makeBasic()
-                        .setPendingIntentBackgroundActivityStartMode(android.os.Build.VERSION.SDK_INT >= 36 ? 3 : 1)
+                        .setPendingIntentBackgroundActivityStartMode(backgroundStartMode())
                         .toBundle();
             }
             pi.send(null, 0, null, null, null, null, options);
@@ -89,6 +89,12 @@ public class LocationCheckShell extends Binder {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    @SuppressWarnings("deprecation") // MODE_BACKGROUND_ACTIVITY_START_ALLOWED on API 34-35
+    private static int backgroundStartMode() {
+        return android.os.Build.VERSION.SDK_INT >= 36 ? android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                : android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
     }
 
     private static Map<String, ProcessCaps.State> check(List<String> packages) {
