@@ -48,9 +48,11 @@ internal object NoticeAutoDismissFingerprint : Fingerprint(
 val voiceReplyPatch = patch(
     name = "Voice reply",
     description = "After a message is read aloud, shows a \"Reply\" card on the car screen for 15 seconds, and adds " +
-        "\"Reply\" to the messages of the notification centre. Replying lets you dictate the answer, shown live " +
-        "on the car screen, then send it after saying \"yes\" or tapping \"Send\". Uses the phone's speech " +
-        "recognition, on the phone when available.",
+        "\"Reply\" to the messages of the notification centre (also after the app removed its notification, for an " +
+        "hour). Replying lets you dictate the answer, shown live on the car screen; it is read back and sent only " +
+        "after a spoken \"yes\" or \"Send\" (\"change message\" dictates it again). Optional in the patches' Settings: " +
+        "\"Do you want to reply?\" asked by voice, and listening tones. Uses the phone's speech recognition. " +
+        "Android 8 or later.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)

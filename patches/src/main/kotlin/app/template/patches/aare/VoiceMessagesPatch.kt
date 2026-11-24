@@ -33,7 +33,7 @@ val voiceMessagesPatch = patch(
     name = "Voice messages",
     description = "Plays WhatsApp voice messages in the car when a message is read aloud, instead of " +
         "reading \"Voice message (0:05)\". Reads them through Shizuku, which AARE already uses for " +
-        "car audio, so AARE needs no storage permission.",
+        "car audio, so AARE needs no storage permission. Android 8 or later; off by default.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)

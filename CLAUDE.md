@@ -122,6 +122,8 @@ dependencies weighed and needed.
 - `feat:` for new features, `fix:` for fixes, `chore:` for anything that must not release.
 - Never put a link to the Claude session (claude.ai/code/session_…) in commits, pull requests,
   comments or releases, in this repo or in AARE.
-- Update the README (patch description and "What's new / Novità") with every feature.
+- With every change to what a patch does, update all three descriptions together: the patch's summary in the
+  patches' Settings (`PatchSettings`), its Morphe description (`description` in the patch file, shown in Morphe and
+  in `patches-list.json`), and the README (patch description and "What's new / Novità").
 - Things CI can't test (car audio, microphone, tunnels) are tested by the owner in the car before being
   recommended to others.
