@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
+import android.os.SystemClock;
 import android.service.notification.StatusBarNotification;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
@@ -62,23 +63,35 @@ public final class VoiceNotes {
 
     private static final int MAX_RECORDS = 200;
 
+    /**
+     * How long a voice message stays known after its notification was seen. Long enough for one
+     * received before getting into the car; then the sender and time are forgotten.
+     */
+    static final long KEEP_MS = 24 * 60 * 60 * 1000L;
+
     /** Finds and opens recordings off the main thread, one request at a time, in order. */
     private static final ExecutorService worker = Executors.newSingleThreadExecutor();
 
     /** A voice message seen in a notification. */
-    private static final class Record {
+    static final class Record {
         final String sender;
         final String text;
         final long timeMs;
+        /** When its notification was first seen (SystemClock.elapsedRealtime), for KEEP_MS. */
+        final long seenAtMs;
 
-        Record(String sender, String text, long timeMs) {
+        Record(String sender, String text, long timeMs, long seenAtMs) {
             this.sender = sender;
             this.text = text;
             this.timeMs = timeMs;
+            this.seenAtMs = seenAtMs;
         }
     }
 
-    /** Newest last. Only touched on the main thread, where notifications and speak() arrive. */
+    /**
+     * Newest last, in memory only, kept only while "Voice messages" is on and for KEEP_MS. Only
+     * touched on the main thread, where notifications and speak() arrive.
+     */
     private static final ArrayDeque<Record> records = new ArrayDeque<>();
 
     private static volatile boolean shizukuHintSpoken;
@@ -101,6 +114,11 @@ public final class VoiceNotes {
         if (context != null && listenerRef.get() != context) listenerRef = new java.lang.ref.WeakReference<>(context);
         try {
             if (sbn == null || !PACKAGES.contains(sbn.getPackageName())) return;
+            // Off (or below Android 8): nothing about voice messages is kept.
+            if (!PatchSettings.isEnabled(context, PatchSettings.VOICE_MESSAGES)) {
+                forget();
+                return;
+            }
             Bundle extras = sbn.getNotification().extras;
             if (extras == null) return;
             Parcelable[] messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES);
@@ -110,7 +128,7 @@ public final class VoiceNotes {
                 Bundle m = (Bundle) p;
                 CharSequence text = m.getCharSequence("text");
                 if (text == null || !isVoice(text.toString())) continue;
-                remember(new Record(senderOf(m), text.toString().trim(), m.getLong("time")));
+                remember(new Record(senderOf(m), text.toString().trim(), m.getLong("time"), SystemClock.elapsedRealtime()));
             }
         } catch (Throwable t) {
             Log.w(TAG, "onPosted", t);
@@ -134,8 +152,14 @@ public final class VoiceNotes {
             // Read as Android Auto's Google voice does before "Do you want to reply?": "Marco says: …".
             final String said = conversation != null && PatchSettings.isEnabled(context, PatchSettings.VOICE_REPLY_ASK)
                     ? VoiceReply.withSays(conversation, text) : text;
-            List<Segment> voices = PatchSettings.isEnabled(context, PatchSettings.VOICE_MESSAGES)
-                    ? findVoices(said) : new ArrayList<>();
+            List<Segment> voices;
+            if (PatchSettings.isEnabled(context, PatchSettings.VOICE_MESSAGES)) {
+                forgetOlderThan(SystemClock.elapsedRealtime());
+                voices = findVoices(said);
+            } else {
+                forget();
+                voices = new ArrayList<>();
+            }
             if (voices.isEmpty() && conversation == null) return false;
             if (!voices.isEmpty()) PatchLog.add("voice", "reading " + voices.size() + " voice message(s); reply offered after: " + (conversation != null));
 
@@ -222,7 +246,9 @@ public final class VoiceNotes {
         return sender == null ? "" : sender.toString();
     }
 
-    private static void remember(Record r) {
+    /** Keeps [r] unless already known; drops the ones past KEEP_MS and the oldest past MAX_RECORDS. */
+    static void remember(Record r) {
+        forgetOlderThan(r.seenAtMs);
         for (Record old : records) {
             if (old.timeMs == r.timeMs && old.text.equals(r.text) && old.sender.equals(r.sender)) return;
         }
@@ -230,8 +256,18 @@ public final class VoiceNotes {
         while (records.size() > MAX_RECORDS) records.removeFirst();
     }
 
+    /** Drops the voice messages seen more than KEEP_MS before [nowMs] (they are oldest first). */
+    static void forgetOlderThan(long nowMs) {
+        while (!records.isEmpty() && nowMs - records.peekFirst().seenAtMs > KEEP_MS) records.removeFirst();
+    }
+
+    /** Drops every voice message known. */
+    static void forget() {
+        records.clear();
+    }
+
     /** A voice message inside a spoken text, with the record it stands for if known. */
-    private static final class Segment {
+    static final class Segment {
         final int start;
         final int end;
         final Record record;
@@ -248,7 +284,7 @@ public final class VoiceNotes {
      * "Sender. text" for a new message and "Title. text. Sender: text…" for a conversation, oldest
      * first, so the same text found several times stands for its newest records, in time order.
      */
-    private static List<Segment> findVoices(String spoken) {
+    static List<Segment> findVoices(String spoken) {
         List<Segment> found = new ArrayList<>();
         Set<String> texts = new HashSet<>();
         for (Record r : records) texts.add(r.text);
