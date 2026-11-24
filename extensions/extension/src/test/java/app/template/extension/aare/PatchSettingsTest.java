@@ -14,5 +14,7 @@ public class PatchSettingsTest {
         assertTrue(PatchSettings.offByDefault(PatchSettings.VOICE_REPLY_ASK));
         assertTrue(PatchSettings.offByDefault(PatchSettings.VOICE_REPLY_BEEP));
         assertTrue(PatchSettings.offByDefault(PatchSettings.RADIO_PAUSE));
+        assertTrue(PatchSettings.offByDefault(PatchSettings.LOCATION_CHECK));
+        assertTrue(PatchSettings.offByDefault(PatchSettings.LOCATION_FIX));
     }
 }

@@ -31,6 +31,10 @@ import rikka.shizuku.Shizuku;
 final class LocationCheck {
     private static final String TAG = "AareLocationCheck";
     static final String KEY = PatchSettings.LOCATION_CHECK;
+    /** Test fix: restart AARE's service so it may read the location while in use (see {@link #restartOwnService}). */
+    static final String FIX_KEY = PatchSettings.LOCATION_FIX;
+    /** The fix was tried in this session (once per session). */
+    private static boolean fixTried;
 
     /** Navigation apps that run on the car screen through AARE (car app library), besides AARE. */
     private static final String[] NAVIGATION_APPS = {
@@ -52,12 +56,13 @@ final class LocationCheck {
 
     /** A new car session began (its first car fix): checks for the next minutes. Any thread. */
     static void sessionStarted() {
-        if (!PatchSettings.isEnabled(null, KEY)) return;
+        if (!PatchSettings.isEnabled(null, KEY) && !PatchSettings.isEnabled(null, FIX_KEY)) return;
         Handler h = worker();
         h.post(() -> {
             session++;
             startedAt = SystemClock.elapsedRealtime();
             lastLine = null;
+            fixTried = false;
             final int mine = session;
             h.removeCallbacksAndMessages(null);
             h.post(new Runnable() {
@@ -102,6 +107,7 @@ final class LocationCheck {
             b.transact(LocationCheckShell.TRANSACTION_CHECK, data, reply, 0);
             reply.readException();
             Map<String, String> states = new LinkedHashMap<>();
+            Boolean aareLocation = null;
             int n = reply.readInt();
             for (int i = 0; i < n; i++) {
                 String p = reply.readString();
@@ -110,6 +116,7 @@ final class LocationCheck {
                 ProcessCaps.State s = new ProcessCaps.State();
                 s.capability = capability == null ? "?" : capability;
                 Boolean loc = s.location();
+                if (app.getPackageName().equals(p)) aareLocation = loc;
                 states.put(p, "state " + procState + ", location " + (loc == null ? "?" : loc ? "yes" : "NO") + " (" + s.capability + ")");
             }
             StringBuilder line = new StringBuilder();
@@ -120,10 +127,48 @@ final class LocationCheck {
             if (!states.containsKey(app.getPackageName())) line.insert(0, "AARE not found; ");
             if (states.size() <= 1) line.append(" (no navigation app running)");
             log(sinceS, line.toString());
+            if (Boolean.FALSE.equals(aareLocation) && !fixTried && PatchSettings.isEnabled(null, FIX_KEY)) {
+                fixTried = true;
+                restartOwnService(app, b, sinceS);
+            }
         } catch (Throwable t) {
             Log.w(TAG, "check", t);
             forget();
             log(sinceS, "check failed: " + t.getClass().getSimpleName());
+        } finally {
+            data.recycle();
+            reply.recycle();
+        }
+    }
+
+    /**
+     * AARE's projection service was started from the background (the car connecting over
+     * Bluetooth), so Android didn't let it read the location "while in use", and the navigation
+     * apps it binds get no location until AARE or the app is opened on the phone. Android lets a
+     * service started by an app holding START_ACTIVITIES_FROM_BACKGROUND have it: the Shizuku helper
+     * (shell) sends AARE's own PendingIntent for that service. The service only runs its start again
+     * (it is already running): nothing else changes, no other app is touched.
+     */
+    private static void restartOwnService(Context app, IBinder b, long sinceS) {
+        if (android.os.Build.VERSION.SDK_INT < 26) return; // getForegroundService
+        android.content.Intent intent = new android.content.Intent()
+                .setClassName(app.getPackageName(), "net.prototux.aare.service.ProjectionService");
+        android.app.PendingIntent pi = android.app.PendingIntent.getForegroundService(app, 0x4c4f43, intent,
+                android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+        try {
+            data.writeInterfaceToken(LocationCheckShell.DESCRIPTOR);
+            android.app.PendingIntent.writePendingIntentOrNullToParcel(pi, data);
+            b.transact(LocationCheckShell.TRANSACTION_SEND_OWN, data, reply, 0);
+            reply.readException();
+            boolean sent = reply.readInt() == 1;
+            PatchLog.add("location", "+" + sinceS + " s: fix: AARE's service " + (sent ? "started again through Shizuku" : "could not be started again"));
+            // The next check (15 s) shows whether AARE and the navigation app now have the location.
+            lastLine = null;
+        } catch (Throwable t) {
+            Log.w(TAG, "restartOwnService", t);
+            PatchLog.add("location", "+" + sinceS + " s: fix failed: " + t.getClass().getSimpleName());
         } finally {
             data.recycle();
             reply.recycle();

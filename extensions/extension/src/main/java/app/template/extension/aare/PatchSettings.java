@@ -41,6 +41,8 @@ public final class PatchSettings {
     public static final String RADIO_PAUSE = "radio_pause";
     /** Test diagnostics: whether AARE and the navigation apps may read the location (Tunnel navigation patch). */
     public static final String LOCATION_CHECK = "location_check";
+    /** Test fix: AARE's service restarted through Shizuku so navigation apps get the location (Tunnel navigation patch). */
+    public static final String LOCATION_FIX = "location_fix";
 
     /** One switch of the screen. */
     static final class Feature {
@@ -108,7 +110,7 @@ public final class PatchSettings {
         for (Feature f : known()) {
             // "Ask by voice to reply" comes with the Voice reply patch.
             String patch = VOICE_REPLY_ASK.equals(f.key) || VOICE_REPLY_BEEP.equals(f.key) ? VOICE_REPLY
-                    : LOCATION_CHECK.equals(f.key) ? TUNNEL_NAVIGATION : f.key;
+                    : LOCATION_CHECK.equals(f.key) || LOCATION_FIX.equals(f.key) ? TUNNEL_NAVIGATION : f.key;
             if (registered.contains(patch)) list.add(f);
         }
         return list;
@@ -146,6 +148,16 @@ public final class PatchSettings {
                                         + "navigation apps may read the location (needs Shizuku). For the black map at the start.",
                                 "Solo diagnostica: per 5 minuti dopo il collegamento annota ogni 15 s se AARE e le app di "
                                         + "navigazione possono leggere la posizione (serve Shizuku). Per la mappa nera all'avvio."),
+                        ICON_LOCATION_CHECK, TUNNEL_NAVIGATION),
+                new Feature(LOCATION_FIX,
+                        phrase("Location for navigation at the start (test)", "Posizione per la navigazione all'avvio (prova)"),
+                        phrase("When the car connects with AARE in the background, the navigation app may get no location until "
+                                        + "AARE is opened on the phone (black map). This starts AARE's service again through Shizuku so "
+                                        + "it may pass the location on. Notes the result in the diagnostics.",
+                                "Quando l'auto si collega con AARE in background, l'app di navigazione può restare senza "
+                                        + "posizione finché non apri AARE sul telefono (mappa nera). Questa opzione fa ripartire il "
+                                        + "servizio di AARE tramite Shizuku perché possa passare la posizione. Annota il risultato "
+                                        + "nella diagnostica."),
                         ICON_LOCATION_CHECK, TUNNEL_NAVIGATION),
                 new Feature(VOICE_MESSAGES,
                         phrase("Voice messages", "Messaggi vocali"),
@@ -201,7 +213,7 @@ public final class PatchSettings {
      * Features off until the user turns them on, as AARE would ship them: they change what other apps
      * get (tunnel navigation's estimated position) or read another app's files (voice messages).
      */
-    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, LOCATION_CHECK));
+    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, LOCATION_CHECK, LOCATION_FIX));
 
     /**
      * The voice features use Android 8's audio focus requests; AARE also runs on Android 6 and 7,

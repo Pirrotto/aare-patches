@@ -23,6 +23,14 @@ public class LocationCheckShell extends Binder {
 
     /** In: count (at most 8), then package names. Out: count, then for each: package, process state, capability. */
     static final int TRANSACTION_CHECK = FIRST_CALL_TRANSACTION + 1;
+    /**
+     * In: a PendingIntent created by the caller (AARE) for its own service. The helper sends it with
+     * the shell's right to start things from the background, so the service started this way may
+     * read the location while in use (Android's exemption for starts by an app that holds
+     * START_ACTIVITIES_FROM_BACKGROUND). Out: 1 if sent, 0 if refused or failed. Only the caller's
+     * own PendingIntents are sent.
+     */
+    static final int TRANSACTION_SEND_OWN = FIRST_CALL_TRANSACTION + 2;
     /** Shizuku's user-service teardown call. */
     static final int TRANSACTION_DESTROY = FIRST_CALL_TRANSACTION + 16777114;
 
@@ -50,12 +58,43 @@ public class LocationCheckShell extends Binder {
                 }
                 return true;
             }
+            case TRANSACTION_SEND_OWN: {
+                data.enforceInterface(DESCRIPTOR);
+                android.app.PendingIntent pi = android.app.PendingIntent.readPendingIntentOrNullFromParcel(data);
+                reply.writeNoException();
+                reply.writeInt(sendOwn(pi, Binder.getCallingUid()) ? 1 : 0);
+                return true;
+            }
             case TRANSACTION_DESTROY:
                 System.exit(0);
                 return true;
             default:
                 return super.onTransact(code, data, reply, flags);
         }
+    }
+
+    /** Sends [pi] only if the app that asks ([callingUid]) created it: never another app's. */
+    private static boolean sendOwn(android.app.PendingIntent pi, int callingUid) {
+        if (pi == null || pi.getCreatorUid() != callingUid) return false;
+        try {
+            android.os.Bundle options = null;
+            if (android.os.Build.VERSION.SDK_INT >= 34) {
+                // The sender must opt in to lend its background-start right, as AARE's MediaWidgets does.
+                options = android.app.ActivityOptions.makeBasic()
+                        .setPendingIntentBackgroundActivityStartMode(backgroundStartMode())
+                        .toBundle();
+            }
+            pi.send(null, 0, null, null, null, null, options);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @SuppressWarnings("deprecation") // MODE_BACKGROUND_ACTIVITY_START_ALLOWED on API 34-35
+    private static int backgroundStartMode() {
+        return android.os.Build.VERSION.SDK_INT >= 36 ? android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                : android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
     }
 
     private static Map<String, ProcessCaps.State> check(List<String> packages) {
