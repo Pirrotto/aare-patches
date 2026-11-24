@@ -22,7 +22,9 @@ val tunnelNavigationPatch = patch(
         "car's speed, compass and gyroscope until the GPS is back, up to 5 km or 5 minutes. Outside tunnels it learns " +
         "from the GPS how much to turn in curves, and remembers it for each car model (deleted when switched off). " +
         "Off by default: turn it on in the patches' Settings. A test switch below it, \"Location check\", notes in the " +
-        "diagnostics whether the navigation apps may read the location (with Shizuku).",
+        "diagnostics whether the navigation apps may read the location (with Shizuku); the test switch \"Location for " +
+        "navigation at the start\" starts AARE's service again through Shizuku so the navigation app gets the location " +
+        "without opening AARE on the phone.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)
