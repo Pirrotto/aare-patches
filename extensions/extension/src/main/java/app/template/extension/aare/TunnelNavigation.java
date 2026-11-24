@@ -87,6 +87,7 @@ public final class TunnelNavigation {
         try {
             if (pushingOurs.get() != null) return false; // our estimate, on its way
             if (!PatchSettings.isEnabled(null, KEY)) return false;
+            noteStartFix(locationFeed, fix);
             // AARE makes a new feed for every car session: the last trip's position no longer holds.
             if (locationFeed != feed.get() && lastFix != null) forgetTrip("new car session");
             feed = new WeakReference<>(locationFeed);
@@ -325,6 +326,38 @@ public final class TunnelNavigation {
 
     private static double wrap(double deg) {
         return TunnelMath.wrap(deg);
+    }
+
+    // endregion
+
+    // region Car GPS at the start of a session (diagnostics only)
+
+    /** After the first fix, the summary is logged at these times (ms), then no more. */
+    private static final long[] START_SUMMARY_MS = {30_000L, 120_000L};
+    private static final TunnelMath.FixStats startStats = new TunnelMath.FixStats();
+    private static WeakReference<Object> statsFeed = new WeakReference<>(null);
+    private static int startSummaries;
+
+    /**
+     * Notes how the car's fixes arrive in the first two minutes of a session: when the map stays
+     * black or off-centre at the start, this tells whether the car sent too few or too coarse fixes.
+     */
+    private static void noteStartFix(Object locationFeed, Location fix) {
+        long now = SystemClock.elapsedRealtime();
+        if (locationFeed != statsFeed.get()) {
+            statsFeed = new WeakReference<>(locationFeed);
+            startStats.reset();
+            startSummaries = 0;
+        }
+        if (startSummaries >= START_SUMMARY_MS.length) return;
+        startStats.add(now, fix.hasAccuracy() ? fix.getAccuracy() : Float.NaN);
+        if (startStats.fixes() == 1) {
+            PatchLog.add("tunnel", "car GPS, first fix of the session: " + (fix.hasAccuracy() ? Math.round(fix.getAccuracy()) + " m" : "no accuracy")
+                    + (fix.hasSpeed() ? ", speed" : ", no speed") + (fix.hasBearing() ? ", bearing" : ", no bearing"));
+        } else if (startStats.sinceFirst(now) >= START_SUMMARY_MS[startSummaries]) {
+            PatchLog.add("tunnel", "car GPS, first " + START_SUMMARY_MS[startSummaries] / 1000 + " s: " + startStats.summary());
+            startSummaries++;
+        }
     }
 
     // endregion

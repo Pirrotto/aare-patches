@@ -220,6 +220,65 @@ final class TunnelMath {
         }
     }
 
+    /**
+     * How the car's GPS behaves at the start of a session, for the diagnostics: how many fixes,
+     * how precise, the longest gap. Only numbers, never a position. Navigation apps such as Vela
+     * ignore fixes worse than [APP_LIMIT_M], which can leave the map black or off-centre.
+     */
+    static final class FixStats {
+        static final float APP_LIMIT_M = 50f;
+        private final java.util.List<Float> accuracies = new java.util.ArrayList<>();
+        private int fixes;
+        private int withoutAccuracy;
+        private long firstAt = -1;
+        private long lastAt = -1;
+        private long longestGapMs;
+
+        void reset() {
+            accuracies.clear();
+            fixes = 0;
+            withoutAccuracy = 0;
+            firstAt = -1;
+            lastAt = -1;
+            longestGapMs = 0;
+        }
+
+        /** A fix at [atMs] (elapsed time) with this accuracy, or NaN if it has none. */
+        void add(long atMs, float accuracy) {
+            if (firstAt < 0) firstAt = atMs;
+            if (lastAt >= 0) longestGapMs = Math.max(longestGapMs, atMs - lastAt);
+            lastAt = atMs;
+            fixes++;
+            if (Float.isNaN(accuracy)) withoutAccuracy++;
+            else accuracies.add(accuracy);
+        }
+
+        int fixes() {
+            return fixes;
+        }
+
+        /** Milliseconds since the first fix, or -1 before it. */
+        long sinceFirst(long nowMs) {
+            return firstAt < 0 ? -1 : nowMs - firstAt;
+        }
+
+        /** E.g. "28 fixes, accuracy 8-65 m (median 12), 3 worse than 50 m, 0 without accuracy, longest gap 2 s". */
+        String summary() {
+            StringBuilder b = new StringBuilder().append(fixes).append(fixes == 1 ? " fix" : " fixes");
+            if (!accuracies.isEmpty()) {
+                java.util.List<Float> sorted = new java.util.ArrayList<>(accuracies);
+                java.util.Collections.sort(sorted);
+                int worse = 0;
+                for (float a : sorted) if (a > APP_LIMIT_M) worse++;
+                b.append(", accuracy ").append(Math.round(sorted.get(0))).append('-').append(Math.round(sorted.get(sorted.size() - 1)))
+                        .append(" m (median ").append(Math.round(sorted.get(sorted.size() / 2))).append("), ")
+                        .append(worse).append(" worse than ").append((int) APP_LIMIT_M).append(" m");
+            }
+            b.append(", ").append(withoutAccuracy).append(" without accuracy, longest gap ").append(longestGapMs / 1000).append(" s");
+            return b.toString();
+        }
+    }
+
     private static boolean finite(double d) {
         return !Double.isNaN(d) && !Double.isInfinite(d);
     }
