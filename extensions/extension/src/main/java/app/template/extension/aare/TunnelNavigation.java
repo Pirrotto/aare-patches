@@ -29,6 +29,7 @@ public final class TunnelNavigation {
     // Limits (5 km, 5 minutes of driving) and honest accuracy: TunnelMath. Other apps get this
     // position too, so past the limits the estimate stops and the position stays put.
     private static final float MOVING_MPS = 2f;
+    private static final TunnelMath.SpeedHold speedHold = new TunnelMath.SpeedHold();
 
     private static WeakReference<Object> feed = new WeakReference<>(null);
     private static Handler worker;
@@ -75,6 +76,7 @@ public final class TunnelNavigation {
             boolean stale = false;
             if (lastFix != null) {
                 Float v = carSpeed();
+                speedHold.update(v, now);
                 double expected = v == null ? 0 : v * (now - lastFixAt) / 1000.0;
                 stale = TunnelMath.isStale(fix.distanceTo(lastFix), expected);
             }
@@ -137,7 +139,8 @@ public final class TunnelNavigation {
         long now = SystemClock.elapsedRealtime();
         long sinceFix = now - Math.max(lastFixAt, lastMovedAt);
         if (sinceFix < STALE_MS) return;
-        Float speed = carSpeed();
+        // The car's speed, a short gap filled with the last one.
+        Float speed = speedHold.update(carSpeed(), now);
         if (speed == null || !connected()) {
             noSpeedSteps++;
             if (noSpeedSteps == 3) PatchLog.add("tunnel", "no GPS, but " + (speed == null ? "no fresh speed from the car" : "car not connected") + ": no estimate");

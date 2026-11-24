@@ -105,4 +105,25 @@ final class TunnelMath {
             return nowMs - changedAt > COMPASS_FROZEN_MS ? null : bearingDeg;
         }
     }
+
+    /**
+     * The car's speed with short gaps filled: cars don't send it at a fixed rate, and a missing
+     * reading for a moment stopped the estimate in a tunnel. The last speed is kept [HOLD_MS].
+     */
+    static final class SpeedHold {
+        static final long HOLD_MS = 5_000L;
+        private Float last;
+        private long lastAt;
+
+        /** [speed] (m/s, or null if none fresh) at [nowMs]: it, else the last one if recent, else null. */
+        Float update(Float speed, long nowMs) {
+            if (speed != null) {
+                last = speed;
+                lastAt = nowMs;
+                return speed;
+            }
+            if (last != null && nowMs - lastAt <= HOLD_MS) return last;
+            return null;
+        }
+    }
 }
