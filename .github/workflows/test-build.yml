@@ -41,7 +41,7 @@ jobs:
         run: ./gradlew :extensions:extension:test --no-daemon
 
       - name: Lint (Android lint on the patches' code)
-        run: ./gradlew :extensions:extension:lintDebug --no-daemon || { cat extensions/extension/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt; exit 1; }
+        run: ./gradlew :extensions:extension:lintDebug --no-daemon || { cat extensions/extension/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt; echo "=== baseline"; cat extensions/extension/lint-baseline.xml 2>/dev/null; exit 1; }
 
       - name: Build patches
         run: ./gradlew :patches:buildAndroid --no-daemon && ls -la patches/build/libs
