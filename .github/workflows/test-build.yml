@@ -29,6 +29,14 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Label the build (date, time and change)
+        id: label
+        run: |
+          # Shown at the bottom of the patches' Settings and in "Copy diagnostics".
+          STAMP="$(TZ=Europe/Zurich date +%Y%m%d-%H%M)"
+          echo "stamp=$STAMP" >> "$GITHUB_OUTPUT"
+          echo "PATCH_BUILD_LABEL=test $STAMP · ${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
       - name: Unit tests
         run: ./gradlew :extensions:extension:test --no-daemon
 
@@ -53,7 +61,7 @@ jobs:
         if: github.ref == 'refs/heads/dev'
         run: |
           # A different name for every test build, so they can be told apart on the phone.
-          NAME="aare-patches-test-$(TZ=Europe/Zurich date +%Y%m%d-%H%M)-${GITHUB_SHA::7}.mpp"
+          NAME="aare-patches-test-${{ steps.label.outputs.stamp }}-${GITHUB_SHA::7}.mpp"
           mkdir -p work/test-build
           cp patches/build/libs/patches-*.mpp "work/test-build/$NAME"
           ls -la work/test-build
