@@ -1,5 +1,7 @@
 package app.template.extension.aare;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.location.Location;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -105,7 +107,10 @@ public final class TunnelNavigation {
             passLogged = false;
             noSpeedSteps = 0;
 
-            learnGyroSign(fix);
+            synchronized (learnedLock) {
+                followCar(now);
+                learnGyroSign(fix);
+            }
             carCompass(); // follows the compass outside tunnels too, to tell when it freezes
             if (estimate != null) {
                 String back = "GPS back after " + (now - lastFixAt) / 1000 + " s, " + (int) travelledM + " m estimated, "
@@ -258,6 +263,7 @@ public final class TunnelNavigation {
         gyroCorrelation = Math.max(-50, Math.min(50, gyroCorrelation + Math.signum(rate * yaw)));
         if (!before && Math.abs(gyroCorrelation) > 2) {
             PatchLog.add("tunnel", "gyroscope direction learned (" + (gyroCorrelation > 0 ? "as sent" : "reversed") + ")");
+            saveLearned();
         }
         // How much it turns, once the direction is known: the GPS turn over the interval against
         // the gyroscope's mean over it.
@@ -266,6 +272,7 @@ public final class TunnelNavigation {
             turnGain.add(rate, (yawBefore + yaw) / 2.0 * Math.signum(gyroCorrelation));
             if (!ready && turnGain.ready()) {
                 PatchLog.add("tunnel", "turn gain learned: " + String.format(java.util.Locale.ROOT, "%.2f", turnGain.gain()));
+                saveLearned();
             }
         }
     }
@@ -274,7 +281,9 @@ public final class TunnelNavigation {
     private static void learnSpeedGain(Location fix, boolean precise) {
         Float v = carSpeed();
         if (!precise || v == null || v < 5 || !fix.hasSpeed() || fix.getSpeed() < 5) return;
+        boolean ready = speedGain.ready();
         speedGain.add(fix.getSpeed(), v);
+        if (!ready && speedGain.ready()) saveLearned();
     }
 
     private static Location destination(Location from, double bearingDeg, double meters) {
@@ -287,6 +296,116 @@ public final class TunnelNavigation {
 
     private static double wrap(double deg) {
         return TunnelMath.wrap(deg);
+    }
+
+    // endregion
+
+    // region Learned values, kept per car
+
+    /** AARE's private storage, excluded from backup (AARE sets allowBackup=false). */
+    private static final String LEARNED_PREFS = "aare_patches_tunnel";
+    private static final String CAR_PREFIX = "car_";
+    /** Cars kept: past it, the one saved longest ago is dropped. */
+    private static final int MAX_CARS = 5;
+    /** While driving, what was learned is saved this often: the car can disconnect at any time. */
+    private static final long SAVE_EVERY_MS = 5 * 60_000L;
+
+    /** Guards the learned values: learnt on the feed's thread, deleted from the Settings screen. */
+    private static final Object learnedLock = new Object();
+    /** The car whose learned values are in use (see carKey), or null. */
+    private static String learnedCar;
+    private static long learnedSavedAt;
+
+    /** Uses the connected car's learned values, loading them when the car changes, and saves now and then. */
+    private static void followCar(long now) {
+        String car = carKey();
+        if (car == null) return;
+        if (!car.equals(learnedCar)) {
+            if (learnedCar != null) saveLearned();
+            loadLearned(car);
+            learnedSavedAt = now;
+        } else if (now - learnedSavedAt >= SAVE_EVERY_MS) {
+            saveLearned();
+            learnedSavedAt = now;
+        }
+    }
+
+    private static SharedPreferences learnedPrefs() {
+        Context app = PatchSettings.application();
+        return app == null ? null : app.getSharedPreferences(LEARNED_PREFS, Context.MODE_PRIVATE);
+    }
+
+    private static void loadLearned(String car) {
+        learnedCar = car;
+        SharedPreferences prefs = learnedPrefs();
+        double corr = TunnelMath.Learned.decode(prefs == null ? null : prefs.getString(CAR_PREFIX + car, null), turnGain, speedGain);
+        if (Double.isNaN(corr)) {
+            gyroCorrelation = 0;
+            PatchLog.add("tunnel", "nothing learned yet for this car: learning from the GPS");
+            return;
+        }
+        gyroCorrelation = corr;
+        PatchLog.add("tunnel", "learned values for this car restored: gyroscope " + (Math.abs(corr) > 2 ? "known" : "not known yet")
+                + ", turn gain " + String.format(java.util.Locale.ROOT, "%.2f", turnGain.gain()) + " (" + turnGain.samples() + " curves)"
+                + ", speed gain " + String.format(java.util.Locale.ROOT, "%.2f", speedGain.gain()));
+    }
+
+    /** Saves what was learned for the current car, if anything (call with learnedLock held). */
+    private static void saveLearned() {
+        if (learnedCar == null || (turnGain.samples() == 0 && speedGain.samples() == 0 && gyroCorrelation == 0)) return;
+        SharedPreferences prefs = learnedPrefs();
+        if (prefs == null) return;
+        try {
+            SharedPreferences.Editor edit = prefs.edit();
+            edit.putString(CAR_PREFIX + learnedCar,
+                    TunnelMath.Learned.encode(System.currentTimeMillis(), gyroCorrelation, turnGain, speedGain));
+            // Keep at most MAX_CARS: drop the ones saved longest ago, never the current one.
+            java.util.List<java.util.Map.Entry<String, ?>> others = new java.util.ArrayList<>();
+            for (java.util.Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
+                if (e.getKey().startsWith(CAR_PREFIX) && !e.getKey().equals(CAR_PREFIX + learnedCar)) others.add(e);
+            }
+            java.util.Collections.sort(others, (a, b) -> Long.compare(
+                    TunnelMath.Learned.savedAt(String.valueOf(a.getValue())), TunnelMath.Learned.savedAt(String.valueOf(b.getValue()))));
+            for (int i = 0; i < others.size() - (MAX_CARS - 1); i++) edit.remove(others.get(i).getKey());
+            edit.apply();
+        } catch (Throwable t) {
+            Log.w(TAG, "saveLearned", t);
+        }
+    }
+
+    /** Deletes what was learned, for every car (tunnel navigation switched off). */
+    static void forgetLearned(Context context) {
+        synchronized (learnedLock) {
+            turnGain.reset();
+            speedGain.reset();
+            gyroCorrelation = 0;
+            learnedCar = null;
+            try {
+                context.getApplicationContext().getSharedPreferences(LEARNED_PREFS, Context.MODE_PRIVATE).edit().clear().apply();
+                PatchLog.add("tunnel", "switched off: learned values deleted");
+            } catch (Throwable t) {
+                Log.w(TAG, "forgetLearned", t);
+            }
+        }
+    }
+
+    /**
+     * The connected car, as a short hash of the make, model and year it reports: the same for every
+     * car of that model, nothing about the phone or its owner. Null if not connected or not reported.
+     */
+    private static String carKey() {
+        try {
+            Object s = state();
+            if (s == null || !(boolean) s.getClass().getMethod("getConnected").invoke(s)) return null;
+            Object id = s.getClass().getMethod("getIdentity").invoke(s);
+            if (id == null) return null;
+            String make = String.valueOf(id.getClass().getMethod("getMake").invoke(id)).trim();
+            String model = String.valueOf(id.getClass().getMethod("getModel").invoke(id)).trim();
+            Object year = id.getClass().getMethod("getYear").invoke(id);
+            return TunnelMath.Learned.carKey(make, model, year == null ? "" : year.toString());
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     // endregion

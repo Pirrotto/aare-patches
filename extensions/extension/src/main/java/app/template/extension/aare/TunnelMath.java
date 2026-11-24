@@ -183,5 +183,115 @@ final class TunnelMath {
             if (!ready()) return 1;
             return Math.max(min, Math.min(max, sxy / sxx));
         }
+
+        /** Back to nothing learned. */
+        void reset() {
+            sxy = 0;
+            sxx = 0;
+            samples = 0;
+        }
+
+        /** What it learned, as text (see [restore]). */
+        String save() {
+            return sxy + "," + sxx + "," + samples;
+        }
+
+        /**
+         * Takes back what [save] wrote. Anything malformed, not finite or negative leaves it at
+         * nothing learned and returns false. The gain stays within min and max as always.
+         */
+        boolean restore(String saved) {
+            reset();
+            if (saved == null) return false;
+            String[] p = saved.split(",", -1);
+            if (p.length != 3) return false;
+            try {
+                double xy = Double.parseDouble(p[0]);
+                double xx = Double.parseDouble(p[1]);
+                int n = Integer.parseInt(p[2]);
+                if (!finite(xy) || !finite(xx) || xx < 0 || n < 0) return false;
+                sxy = xy;
+                sxx = xx;
+                samples = n;
+                return true;
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+    }
+
+    private static boolean finite(double d) {
+        return !Double.isNaN(d) && !Double.isInfinite(d);
+    }
+
+    /**
+     * What the tunnel estimate learned about one car, kept between trips: the gyroscope's direction
+     * (its correlation with GPS turns) and the two gains. No position, only the car's own scales.
+     */
+    static final class Learned {
+        /** Format of [encode]: a different one is ignored, so an update can change it safely. */
+        static final String VERSION = "1";
+        /** Same bound as while learning. */
+        static final double MAX_CORRELATION = 50;
+
+        static String encode(long savedAtMs, double gyroCorrelation, GainLearner turn, GainLearner speed) {
+            return VERSION + ";" + savedAtMs + ";" + gyroCorrelation + ";" + turn.save() + ";" + speed.save();
+        }
+
+        /**
+         * Restores [turn] and [speed] from [saved] and returns the gyroscope correlation, or NaN
+         * (with both learners at nothing learned) if [saved] is missing, malformed or of another
+         * version.
+         */
+        static double decode(String saved, GainLearner turn, GainLearner speed) {
+            turn.reset();
+            speed.reset();
+            if (saved == null) return Double.NaN;
+            String[] p = saved.split(";", -1);
+            if (p.length != 5 || !VERSION.equals(p[0])) return Double.NaN;
+            try {
+                Long.parseLong(p[1]);
+                double corr = Double.parseDouble(p[2]);
+                if (!finite(corr) || Math.abs(corr) > MAX_CORRELATION) return Double.NaN;
+                if (!turn.restore(p[3]) || !speed.restore(p[4])) {
+                    turn.reset();
+                    speed.reset();
+                    return Double.NaN;
+                }
+                return corr;
+            } catch (NumberFormatException e) {
+                return Double.NaN;
+            }
+        }
+
+        /**
+         * A short key for the car with this make, model and year, or null if make and model are both
+         * unknown (nothing is kept then). A hash, so the stored names say nothing readable.
+         */
+        static String carKey(String make, String model, String year) {
+            if ((make == null || make.isEmpty()) && (model == null || model.isEmpty())) return null;
+            String id = (make == null ? "" : make.toLowerCase(java.util.Locale.ROOT)) + "|"
+                    + (model == null ? "" : model.toLowerCase(java.util.Locale.ROOT)) + "|" + (year == null ? "" : year);
+            try {
+                byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(id.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                StringBuilder b = new StringBuilder();
+                for (int i = 0; i < 8; i++) b.append(String.format(java.util.Locale.ROOT, "%02x", d[i]));
+                return b.toString();
+            } catch (java.security.NoSuchAlgorithmException e) {
+                return null;
+            }
+        }
+
+        /** When [saved] was written (ms since 1970), or 0 if it can't be read. */
+        static long savedAt(String saved) {
+            if (saved == null) return 0;
+            String[] p = saved.split(";", -1);
+            if (p.length < 2) return 0;
+            try {
+                return Long.parseLong(p[1]);
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
     }
 }
