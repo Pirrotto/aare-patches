@@ -1,0 +1,95 @@
+name: Tunnel maps
+
+# The tunnel maps for the tunnel estimate: built from OpenStreetMap once a month, signed, and
+# published as assets of the "tunnel-maps" release (a pre-release, never "latest", so Morphe and the
+# patch releases ignore it). Only countries whose file changed are uploaded again. On a pull request
+# that touches the builder, only its tests and a dry run for one country, nothing published.
+on:
+  schedule:
+    - cron: '17 3 3 * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tools/tunnelmaps/**'
+      - '.github/workflows/tunnel-maps.yml'
+
+concurrency:
+  group: tunnel-maps
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Builder tests and a dry run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Unit tests
+        run: python3 -m unittest discover -s tools/tunnelmaps -v
+      - name: Dry run (Switzerland, not published)
+        run: |
+          mkdir -p work
+          python3 tools/tunnelmaps/tunnelmaps.py --countries CH --out work
+          cat work/index.json
+          ls -la work
+
+  publish:
+    name: Build, sign and publish
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: tunnel-maps
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: The release (created once)
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --prerelease --latest=false \
+            --title "Tunnel maps" --notes "Road tunnels for the tunnel estimate, one file per country, signed. Updated monthly. Data © OpenStreetMap contributors, ODbL 1.0."
+
+      - name: Build every country
+        run: |
+          mkdir -p work old
+          gh release download "$TAG" --pattern index.json --dir old || echo "no index published yet"
+          if [ -f old/index.json ]; then PREV="--previous old/index.json"; else PREV=""; fi
+          python3 tools/tunnelmaps/tunnelmaps.py --countries all --out work $PREV
+
+      - name: Sign
+        env:
+          TUNNEL_MAPS_KEY: ${{ secrets.TUNNEL_MAPS_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$TUNNEL_MAPS_KEY" ]; then echo "::error::the TUNNEL_MAPS_KEY secret is missing"; exit 1; fi
+          umask 077
+          key="$RUNNER_TEMP/tunnel-maps-key.pem"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$TUNNEL_MAPS_KEY" > "$key"
+          # ECDSA P-256 over SHA-256 (DER), as the phone checks it (SHA256withECDSA).
+          for f in work/*.tun work/index.json; do
+            openssl dgst -sha256 -sign "$key" -out "$f.sig" "$f"
+          done
+
+      - name: Publish what changed
+        run: |
+          set -euo pipefail
+          if [ -f old/index.json ] && cmp -s <(jq -S .countries old/index.json) <(jq -S .countries work/index.json); then
+            echo "nothing changed: nothing published"
+            exit 0
+          fi
+          changed=()
+          for f in work/*.tun; do
+            cc=$(basename "$f" .tun)
+            new=$(jq -r --arg c "$cc" '.countries[$c].sha256' work/index.json)
+            old=$( [ -f old/index.json ] && jq -r --arg c "$cc" '.countries[$c].sha256 // ""' old/index.json || echo "")
+            if [ "$new" != "$old" ]; then changed+=("$f" "$f.sig"); fi
+          done
+          # The country files first, the index last: a phone never sees an index naming a file not there yet.
+          if [ ${#changed[@]} -gt 0 ]; then gh release upload "$TAG" "${changed[@]}" --clobber; fi
+          gh release upload "$TAG" work/index.json work/index.json.sig --clobber
+          echo "published ${#changed[@]} files and the index"
