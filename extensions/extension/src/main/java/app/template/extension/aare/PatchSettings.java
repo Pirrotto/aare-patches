@@ -152,12 +152,13 @@ public final class PatchSettings {
                 new Feature(LOCATION_FIX,
                         phrase("Location for navigation at the start (test)", "Posizione per la navigazione all'avvio (prova)"),
                         phrase("When the car connects with AARE in the background, the navigation app may get no location until "
-                                        + "AARE is opened on the phone (black map). This starts AARE's service again through Shizuku so "
-                                        + "it may pass the location on. Notes the result in the diagnostics.",
+                                        + "AARE is opened on the phone (black map). With this, the Shizuku shell starts a small location "
+                                        + "service in AARE while the car is connected, as Android Auto's own start does, so AARE can "
+                                        + "pass the location on. An extra AARE notification shows meanwhile.",
                                 "Quando l'auto si collega con AARE in background, l'app di navigazione può restare senza "
-                                        + "posizione finché non apri AARE sul telefono (mappa nera). Questa opzione fa ripartire il "
-                                        + "servizio di AARE tramite Shizuku perché possa passare la posizione. Annota il risultato "
-                                        + "nella diagnostica."),
+                                        + "posizione finché non apri AARE sul telefono (mappa nera). Con questa opzione la shell di "
+                                        + "Shizuku avvia in AARE un piccolo servizio di posizione mentre l'auto è collegata, come "
+                                        + "fa Android Auto, così AARE può passare la posizione. Intanto compare una notifica di AARE."),
                         ICON_LOCATION_CHECK, TUNNEL_NAVIGATION),
                 new Feature(VOICE_MESSAGES,
                         phrase("Voice messages", "Messaggi vocali"),
