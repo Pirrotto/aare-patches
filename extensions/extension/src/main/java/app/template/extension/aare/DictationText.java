@@ -29,6 +29,24 @@ final class DictationText {
         String c = piece == null ? "" : piece.trim();
         if (a.isEmpty()) return c;
         if (c.isEmpty()) return a;
+        // A pause isn't always the end of a sentence, so no full stop is added between pieces; but
+        // after one the recognizer put, the next piece starts with a capital.
+        if (endsSentence(a)) c = c.substring(0, c.offsetByCodePoints(0, 1)).toUpperCase(java.util.Locale.getDefault())
+                + c.substring(c.offsetByCodePoints(0, 1));
         return a + " " + c;
+    }
+
+    /** Whether [text] ends with a full stop, a question or exclamation mark, or an ellipsis. */
+    static boolean endsSentence(String text) {
+        if (text == null) return false;
+        String t = text.trim();
+        if (t.isEmpty()) return false;
+        char last = t.charAt(t.length() - 1);
+        return last == '.' || last == '?' || last == '!' || last == '\u2026';
+    }
+
+    /** Whether [text] holds any punctuation: for the diagnostics, which never get the text. */
+    static boolean punctuated(String text) {
+        return text != null && text.matches("(?s).*[.,;:?!\u2026].*");
     }
 }

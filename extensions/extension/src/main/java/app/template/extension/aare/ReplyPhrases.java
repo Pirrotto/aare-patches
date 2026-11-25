@@ -35,13 +35,18 @@ final class ReplyPhrases {
         return it ? "Qual è il messaggio?" : "What's the message?";
     }
 
+    /**
+     * The dictated [message] read back, short: "Per Marco: Arrivo tra poco. Lo mando?". A full stop
+     * is added only when the message doesn't already end a sentence ("Ci sei?" stays as it is).
+     */
     static String readBack(String to, String message, boolean it) {
-        return it ? "Ecco il tuo messaggio per " + to + ": " + message + ". Vuoi mandarlo?"
-                : "Here's your message to " + to + ": " + message + ". Do you want to send it?";
+        String end = DictationText.endsSentence(message) ? "" : ".";
+        return it ? "Per " + to + ": " + message + end + " Lo mando?"
+                : "To " + to + ": " + message + end + " Send it?";
     }
 
     static String sendAgain(boolean it) {
-        return it ? "Scusa, vuoi mandarlo?" : "Sorry, do you want to send it?";
+        return it ? "Scusa, lo mando?" : "Sorry, send it?";
     }
 
     static String sent(String to, boolean it) {

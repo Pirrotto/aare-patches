@@ -26,7 +26,12 @@ public class ReplyPhrasesTest {
 
     @Test
     public void googlePhrases() {
-        assertEquals("Ecco il tuo messaggio per Marco: Arrivo. Vuoi mandarlo?", ReplyPhrases.readBack("Marco", "Arrivo", true));
+        assertEquals("Per Marco: Arrivo. Lo mando?", ReplyPhrases.readBack("Marco", "Arrivo", true));
+        assertEquals("To Marco: On my way. Send it?", ReplyPhrases.readBack("Marco", "On my way", false));
+        // The recognizer's own punctuation isn't doubled.
+        assertEquals("Per Marco: Ci sei? Lo mando?", ReplyPhrases.readBack("Marco", "Ci sei?", true));
+        assertEquals("Per Marco: Arrivo tra poco. Lo mando?", ReplyPhrases.readBack("Marco", "Arrivo tra poco.", true));
+        assertEquals("Scusa, lo mando?", ReplyPhrases.sendAgain(true));
         assertEquals("Messaggio inviato a Marco.", ReplyPhrases.sent("Marco", true));
         assertEquals("Qual è il messaggio?", ReplyPhrases.whatMessage(true));
     }
