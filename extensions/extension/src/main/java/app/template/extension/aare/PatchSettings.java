@@ -117,7 +117,7 @@ public final class PatchSettings {
     }
 
     // Material icons (Apache License 2.0): navigation, reply, graphic_eq, record_voice_over,
-    // notifications_active, volume_down, place.
+    // notifications_active, volume_down, place, near_me.
     static final String ICON_TUNNEL = "M12,2L4.5,20.29l0.71,0.71L12,18l6.79,3 0.71,-0.71z";
     private static final String ICON_REPLY = "M10,9V5l-7,7 7,7v-4.1c5,0 8.5,1.6 11,5.1 -1,-5 -4,-10 -11,-11z";
     private static final String ICON_VOICE_MESSAGE = "M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z";
@@ -125,13 +125,14 @@ public final class PatchSettings {
             + "c0-2.66-5.33-4-8-4zm7.76-9.64l-1.68 1.69c.84 1.18.84 2.71 0 3.89l1.68 1.69c2.02-2.02 2.02-5.07 0-7.27z"
             + "M20.07 2l-1.63 1.63c2.77 3.02 2.77 7.56 0 10.74L20.07 16c3.9-3.89 3.91-9.95 0-14z";
     private static final String ICON_LOCATION_CHECK = "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z";
+    private static final String ICON_LOCATION_FIX = "M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z";
     private static final String ICON_RADIO_PAUSE = "M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z";
     private static final String ICON_BEEP = "M7.58 4.08L6.15 2.65C3.75 4.48 2.17 7.3 2.03 10.5h2c.15-2.65 1.51-4.97 3.55-6.42z"
             + "m12.39 6.42h2c-.15-3.2-1.73-6.02-4.12-7.85l-1.42 1.43c2.02 1.45 3.39 3.77 3.54 6.42z"
             + "M18 11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2v-5z"
             + "m-6 11c.14 0 .27-.01.4-.04.65-.14 1.18-.58 1.44-1.18.1-.24.15-.5.15-.78h-4c.01 1.1.9 2 2.01 2z";
 
-    private static List<Feature> known() {
+    static List<Feature> known() {
         return Arrays.asList(
                 new Feature(TUNNEL_NAVIGATION,
                         phrase("Tunnel navigation", "Navigazione in galleria"),
@@ -159,7 +160,7 @@ public final class PatchSettings {
                                         + "posizione finché non apri AARE sul telefono (mappa nera). Con questa opzione la shell di "
                                         + "Shizuku avvia in AARE un piccolo servizio di posizione mentre l'auto è collegata, come "
                                         + "fa Android Auto, così AARE può passare la posizione. Intanto compare una notifica di AARE."),
-                        ICON_LOCATION_CHECK, TUNNEL_NAVIGATION),
+                        ICON_LOCATION_FIX, TUNNEL_NAVIGATION),
                 new Feature(VOICE_MESSAGES,
                         phrase("Voice messages", "Messaggi vocali"),
                         phrase("Plays WhatsApp voice messages in the car when AARE reads a message. Needs Shizuku running.",
