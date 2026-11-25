@@ -17,6 +17,10 @@ public class TunnelLearnedTest {
         return new TunnelMath.GainLearner(0.8, 1.25, 30, 0.995);
     }
 
+    private static TunnelMath.ErrorLearner err() {
+        return new TunnelMath.ErrorLearner();
+    }
+
     private static TunnelMath.BiasLearner bias() {
         return new TunnelMath.BiasLearner(0.02, 60, 0.995);
     }
@@ -28,11 +32,16 @@ public class TunnelLearnedTest {
         for (int i = 0; i < 40; i++) s.add(1.05, 1);
         TunnelMath.BiasLearner b = bias();
         for (int i = 0; i < 80; i++) b.add(0.003);
-        String saved = TunnelMath.Learned.encode(1234, 17, t, s, b);
+        TunnelMath.ErrorLearner e = err();
+        for (double v : new double[] {4, 2.5, 3, 5, 3.5, 4.2}) e.add(v);
+        String saved = TunnelMath.Learned.encode(1234, 17, t, s, b, e);
 
         TunnelMath.GainLearner t2 = turn(), s2 = speed();
         TunnelMath.BiasLearner b2 = bias();
-        assertEquals(17, TunnelMath.Learned.decode(saved, t2, s2, b2), 0);
+        TunnelMath.ErrorLearner e2 = err();
+        assertEquals(17, TunnelMath.Learned.decode(saved, t2, s2, b2, e2), 0);
+        assertEquals(e.samples(), e2.samples());
+        assertEquals(e.rate(), e2.rate(), 1e-12);
         assertEquals(b.bias(), b2.bias(), 1e-12);
         assertEquals(t.gain(), t2.gain(), 1e-9);
         assertEquals(s.gain(), s2.gain(), 1e-9);
@@ -43,12 +52,17 @@ public class TunnelLearnedTest {
     @Test
     public void somethingUnreadableIsIgnored() {
         String[] bad = {null, "", "garbage", "2;1;3;1,1,1;1,1,1", "1;1;3;1,1", "1;1;NaN;1,1,1;1,1,1",
-                "1;1;99;1,1,1;1,1,1", "1;1;3;1,-1,1;1,1,1", "1;1;3;1,1,-4;1,1,1", "1;1;3;1,Infinity,1;1,1,1", "1;x;3;1,1,1;1,1,1"};
+                "1;1;99;1,1,1;1,1,1", "1;1;3;1,-1,1;1,1,1", "1;1;3;1,1,-4;1,1,1", "1;1;3;1,Infinity,1;1,1,1", "1;x;3;1,1,1;1,1,1",
+                "3;1;3;1,1,1;1,1,1;0,0,1", "3;1;3;1,1,1;1,1,1;0,0,1;4,x", "3;1;3;1,1,1;1,1,1;0,0,1;4,-1",
+                "3;1;3;1,1,1;1,1,1;0,0,1;1,1,1,1,1,1,1,1,1,1,1", "4;1;3;1,1,1;1,1,1;0,0,1;4"};
         for (String b : bad) {
             TunnelMath.GainLearner t = turn(), s = speed();
             for (int i = 0; i < 40; i++) t.add(2, 1);
             TunnelMath.BiasLearner g = bias();
-            assertTrue(b, Double.isNaN(TunnelMath.Learned.decode(b, t, s, g)));
+            TunnelMath.ErrorLearner e = err();
+            for (int i = 0; i < 6; i++) e.add(2);
+            assertTrue(b, Double.isNaN(TunnelMath.Learned.decode(b, t, s, g, e)));
+            assertFalse(b, e.ready());
             assertEquals(b, 0, g.bias(), 0);
             // Nothing learned: as sent, as before the feature.
             assertFalse(b, t.ready());
@@ -61,7 +75,7 @@ public class TunnelLearnedTest {
     public void aRestoredGainStaysWithinItsLimits() {
         TunnelMath.GainLearner t = turn(), s = speed();
         // Written as if the car's gyroscope were 10 times off: the gain is still capped at 3.
-        TunnelMath.Learned.decode("1;1;10;1000,100,100;1,1,100", t, s, bias());
+        TunnelMath.Learned.decode("1;1;10;1000,100,100;1,1,100", t, s, bias(), err());
         assertEquals(3, t.gain(), 0);
     }
 
@@ -82,7 +96,9 @@ public class TunnelLearnedTest {
         // Saved before the gyroscope offset was learned: gains kept, offset learned from now on.
         TunnelMath.GainLearner t = turn(), s = speed();
         TunnelMath.BiasLearner b = bias();
-        assertEquals(17, TunnelMath.Learned.decode("1;1234;17;40,25,25;40,40,40", t, s, b), 0);
+        TunnelMath.ErrorLearner e = err();
+        assertEquals(17, TunnelMath.Learned.decode("1;1234;17;40,25,25;40,40,40", t, s, b, e), 0);
+        assertEquals(0, e.samples());
         assertEquals(1.6, t.gain(), 1e-9);
         assertEquals(0, b.samples());
         assertEquals(0, b.bias(), 0);
@@ -92,7 +108,7 @@ public class TunnelLearnedTest {
     public void aBrokenOffsetDropsEverything() {
         TunnelMath.GainLearner t = turn(), s = speed();
         TunnelMath.BiasLearner b = bias();
-        assertTrue(Double.isNaN(TunnelMath.Learned.decode("2;1;17;40,25,25;40,40,40;x,1,1", t, s, b)));
+        assertTrue(Double.isNaN(TunnelMath.Learned.decode("2;1;17;40,25,25;40,40,40;x,1,1", t, s, b, err())));
         assertEquals(1, t.gain(), 0);
     }
 
@@ -108,5 +124,68 @@ public class TunnelLearnedTest {
         assertEquals(0.02, wild.bias(), 0);
         wild.add(Double.NaN);
         assertEquals(100, wild.samples());
+    }
+
+    @Test
+    public void whatVersion2SavedIsStillRead() {
+        // Saved before the tunnel error was measured: the rest kept, the error learned from now on.
+        TunnelMath.GainLearner t = turn(), s = speed();
+        TunnelMath.BiasLearner b = bias();
+        TunnelMath.ErrorLearner e = err();
+        assertEquals(17, TunnelMath.Learned.decode("2;1234;17;40,25,25;40,40,40;0.06,20,61", t, s, b, e), 0);
+        assertEquals(1.6, t.gain(), 1e-9);
+        assertEquals(61, b.samples());
+        assertEquals(0, e.samples());
+        assertEquals(TunnelMath.ERROR_PER_M, e.rate(), 0);
+    }
+
+    @Test
+    public void nothingMeasuredYetIsSavedAndReadBack() {
+        TunnelMath.ErrorLearner e = err();
+        String saved = TunnelMath.Learned.encode(1, 3, turn(), speed(), bias(), e);
+        TunnelMath.ErrorLearner e2 = err();
+        assertEquals(3, TunnelMath.Learned.decode(saved, turn(), speed(), bias(), e2), 0);
+        assertEquals(0, e2.samples());
+    }
+
+    @Test
+    public void theTunnelErrorIsHonest() {
+        TunnelMath.ErrorLearner e = err();
+        // Until five tunnels were measured: the default 10 %.
+        for (int i = 0; i < 4; i++) e.add(2);
+        assertFalse(e.ready());
+        assertEquals(TunnelMath.ERROR_PER_M, e.rate(), 0);
+        // Then the worst of them plus 20 %, never under 3 %.
+        e.add(4);
+        assertEquals(0.048, e.rate(), 1e-12);
+        TunnelMath.ErrorLearner good = err();
+        for (int i = 0; i < 6; i++) good.add(0.5);
+        assertEquals(TunnelMath.ErrorLearner.FLOOR, good.rate(), 0);
+        // One bad tunnel raises it at once, above the default too if that is what was measured.
+        good.add(15);
+        assertEquals(0.18, good.rate(), 1e-12);
+        // It falls back only once ten newer tunnels pushed the bad one out.
+        for (int i = 0; i < 9; i++) good.add(1);
+        assertEquals(0.18, good.rate(), 1e-12);
+        good.add(1);
+        assertEquals(TunnelMath.ErrorLearner.FLOOR, good.rate(), 0);
+    }
+
+    @Test
+    public void aBrokenMeasureIsNotLearned() {
+        TunnelMath.ErrorLearner e = err();
+        assertFalse(e.add(Double.NaN));
+        assertFalse(e.add(-1));
+        assertFalse(e.add(Double.POSITIVE_INFINITY));
+        assertFalse(e.add(150));
+        assertEquals(0, e.samples());
+    }
+
+    @Test
+    public void theLearnedErrorSetsTheAccuracy() {
+        // 1000 m after a 5 m fix: 105 m at the default 10 %, 35 m at a learned 3 %.
+        assertEquals(105, TunnelMath.accuracy(5, 1000), 1e-3);
+        assertEquals(35, TunnelMath.accuracy(5, 1000, 0.03), 1e-3);
+        assertTrue(TunnelMath.accurateEnough(TunnelMath.accuracy(5, 1000, 0.03)));
     }
 }
