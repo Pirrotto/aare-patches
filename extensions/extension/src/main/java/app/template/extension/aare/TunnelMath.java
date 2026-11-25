@@ -71,6 +71,18 @@ final class TunnelMath {
      */
     static final float STOP_ACCURACY_M = 45f;
 
+    /** Below this distance without GPS the error per 100 m says little (the start fix's own error dominates). */
+    static final double MIN_MEASURED_M = 100;
+
+    /**
+     * The estimate's error at the GPS's return, [offM] after [travelledM] without it, as metres per
+     * 100 m driven: what ERROR_PER_M is measured from. NaN under MIN_MEASURED_M or for bad input.
+     */
+    static double errorPer100m(double offM, double travelledM) {
+        if (!(travelledM >= MIN_MEASURED_M) || !(offM >= 0) || Double.isInfinite(offM)) return Double.NaN;
+        return 100.0 * offM / travelledM;
+    }
+
     /** Whether an estimate with this honest accuracy may still be sent. */
     static boolean accurateEnough(float accuracy) {
         return accuracy <= STOP_ACCURACY_M;
