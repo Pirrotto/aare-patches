@@ -28,7 +28,12 @@ The patches follow these too, since they must match what is proposed to AARE.
 
 ## Security and privacy (never relax these)
 
-- No internet connections added by the patches.
+- No internet connections added by the patches. One exception, the tunnel maps, built like AARE's phone
+  certificate download (`cert/CertificateDownload`, `CertificateUpdates`): a download only on the user's tap,
+  and automatic updates behind their own switch, off by default, at most once a day and never while a car is
+  connected; only from this repository's GitHub releases; a file is accepted only with a valid signature from
+  the key pinned in the code; the request names only the map file (a country the user chose), never the
+  position. Nothing else may connect.
 - No personal data (messages, dictated text, contacts, location, voice notes) in logs, the clipboard, or files
   other apps can read. Diagnostics hold technical state only.
 - No new permission without a stated reason; prefer Shizuku over broad permissions (never all-files access).
