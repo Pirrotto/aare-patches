@@ -183,4 +183,18 @@ public class TunnelMathTest {
         assertEquals(0.02, TunnelMath.deadband(0.02, 0.006), 0);
         assertEquals(-0.05, TunnelMath.deadband(-0.05, 0.006), 0);
     }
+
+    @Test
+    public void errorPer100mIsMeasuredOnlyOverEnoughDistance() {
+        // 60 m off after 1200 m: 5 m per 100 m.
+        assertEquals(5.0, TunnelMath.errorPer100m(60, 1200), 1e-9);
+        assertEquals(0.0, TunnelMath.errorPer100m(0, 400), 1e-9);
+        // Too short to tell, or bad input: no figure rather than a misleading one.
+        assertTrue(Double.isNaN(TunnelMath.errorPer100m(20, 99)));
+        assertTrue(Double.isNaN(TunnelMath.errorPer100m(20, 0)));
+        assertTrue(Double.isNaN(TunnelMath.errorPer100m(-1, 500)));
+        assertTrue(Double.isNaN(TunnelMath.errorPer100m(Double.NaN, 500)));
+        assertTrue(Double.isNaN(TunnelMath.errorPer100m(20, Double.NaN)));
+        assertTrue(Double.isNaN(TunnelMath.errorPer100m(Double.POSITIVE_INFINITY, 500)));
+    }
 }

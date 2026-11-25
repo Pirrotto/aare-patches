@@ -66,6 +66,12 @@ public final class TunnelNavigation {
     private static boolean limitLogged;
     /** "May be off the road" was logged for this estimate. */
     private static boolean wideLogged;
+    /**
+     * Where the estimate stopped being sent (its honest accuracy passed 45 m), or NaN while it is
+     * sent. Past it the estimate goes on unsent, only so the error at the exit is measured over the
+     * whole tunnel: what it would take to send it further, honestly.
+     */
+    private static double unsentAfterM = Double.NaN;
     private static boolean passLogged;
     // Diagnostics: where the heading came from during the current estimate.
     private static int compassSteps, gyroSteps, straightSteps, noSpeedSteps;
@@ -142,8 +148,13 @@ public final class TunnelNavigation {
                                 + ", with a deadband " + Math.round(wrap(bearingDeadband - fix.getBearing())) + ")";
                     }
                 }
-                String back = "GPS back after " + (now - lastFixAt) / 1000 + " s, " + (int) travelledM + " m estimated" + headingOff + ", "
-                        + (int) fix.distanceTo(estimate) + " m from the estimate; heading steps compass=" + compassSteps
+                float off = fix.distanceTo(estimate);
+                double per100 = TunnelMath.errorPer100m(off, travelledM);
+                String back = "GPS back after " + (now - lastFixAt) / 1000 + " s, " + (int) travelledM + " m estimated"
+                        + (Double.isNaN(unsentAfterM) ? "" : " (not sent after " + (int) unsentAfterM + " m)") + headingOff + ", "
+                        + (int) off + " m from the estimate"
+                        + (Double.isNaN(per100) ? "" : " (" + String.format(java.util.Locale.ROOT, "%.1f", per100) + " m per 100 m)")
+                        + "; heading steps compass=" + compassSteps
                         + " gyro=" + gyroSteps + " straight=" + straightSteps;
                 Log.i(TAG, back);
                 PatchLog.add("tunnel", back);
@@ -225,6 +236,7 @@ public final class TunnelNavigation {
             movingMs = 0;
             limitLogged = false;
             wideLogged = false;
+            unsentAfterM = Double.NaN;
             startAccuracy = lastFix.hasAccuracy() ? lastFix.getAccuracy() : 10f;
             if (Double.isNaN(bearing) && lastFix.hasBearing()) bearing = lastFix.getBearing();
             bearingOffset = bearing;
@@ -284,18 +296,19 @@ public final class TunnelNavigation {
                     + " m off the road after " + (int) travelledM + " m (apps snap to their route only within that)");
         }
         if (!TunnelMath.accurateEnough(accuracy)) {
-            // Honest past here would be over 45 m: stop rather than send a position likely off the road.
-            if (!limitLogged) {
-                PatchLog.add("tunnel", "estimate stopped after " + (int) travelledM + " m: its accuracy would be over "
-                        + (int) TunnelMath.STOP_ACCURACY_M + " m (apps ignore worse than 50 m)");
+            // Honest past here would be over 45 m: no longer sent, rather than a position likely off
+            // the road. It goes on unsent (below) only to measure the error at the exit.
+            if (Double.isNaN(unsentAfterM)) {
+                unsentAfterM = travelledM - distance;
+                PatchLog.add("tunnel", "estimate stopped after " + (int) unsentAfterM + " m: its accuracy would be over "
+                        + (int) TunnelMath.STOP_ACCURACY_M + " m (apps ignore worse than 50 m); measured on, unsent");
             }
-            limitLogged = true;
-            return;
         }
         next.setAccuracy(accuracy);
         next.setTime(System.currentTimeMillis());
         next.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
         estimate = next;
+        if (!Double.isNaN(unsentAfterM)) return; // measured only: neither the car nor the apps get it
 
         pushingOurs.set(Boolean.TRUE);
         try {
