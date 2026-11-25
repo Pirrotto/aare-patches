@@ -144,3 +144,6 @@ dependencies weighed and needed.
   in `patches-list.json`), and the README (patch description and "What's new / Novità").
 - Things CI can't test (car audio, microphone, tunnels) are tested by the owner in the car before being
   recommended to others.
+- With every option added to or removed from the patches' Settings, check the icons: each option has its own
+  Material icon (no two alike), drawn only with the path commands the settings screen supports (no arcs), and
+  sub-options greyed under their parent. `FeatureIconsTest` checks the first two.
