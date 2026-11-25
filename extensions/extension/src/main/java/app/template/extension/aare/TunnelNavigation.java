@@ -70,6 +70,15 @@ public final class TunnelNavigation {
     // Diagnostics: where the heading came from during the current estimate.
     private static int compassSteps, gyroSteps, straightSteps, noSpeedSteps;
     private static double bearing = Double.NaN;
+    /**
+     * The same estimate's heading turned two other ways, only for the diagnostics at the exit: with
+     * the learned gyroscope offset subtracted (25.11: it made the heading 59 degrees off, so it is no
+     * longer used) and with readings near zero taken as straight on.
+     */
+    private static double bearingOffset = Double.NaN;
+    private static double bearingDeadband = Double.NaN;
+    /** Readings within this of zero count as straight on, in the deadband experiment (rad/s as sent). */
+    private static final double DEADBAND = 0.006;
     private static long estimateAt;
     private static final ThreadLocal<Boolean> pushingOurs = new ThreadLocal<>();
 
@@ -125,8 +134,14 @@ public final class TunnelNavigation {
             if (estimate != null) {
                 // How far the estimated heading had turned from the real one: tells a heading drift
                 // (gyroscope offset) from a distance error (speed).
-                String headingOff = fix.hasBearing() && fix.getSpeed() > MOVING_MPS && !Double.isNaN(bearing)
-                        ? ", heading " + Math.round(wrap(bearing - fix.getBearing())) + " deg off" : "";
+                String headingOff = "";
+                if (fix.hasBearing() && fix.getSpeed() > MOVING_MPS && !Double.isNaN(bearing)) {
+                    headingOff = ", heading " + Math.round(wrap(bearing - fix.getBearing())) + " deg off";
+                    if (!Double.isNaN(bearingOffset) && !Double.isNaN(bearingDeadband)) {
+                        headingOff += " (with the gyro offset " + Math.round(wrap(bearingOffset - fix.getBearing()))
+                                + ", with a deadband " + Math.round(wrap(bearingDeadband - fix.getBearing())) + ")";
+                    }
+                }
                 String back = "GPS back after " + (now - lastFixAt) / 1000 + " s, " + (int) travelledM + " m estimated" + headingOff + ", "
                         + (int) fix.distanceTo(estimate) + " m from the estimate; heading steps compass=" + compassSteps
                         + " gyro=" + gyroSteps + " straight=" + straightSteps;
@@ -212,6 +227,8 @@ public final class TunnelNavigation {
             wideLogged = false;
             startAccuracy = lastFix.hasAccuracy() ? lastFix.getAccuracy() : 10f;
             if (Double.isNaN(bearing) && lastFix.hasBearing()) bearing = lastFix.getBearing();
+            bearingOffset = bearing;
+            bearingDeadband = bearing;
             Log.i(TAG, "no GPS while moving: estimating from the last fix");
             compassSteps = gyroSteps = straightSteps = noSpeedSteps = 0;
             PatchLog.add("tunnel", "estimate starts; gyro learned=" + (Math.abs(gyroCorrelation) > 2)
@@ -235,7 +252,9 @@ public final class TunnelNavigation {
             compassSteps++;
         } else if (yaw != null && Math.abs(gyroCorrelation) > 2) {
             double sign = Math.signum(gyroCorrelation);
-            bearing = TunnelMath.turn(bearing, (yaw - gyroBias.bias()) * turnGain.gain(), sign, dt);
+            bearing = TunnelMath.turn(bearing, yaw * turnGain.gain(), sign, dt);
+            if (!Double.isNaN(bearingOffset)) bearingOffset = TunnelMath.turn(bearingOffset, (yaw - gyroBias.bias()) * turnGain.gain(), sign, dt);
+            if (!Double.isNaN(bearingDeadband)) bearingDeadband = TunnelMath.turn(bearingDeadband, TunnelMath.deadband(yaw, DEADBAND) * turnGain.gain(), sign, dt);
             gyroSteps++;
         } else {
             straightSteps++; // no heading source: straight on
@@ -264,7 +283,16 @@ public final class TunnelNavigation {
             PatchLog.add("tunnel", "estimate may now be more than " + (int) TunnelMath.ROUTE_SNAP_M
                     + " m off the road after " + (int) travelledM + " m (apps snap to their route only within that)");
         }
-        next.setAccuracy(TunnelMath.reportedAccuracy(accuracy));
+        if (!TunnelMath.accurateEnough(accuracy)) {
+            // Honest past here would be over 45 m: stop rather than send a position likely off the road.
+            if (!limitLogged) {
+                PatchLog.add("tunnel", "estimate stopped after " + (int) travelledM + " m: its accuracy would be over "
+                        + (int) TunnelMath.STOP_ACCURACY_M + " m (apps ignore worse than 50 m)");
+            }
+            limitLogged = true;
+            return;
+        }
+        next.setAccuracy(accuracy);
         next.setTime(System.currentTimeMillis());
         next.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
         estimate = next;

@@ -10,10 +10,11 @@ final class TunnelMath {
     /** Past this much driving (not standing) without GPS it stops too. */
     static final long MAX_MOVING_MS = 5 * 60_000;
     /**
-     * Honest accuracy: the error grows by about 6 % of the distance driven without GPS (heading a
-     * few degrees off, speed a few percent), on top of the last fix's own accuracy.
+     * Honest accuracy: the error grows by about 10 % of the distance driven without GPS, on top of
+     * the last fix's own accuracy. Measured in the owner's car tests of 24-25.11 (error at the exit
+     * over distance in nine tunnels: median 9.5 %, two thirds within 10 %).
      */
-    static final double ERROR_PER_M = 0.06;
+    static final double ERROR_PER_M = 0.10;
     /** A compass that hasn't moved for this long is frozen (cars that derive it from their GPS). */
     static final long COMPASS_FROZEN_MS = 2500;
 
@@ -63,16 +64,24 @@ final class TunnelMath {
     }
 
     /**
-     * The accuracy reported to the apps, at most this. Navigation apps ignore fixes worse than 50 m
-     * (Vela on the car screen does: VelaCarSession, CarMapRenderer), so past about 750 m of tunnel
-     * the estimate was dropped and the arrow stopped. The estimate still stops at its limits
-     * (MAX_DISTANCE_M, MAX_MOVING_MS).
+     * The estimate stops once its honest accuracy would pass this: navigation apps ignore fixes
+     * worse than 50 m (Vela on the car screen does), and an estimate that far off made Vela
+     * reroute every 2 s (25.11). The accuracy reported is always the honest one (AARE's
+     * maintainer: "report an honest accuracy").
      */
-    static final float REPORTED_ACCURACY_MAX_M = 45f;
+    static final float STOP_ACCURACY_M = 45f;
 
-    /** The accuracy to report for [accuracy]: never worse than [REPORTED_ACCURACY_MAX_M]. */
-    static float reportedAccuracy(float accuracy) {
-        return Math.min(accuracy, REPORTED_ACCURACY_MAX_M);
+    /** Whether an estimate with this honest accuracy may still be sent. */
+    static boolean accurateEnough(float accuracy) {
+        return accuracy <= STOP_ACCURACY_M;
+    }
+
+    /**
+     * A gyroscope rate with readings within [band] of zero taken as straight on: an experiment
+     * logged beside the estimate (not used for it), against a small constant offset.
+     */
+    static double deadband(double rate, double band) {
+        return Math.abs(rate) <= band ? 0 : rate;
     }
 
     /** A navigation app keeps the position on its route only within about this distance of it. */

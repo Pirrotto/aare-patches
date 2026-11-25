@@ -136,11 +136,11 @@ public final class PatchSettings {
                 new Feature(TUNNEL_NAVIGATION,
                         phrase("Tunnel navigation", "Navigazione in galleria"),
                         phrase("With the car's GPS for the phone: in tunnels the position keeps moving, estimated from the car's "
-                                        + "speed, compass and gyroscope, until the GPS is back. What it learns about each car is kept, and deleted when "
-                                        + "switched off.",
+                                        + "speed, compass and gyroscope, for as long as it stays within 45 m (about 400 m of tunnel). What it learns "
+                                        + "about each car is kept, and deleted when switched off.",
                                 "Col GPS dell'auto per il telefono: in galleria la posizione continua ad avanzare, stimata da "
-                                        + "velocità, bussola e giroscopio dell'auto, finché torna il GPS. Ricorda ciò che impara di ogni auto e lo "
-                                        + "cancella quando la spegni."),
+                                        + "velocità, bussola e giroscopio dell'auto, finché resta entro 45 m (circa 400 m di galleria). Ricorda ciò "
+                                        + "che impara di ogni auto e lo cancella quando la spegni."),
                         ICON_TUNNEL),
                 new Feature(LOCATION_CHECK,
                         phrase("Location check (test)", "Controllo posizione (prova)"),

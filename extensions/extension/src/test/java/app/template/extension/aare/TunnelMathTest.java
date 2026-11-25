@@ -39,7 +39,7 @@ public class TunnelMathTest {
     @Test
     public void accuracyIsHonestAndGrowsWithTheDistance() {
         assertEquals(5, TunnelMath.accuracy(5, 0), 1e-6);
-        assertEquals(65, TunnelMath.accuracy(5, 1000), 1e-3);
+        assertEquals(105, TunnelMath.accuracy(5, 1000), 1e-3);
         // A fix claiming better than 3 m doesn't make the estimate look better.
         assertEquals(3, TunnelMath.accuracy(1, 0), 1e-6);
     }
@@ -167,14 +167,20 @@ public class TunnelMathTest {
     }
 
     @Test
-    public void theReportedAccuracyStaysWhereNavigationAppsStillUseIt() {
-        // Honest growth: 5 m + 6 % of the distance; 50 m is passed after 750 m.
-        assertTrue(TunnelMath.accuracy(5, 800) > 50);
-        // What the apps get stays under their 50 m cut-off, the whole way.
-        assertEquals(45, TunnelMath.reportedAccuracy(TunnelMath.accuracy(5, 800)), 1e-6);
-        assertEquals(45, TunnelMath.reportedAccuracy(TunnelMath.accuracy(5, TunnelMath.MAX_DISTANCE_M)), 1e-6);
-        assertTrue(TunnelMath.reportedAccuracy(TunnelMath.accuracy(5, 5000)) < 50);
-        // Short of the cap it is the honest value.
-        assertEquals(17, TunnelMath.reportedAccuracy(TunnelMath.accuracy(5, 200)), 1e-3);
+    public void theEstimateStopsBeforeItsHonestAccuracyPasses45m() {
+        // Honest growth: 5 m + 10 % of the distance.
+        assertEquals(25, TunnelMath.accuracy(5, 200), 1e-3);
+        assertTrue(TunnelMath.accurateEnough(TunnelMath.accuracy(5, 400)));
+        // Past 400 m it would be over 45 m: no longer sent (never reported lower than it is).
+        assertFalse(TunnelMath.accurateEnough(TunnelMath.accuracy(5, 401)));
+        assertFalse(TunnelMath.accurateEnough(TunnelMath.accuracy(5, 3000)));
+    }
+
+    @Test
+    public void theDeadbandOnlyDropsReadingsNearZero() {
+        assertEquals(0, TunnelMath.deadband(0.004, 0.006), 0);
+        assertEquals(0, TunnelMath.deadband(-0.006, 0.006), 0);
+        assertEquals(0.02, TunnelMath.deadband(0.02, 0.006), 0);
+        assertEquals(-0.05, TunnelMath.deadband(-0.05, 0.006), 0);
     }
 }
