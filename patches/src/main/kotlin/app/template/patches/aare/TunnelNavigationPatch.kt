@@ -4,6 +4,7 @@ import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.patch.patch
+import app.morphe.patcher.patch.resourceXml
 import app.morphe.patcher.util.smali.ExternalLabel
 import app.template.patches.shared.Constants.COMPATIBILITY_AARE
 
@@ -23,8 +24,8 @@ val tunnelNavigationPatch = patch(
         "from the GPS how much to turn in curves and the gyroscope's zero offset, and remembers it for each car model (deleted when switched off). " +
         "Off by default: turn it on in the patches' Settings. A test switch below it, \"Location check\", notes in the " +
         "diagnostics whether the navigation apps may read the location (with Shizuku); the test switch \"Location for " +
-        "navigation at the start\" starts AARE's service again through Shizuku so the navigation app gets the location " +
-        "without opening AARE on the phone.",
+        "navigation at the start\" has the Shizuku shell start a small location service in AARE, so the navigation app " +
+        "gets the location without opening AARE on the phone.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)
@@ -35,6 +36,21 @@ val tunnelNavigationPatch = patch(
 
     execute {
         registerSetting("tunnel_navigation")
+
+        // The bridge for the test switch "Location for navigation at the start": started only by the shell
+        // (Shizuku helper) or the system, which alone hold INTERACT_ACROSS_USERS_FULL, as AARE's Shizuku provider.
+        resourceXml("AndroidManifest.xml").use { manifest ->
+            val application = manifest.root.children("application").first()
+            val bridge = "app.template.extension.aare.LocationBridgeService"
+            if (application.children("service").none { it.attribute("android:name") == bridge }) {
+                application.appendChild("service") {
+                    setAttribute("android:name", bridge)
+                    setAttribute("android:exported", "true")
+                    setAttribute("android:permission", "android.permission.INTERACT_ACROSS_USERS_FULL")
+                    setAttribute("android:foregroundServiceType", "location")
+                }
+            }
+        }
 
         PhoneLocationFeedPushFingerprint.method.apply {
             addInstructionsWithLabels(

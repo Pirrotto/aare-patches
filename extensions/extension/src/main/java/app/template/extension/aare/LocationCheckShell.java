@@ -24,13 +24,14 @@ public class LocationCheckShell extends Binder {
     /** In: count (at most 8), then package names. Out: count, then for each: package, process state, capability. */
     static final int TRANSACTION_CHECK = FIRST_CALL_TRANSACTION + 1;
     /**
-     * In: a PendingIntent created by the caller (AARE) for its own service. The helper sends it with
-     * the shell's right to start things from the background, so the service started this way may
-     * read the location while in use (Android's exemption for starts by an app that holds
-     * START_ACTIVITIES_FROM_BACKGROUND). Out: 1 if sent, 0 if refused or failed. Only the caller's
-     * own PendingIntents are sent.
+     * In: the caller's package name. The helper, as the shell, starts that package's
+     * {@link LocationBridgeService} as a foreground service: a start by the shell (which holds
+     * START_ACTIVITIES_FROM_BACKGROUND) lets it read the location while in use. Only the caller's
+     * own package is accepted. Out: the exit code of "am start-foreground-service" (0: started),
+     * -1 if refused.
      */
-    static final int TRANSACTION_SEND_OWN = FIRST_CALL_TRANSACTION + 2;
+    static final int TRANSACTION_START_BRIDGE = FIRST_CALL_TRANSACTION + 2;
+    static final String BRIDGE_CLASS = "app.template.extension.aare.LocationBridgeService";
     /** Shizuku's user-service teardown call. */
     static final int TRANSACTION_DESTROY = FIRST_CALL_TRANSACTION + 16777114;
 
@@ -58,11 +59,11 @@ public class LocationCheckShell extends Binder {
                 }
                 return true;
             }
-            case TRANSACTION_SEND_OWN: {
+            case TRANSACTION_START_BRIDGE: {
                 data.enforceInterface(DESCRIPTOR);
-                android.app.PendingIntent pi = android.app.PendingIntent.readPendingIntentOrNullFromParcel(data);
+                String pkg = data.readString();
                 reply.writeNoException();
-                reply.writeInt(sendOwn(pi, Binder.getCallingUid()) ? 1 : 0);
+                reply.writeInt(startBridge(pkg, Binder.getCallingUid()));
                 return true;
             }
             case TRANSACTION_DESTROY:
@@ -73,28 +74,49 @@ public class LocationCheckShell extends Binder {
         }
     }
 
-    /** Sends [pi] only if the app that asks ([callingUid]) created it: never another app's. */
-    private static boolean sendOwn(android.app.PendingIntent pi, int callingUid) {
-        if (pi == null || pi.getCreatorUid() != callingUid) return false;
+    /** Starts [pkg]'s bridge, only if [pkg] is the package of the app that asks ([callingUid]). */
+    private static int startBridge(String pkg, int callingUid) {
+        if (pkg == null || !ProcessCaps.PACKAGE.matcher(pkg).matches() || !isPackageOfUid(pkg, callingUid)) return -1;
+        return run("am", "start-foreground-service", "-n", pkg + "/" + BRIDGE_CLASS);
+    }
+
+    /** "package:net.prototux.aare uid:10211" from "cmd package list packages -U pkg". */
+    private static boolean isPackageOfUid(String pkg, int uid) {
+        Process process = null;
         try {
-            android.os.Bundle options = null;
-            if (android.os.Build.VERSION.SDK_INT >= 34) {
-                // The sender must opt in to lend its background-start right, as AARE's MediaWidgets does.
-                options = android.app.ActivityOptions.makeBasic()
-                        .setPendingIntentBackgroundActivityStartMode(backgroundStartMode())
-                        .toBundle();
+            process = new ProcessBuilder("cmd", "package", "list", "packages", "-U", pkg).redirectErrorStream(true).start();
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                for (String line; (line = r.readLine()) != null; ) {
+                    if (line.trim().equals("package:" + pkg + " uid:" + uid)) return true;
+                }
             }
-            pi.send(null, 0, null, null, null, null, options);
-            return true;
+            return false;
         } catch (Exception e) {
             return false;
+        } finally {
+            if (process != null) process.destroy();
         }
     }
 
-    @SuppressWarnings("deprecation") // MODE_BACKGROUND_ACTIVITY_START_ALLOWED on API 34-35
-    private static int backgroundStartMode() {
-        return android.os.Build.VERSION.SDK_INT >= 36 ? android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
-                : android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
+    /** Runs a command and returns its exit code, or -1; its output is read and dropped. */
+    private static int run(String... command) {
+        Process process = null;
+        try {
+            process = new ProcessBuilder(command).redirectErrorStream(true).start();
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                while (r.readLine() != null) {
+                    // Drained so the command can finish; nothing of it leaves the helper.
+                }
+            }
+            return process.waitFor();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return -1;
+        } catch (Exception e) {
+            return -1;
+        } finally {
+            if (process != null) process.destroy();
+        }
     }
 
     private static Map<String, ProcessCaps.State> check(List<String> packages) {

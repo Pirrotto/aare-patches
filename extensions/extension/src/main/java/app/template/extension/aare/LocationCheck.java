@@ -31,7 +31,7 @@ import rikka.shizuku.Shizuku;
 final class LocationCheck {
     private static final String TAG = "AareLocationCheck";
     static final String KEY = PatchSettings.LOCATION_CHECK;
-    /** Test fix: restart AARE's service so it may read the location while in use (see {@link #restartOwnService}). */
+    /** Test fix: the shell starts the location bridge in AARE's process (see {@link LocationBridgeService}). */
     static final String FIX_KEY = PatchSettings.LOCATION_FIX;
     /** The fix was tried in this session (once per session). */
     private static boolean fixTried;
@@ -129,7 +129,7 @@ final class LocationCheck {
             log(sinceS, line.toString());
             if (Boolean.FALSE.equals(aareLocation) && !fixTried && PatchSettings.isEnabled(null, FIX_KEY)) {
                 fixTried = true;
-                restartOwnService(app, b, sinceS);
+                startBridge(app, b, sinceS);
             }
         } catch (Throwable t) {
             Log.w(TAG, "check", t);
@@ -141,33 +141,21 @@ final class LocationCheck {
         }
     }
 
-    /**
-     * AARE's projection service was started from the background (the car connecting over
-     * Bluetooth), so Android didn't let it read the location "while in use", and the navigation
-     * apps it binds get no location until AARE or the app is opened on the phone. Android lets a
-     * service started by an app holding START_ACTIVITIES_FROM_BACKGROUND have it: the Shizuku helper
-     * (shell) sends AARE's own PendingIntent for that service. The service only runs its start again
-     * (it is already running): nothing else changes, no other app is touched.
-     */
-    private static void restartOwnService(Context app, IBinder b, long sinceS) {
-        if (android.os.Build.VERSION.SDK_INT < 26) return; // getForegroundService
-        android.content.Intent intent = new android.content.Intent()
-                .setClassName(app.getPackageName(), "net.prototux.aare.service.ProjectionService");
-        android.app.PendingIntent pi = android.app.PendingIntent.getForegroundService(app, 0x4c4f43, intent,
-                android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+    /** Has the Shizuku helper (shell) start {@link LocationBridgeService} in AARE's process. */
+    private static void startBridge(Context app, IBinder b, long sinceS) {
         Parcel data = Parcel.obtain();
         Parcel reply = Parcel.obtain();
         try {
             data.writeInterfaceToken(LocationCheckShell.DESCRIPTOR);
-            android.app.PendingIntent.writePendingIntentOrNullToParcel(pi, data);
-            b.transact(LocationCheckShell.TRANSACTION_SEND_OWN, data, reply, 0);
+            data.writeString(app.getPackageName());
+            b.transact(LocationCheckShell.TRANSACTION_START_BRIDGE, data, reply, 0);
             reply.readException();
-            boolean sent = reply.readInt() == 1;
-            PatchLog.add("location", "+" + sinceS + " s: fix: AARE's service " + (sent ? "started again through Shizuku" : "could not be started again"));
+            int code = reply.readInt();
+            PatchLog.add("location", "+" + sinceS + " s: fix: bridge " + (code == 0 ? "started by the shell" : "not started (code " + code + ")"));
             // The next check (15 s) shows whether AARE and the navigation app now have the location.
             lastLine = null;
         } catch (Throwable t) {
-            Log.w(TAG, "restartOwnService", t);
+            Log.w(TAG, "startBridge", t);
             PatchLog.add("location", "+" + sinceS + " s: fix failed: " + t.getClass().getSimpleName());
         } finally {
             data.recycle();
