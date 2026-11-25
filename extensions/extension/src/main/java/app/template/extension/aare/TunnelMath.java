@@ -60,7 +60,12 @@ final class TunnelMath {
 
     /** The accuracy of an estimate [travelledM] metres from a fix of accuracy [start]. */
     static float accuracy(float start, double travelledM) {
-        return (float) (Math.max(start, 3f) + ERROR_PER_M * travelledM);
+        return accuracy(start, travelledM, ERROR_PER_M);
+    }
+
+    /** The same with the car's learned error [perM] (ErrorLearner.rate) instead of ERROR_PER_M. */
+    static float accuracy(float start, double travelledM, double perM) {
+        return (float) (Math.max(start, 3f) + perM * travelledM);
     }
 
     /**
@@ -372,6 +377,86 @@ final class TunnelMath {
         }
     }
 
+    /**
+     * How far off the estimate really ends up, per metre driven without GPS, learned per car from
+     * the error measured at the tunnels' exits. Honest on purpose: until MIN_SAMPLES tunnels were
+     * measured it is ERROR_PER_M; then the worst of the last MAX_SAMPLES plus a MARGIN, never under
+     * FLOOR, so one bad tunnel raises it at once and only a run of good ones lowers it. It may also
+     * end up above ERROR_PER_M, if that is what the car measures.
+     */
+    static final class ErrorLearner {
+        /** Tunnels shorter than this (m without GPS) say too little: the start fix's error dominates. */
+        static final double MIN_TUNNEL_M = 300;
+        static final int MIN_SAMPLES = 5;
+        static final int MAX_SAMPLES = 10;
+        static final double MARGIN = 1.2;
+        /** Never claimed better than 3 m per 100 m, whatever was measured. */
+        static final double FLOOR = 0.03;
+        /** A measure above this (m per 100 m) is a broken one (a jump of the GPS), not an error. */
+        static final double MAX_PER_100 = 100;
+
+        /** Metres per 100 m, oldest first. */
+        private final java.util.ArrayDeque<Double> recent = new java.util.ArrayDeque<>();
+
+        /** Adds one tunnel's error (m per 100 m, as errorPer100m); false if it isn't a usable one. */
+        boolean add(double per100) {
+            if (!finite(per100) || per100 < 0 || per100 > MAX_PER_100) return false;
+            recent.addLast(per100);
+            while (recent.size() > MAX_SAMPLES) recent.removeFirst();
+            return true;
+        }
+
+        boolean ready() {
+            return recent.size() >= MIN_SAMPLES;
+        }
+
+        int samples() {
+            return recent.size();
+        }
+
+        /** The error per metre to report: ERROR_PER_M until ready. */
+        double rate() {
+            if (!ready()) return ERROR_PER_M;
+            double worst = 0;
+            for (double v : recent) worst = Math.max(worst, v);
+            return Math.max(FLOOR, worst / 100.0 * MARGIN);
+        }
+
+        void reset() {
+            recent.clear();
+        }
+
+        String save() {
+            StringBuilder b = new StringBuilder();
+            for (double v : recent) {
+                if (b.length() > 0) b.append(',');
+                b.append(v);
+            }
+            return b.toString();
+        }
+
+        /** Takes back what [save] wrote; anything malformed leaves it at nothing learned. */
+        boolean restore(String saved) {
+            reset();
+            if (saved == null) return false;
+            if (saved.isEmpty()) return true;
+            String[] p = saved.split(",", -1);
+            if (p.length > MAX_SAMPLES) return false;
+            try {
+                for (String v : p) {
+                    if (!add(Double.parseDouble(v))) {
+                        reset();
+                        return false;
+                    }
+                }
+                return true;
+            } catch (NumberFormatException e) {
+                reset();
+                return false;
+            }
+        }
+    }
+
     private static boolean finite(double d) {
         return !Double.isNaN(d) && !Double.isInfinite(d);
     }
@@ -382,15 +467,18 @@ final class TunnelMath {
      */
     static final class Learned {
         /**
-         * Format of [encode]. "2" adds the gyroscope offset; "1" (before) is still read, with the
-         * offset to learn. Any other is ignored, so an update can change it safely.
+         * Format of [encode]. "3" adds the measured tunnel error, "2" the gyroscope offset; "1" and
+         * "2" (before) are still read, with what they lack to learn. Any other is ignored, so an
+         * update can change it safely.
          */
-        static final String VERSION = "2";
+        static final String VERSION = "3";
         /** Same bound as while learning. */
         static final double MAX_CORRELATION = 50;
 
-        static String encode(long savedAtMs, double gyroCorrelation, GainLearner turn, GainLearner speed, BiasLearner bias) {
-            return VERSION + ";" + savedAtMs + ";" + gyroCorrelation + ";" + turn.save() + ";" + speed.save() + ";" + bias.save();
+        static String encode(long savedAtMs, double gyroCorrelation, GainLearner turn, GainLearner speed, BiasLearner bias,
+                ErrorLearner error) {
+            return VERSION + ";" + savedAtMs + ";" + gyroCorrelation + ";" + turn.save() + ";" + speed.save() + ";" + bias.save()
+                    + ";" + error.save();
         }
 
         /**
@@ -398,23 +486,27 @@ final class TunnelMath {
          * (with both learners at nothing learned) if [saved] is missing, malformed or of another
          * version.
          */
-        static double decode(String saved, GainLearner turn, GainLearner speed, BiasLearner bias) {
+        static double decode(String saved, GainLearner turn, GainLearner speed, BiasLearner bias, ErrorLearner error) {
             turn.reset();
             speed.reset();
             bias.reset();
+            error.reset();
             if (saved == null) return Double.NaN;
             String[] p = saved.split(";", -1);
             boolean v1 = "1".equals(p[0]) && p.length == 5;
-            boolean v2 = VERSION.equals(p[0]) && p.length == 6;
-            if (!v1 && !v2) return Double.NaN;
+            boolean v2 = "2".equals(p[0]) && p.length == 6;
+            boolean v3 = VERSION.equals(p[0]) && p.length == 7;
+            if (!v1 && !v2 && !v3) return Double.NaN;
             try {
                 Long.parseLong(p[1]);
                 double corr = Double.parseDouble(p[2]);
                 if (!finite(corr) || Math.abs(corr) > MAX_CORRELATION) return Double.NaN;
-                if (!turn.restore(p[3]) || !speed.restore(p[4]) || (v2 && !bias.restore(p[5]))) {
+                if (!turn.restore(p[3]) || !speed.restore(p[4]) || (!v1 && !bias.restore(p[5]))
+                        || (v3 && !error.restore(p[6]))) {
                     turn.reset();
                     speed.reset();
                     bias.reset();
+                    error.reset();
                     return Double.NaN;
                 }
                 return corr;

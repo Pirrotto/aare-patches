@@ -45,6 +45,8 @@ public final class TunnelNavigation {
      * minute of them, and never more than 0.02 rad/s (about 1 degree a second).
      */
     private static final TunnelMath.BiasLearner gyroBias = new TunnelMath.BiasLearner(0.02, 60, 0.995);
+    /** How far off the estimate ends up per metre, measured at the tunnels' exits: its honest accuracy. */
+    private static final TunnelMath.ErrorLearner errorRate = new TunnelMath.ErrorLearner();
     /** The car's yaw rate at the previous fix, to average it over the interval. */
     private static Float previousYaw;
     /** A fix this precise or better (m) is used to learn the gains. */
@@ -63,6 +65,8 @@ public final class TunnelNavigation {
     private static double travelledM;
     private static long movingMs;
     private static float startAccuracy;
+    /** errorRate's value when this estimate started: one estimate keeps one honest rate. */
+    private static double errorPerM = TunnelMath.ERROR_PER_M;
     private static boolean limitLogged;
     /** "May be off the road" was logged for this estimate. */
     private static boolean wideLogged;
@@ -158,6 +162,19 @@ public final class TunnelNavigation {
                         + " gyro=" + gyroSteps + " straight=" + straightSteps;
                 Log.i(TAG, back);
                 PatchLog.add("tunnel", back);
+                // Learned only from a long enough tunnel, a precise fix at the exit, and an estimate
+                // that ran to the GPS's return (not frozen at the 5 km / 5 min limit).
+                if (travelledM >= TunnelMath.ErrorLearner.MIN_TUNNEL_M && !limitLogged
+                        && fix.hasAccuracy() && fix.getAccuracy() <= LEARN_ACCURACY_M) {
+                    synchronized (learnedLock) {
+                        if (errorRate.add(per100)) {
+                            PatchLog.add("tunnel", "tunnel error measured " + errorRate.samples() + " times; reported now "
+                                    + String.format(java.util.Locale.ROOT, "%.1f", errorRate.rate() * 100) + " m per 100 m"
+                                    + (errorRate.ready() ? "" : " (the default until " + TunnelMath.ErrorLearner.MIN_SAMPLES + " tunnels)"));
+                            saveLearned();
+                        }
+                    }
+                }
             }
             lastFix = new Location(fix);
             lastFixAt = now;
@@ -237,6 +254,9 @@ public final class TunnelNavigation {
             limitLogged = false;
             wideLogged = false;
             unsentAfterM = Double.NaN;
+            synchronized (learnedLock) {
+                errorPerM = errorRate.rate();
+            }
             startAccuracy = lastFix.hasAccuracy() ? lastFix.getAccuracy() : 10f;
             if (Double.isNaN(bearing) && lastFix.hasBearing()) bearing = lastFix.getBearing();
             bearingOffset = bearing;
@@ -248,7 +268,8 @@ public final class TunnelNavigation {
                     + (carCompass() != null ? "live" : "frozen or missing") + ", gyro " + (carYawRate() != null ? "sent" : "missing")
                     + "; turn gain " + String.format(java.util.Locale.ROOT, "%.2f", turnGain.gain()) + " (" + turnGain.samples() + " curves)"
                     + ", speed gain " + String.format(java.util.Locale.ROOT, "%.2f", speedGain.gain())
-                    + ", gyro offset " + String.format(java.util.Locale.ROOT, "%.4f", gyroBias.bias()));
+                    + ", gyro offset " + String.format(java.util.Locale.ROOT, "%.4f", gyroBias.bias())
+                    + ", error " + String.format(java.util.Locale.ROOT, "%.1f", errorPerM * 100) + " m per 100 m");
         }
         if (Double.isNaN(bearing)) return;
 
@@ -289,7 +310,7 @@ public final class TunnelNavigation {
         Location next = destination(estimate, bearing, distance);
         next.setSpeed((float) speedNow);
         next.setBearing((float) bearing);
-        float accuracy = TunnelMath.accuracy(startAccuracy, travelledM);
+        float accuracy = TunnelMath.accuracy(startAccuracy, travelledM, errorPerM);
         if (!wideLogged && accuracy > TunnelMath.ROUTE_SNAP_M) {
             wideLogged = true;
             PatchLog.add("tunnel", "estimate may now be more than " + (int) TunnelMath.ROUTE_SNAP_M
@@ -462,7 +483,7 @@ public final class TunnelNavigation {
         learnedCar = car;
         gyroLogged = false;
         SharedPreferences prefs = learnedPrefs();
-        double corr = TunnelMath.Learned.decode(prefs == null ? null : prefs.getString(CAR_PREFIX + car, null), turnGain, speedGain, gyroBias);
+        double corr = TunnelMath.Learned.decode(prefs == null ? null : prefs.getString(CAR_PREFIX + car, null), turnGain, speedGain, gyroBias, errorRate);
         if (Double.isNaN(corr)) {
             gyroCorrelation = 0;
             PatchLog.add("tunnel", "nothing learned yet for this car: learning from the GPS");
@@ -472,18 +493,21 @@ public final class TunnelNavigation {
         PatchLog.add("tunnel", "learned values for this car restored: gyroscope " + (Math.abs(corr) > 2 ? "known" : "not known yet")
                 + ", turn gain " + String.format(java.util.Locale.ROOT, "%.2f", turnGain.gain()) + " (" + turnGain.samples() + " curves)"
                 + ", speed gain " + String.format(java.util.Locale.ROOT, "%.2f", speedGain.gain())
-                + ", gyro offset " + String.format(java.util.Locale.ROOT, "%.4f", gyroBias.bias()));
+                + ", gyro offset " + String.format(java.util.Locale.ROOT, "%.4f", gyroBias.bias())
+                + ", tunnel error " + String.format(java.util.Locale.ROOT, "%.1f", errorRate.rate() * 100) + " m per 100 m ("
+                + errorRate.samples() + " tunnels)");
     }
 
     /** Saves what was learned for the current car, if anything (call with learnedLock held). */
     private static void saveLearned() {
-        if (learnedCar == null || (turnGain.samples() == 0 && speedGain.samples() == 0 && gyroBias.samples() == 0 && gyroCorrelation == 0)) return;
+        if (learnedCar == null || (turnGain.samples() == 0 && speedGain.samples() == 0 && gyroBias.samples() == 0 && errorRate.samples() == 0
+                && gyroCorrelation == 0)) return;
         SharedPreferences prefs = learnedPrefs();
         if (prefs == null) return;
         try {
             SharedPreferences.Editor edit = prefs.edit();
             edit.putString(CAR_PREFIX + learnedCar,
-                    TunnelMath.Learned.encode(System.currentTimeMillis(), gyroCorrelation, turnGain, speedGain, gyroBias));
+                    TunnelMath.Learned.encode(System.currentTimeMillis(), gyroCorrelation, turnGain, speedGain, gyroBias, errorRate));
             // Keep at most MAX_CARS: drop the ones saved longest ago, never the current one.
             java.util.List<java.util.Map.Entry<String, ?>> others = new java.util.ArrayList<>();
             for (java.util.Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
@@ -504,6 +528,7 @@ public final class TunnelNavigation {
             turnGain.reset();
             speedGain.reset();
             gyroBias.reset();
+            errorRate.reset();
             gyroCorrelation = 0;
             gyroLogged = false;
             learnedCar = null;
