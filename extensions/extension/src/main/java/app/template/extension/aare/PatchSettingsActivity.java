@@ -200,6 +200,10 @@ public final class PatchSettingsActivity extends Activity {
         }
         for (PatchSettings.Feature f : features) card.addView(row(f));
         refreshDependents();
+        if (PatchSettings.isRegistered(PatchSettings.TUNNEL_NAVIGATION)) {
+            card.addView(mapsRow());
+            TunnelMaps.refresh(this);
+        }
 
         // Technical state only (see PatchLog): for reporting a problem.
         TextView copy = text(PatchSettings.phrase("Copy diagnostics", "Copia diagnostica"), Type.LABEL_LARGE, colors.primary);
@@ -234,6 +238,149 @@ public final class PatchSettingsActivity extends Activity {
         card.addView(version, versionParams);
         return card;
     }
+
+    // region Tunnel maps
+
+    private TextView mapsSummary;
+
+    /** "Tunnel maps": which countries are on the phone, and a tap to choose them. */
+    private View mapsRow() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(0, dp(12), 0, dp(4));
+        box.addView(text(PatchSettings.phrase("Tunnel maps", "Mappe delle gallerie"), Type.LABEL_LARGE, colors.primary));
+        mapsSummary = text("", Type.BODY_SMALL, colors.onSurfaceVariant);
+        box.addView(mapsSummary);
+        updateMapsSummary();
+        box.setOnClickListener(v -> loadMapList());
+        LinearLayout.LayoutParams params = wrap();
+        params.topMargin = dp(8);
+        box.setLayoutParams(params);
+        return box;
+    }
+
+    private void updateMapsSummary() {
+        List<String> on = TunnelMaps.installed(this);
+        StringBuilder b = new StringBuilder();
+        for (String c : on) {
+            if (b.length() > 0) b.append(", ");
+            b.append(TunnelMaps.name(c)).append(" (").append(kb(TunnelMaps.size(this, c))).append(')');
+        }
+        mapsSummary.setText(on.isEmpty()
+                ? PatchSettings.phrase("None on the phone. Tap to choose the countries. Data © OpenStreetMap contributors.",
+                        "Nessuna sul telefono. Tocca per scegliere i paesi. Dati © OpenStreetMap contributors.")
+                : PatchSettings.phrase("On the phone: ", "Sul telefono: ") + b
+                        + PatchSettings.phrase(". Data © OpenStreetMap contributors.", ". Dati © OpenStreetMap contributors."));
+    }
+
+    private static String kb(long bytes) {
+        return Math.max(1, Math.round(bytes / 1024.0)) + " KB";
+    }
+
+    /** Asked by the user: the signed list of countries is loaded, then shown to choose from. */
+    private void loadMapList() {
+        if (!TunnelMaps.begin()) {
+            toast(PatchSettings.phrase("The maps are being downloaded, try again in a moment.",
+                    "Le mappe si stanno scaricando, riprova tra poco."));
+            return;
+        }
+        toast(PatchSettings.phrase("Loading the list of countries…", "Carico l'elenco dei paesi…"));
+        new Thread(() -> {
+            try {
+                java.util.Map<String, TunnelMapFile.Entry> index = TunnelMaps.index();
+                runOnUiThread(() -> chooseMaps(index));
+            } catch (TunnelMaps.Failure f) {
+                PatchLog.add("maps", "list not loaded (" + f.getMessage() + ")");
+                runOnUiThread(() -> failed(f));
+            } finally {
+                TunnelMaps.end();
+            }
+        }, "aare-tunnel-maps").start();
+    }
+
+    private void chooseMaps(java.util.Map<String, TunnelMapFile.Entry> index) {
+        if (isFinishing()) return;
+        List<String> installed = TunnelMaps.installed(this);
+        java.util.List<String> codes = new java.util.ArrayList<>(index.keySet());
+        for (String c : installed) if (!codes.contains(c)) codes.add(c); // on the phone, gone from the list
+        java.util.Collections.sort(codes, (a, b) -> TunnelMaps.name(a).compareToIgnoreCase(TunnelMaps.name(b)));
+        String[] labels = new String[codes.size()];
+        boolean[] checked = new boolean[codes.size()];
+        for (int i = 0; i < codes.size(); i++) {
+            String c = codes.get(i);
+            TunnelMapFile.Entry e = index.get(c);
+            labels[i] = TunnelMaps.name(c) + (e != null ? " (" + kb(e.bytes) + ")" : "");
+            checked[i] = installed.contains(c);
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(PatchSettings.phrase("Tunnel maps", "Mappe delle gallerie"))
+                .setMultiChoiceItems(labels, checked, (d, which, on) -> checked[which] = on)
+                .setPositiveButton(PatchSettings.phrase("Save", "Salva"), (d, w) -> applyMaps(codes, checked, index))
+                .setNegativeButton(PatchSettings.phrase("Cancel", "Annulla"), null)
+                .show();
+    }
+
+    /** Downloads the countries ticked and not on the phone, deletes the ones unticked. */
+    private void applyMaps(java.util.List<String> codes, boolean[] checked, java.util.Map<String, TunnelMapFile.Entry> index) {
+        if (!TunnelMaps.begin()) {
+            toast(PatchSettings.phrase("The maps are being downloaded, try again in a moment.",
+                    "Le mappe si stanno scaricando, riprova tra poco."));
+            return;
+        }
+        java.util.List<String> installed = TunnelMaps.installed(this);
+        new Thread(() -> {
+            int got = 0, removed = 0;
+            TunnelMaps.Failure failure = null;
+            try {
+                for (int i = 0; i < codes.size(); i++) {
+                    String c = codes.get(i);
+                    if (checked[i] && !TunnelMaps.current(this, c, index)) {
+                        try {
+                            TunnelMaps.download(this, c, index);
+                            got++;
+                        } catch (TunnelMaps.Failure f) {
+                            failure = f;
+                            PatchLog.add("maps", "a map failed (" + f.getMessage() + ")");
+                        }
+                    } else if (!checked[i] && installed.contains(c)) {
+                        if (TunnelMaps.delete(this, c)) removed++;
+                    }
+                }
+            } finally {
+                TunnelMaps.end();
+            }
+            PatchLog.add("maps", got + " maps downloaded, " + removed + " deleted" + (failure != null ? ", some failed" : ""));
+            final TunnelMaps.Failure f = failure;
+            final int g = got, r = removed;
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                updateMapsSummary();
+                if (f != null) {
+                    failed(f);
+                } else {
+                    toast(PatchSettings.phrase(g + " downloaded, " + r + " deleted.", g + " scaricate, " + r + " cancellate."));
+                }
+            });
+        }, "aare-tunnel-maps").start();
+    }
+
+    private void failed(TunnelMaps.Failure f) {
+        if (isFinishing()) return;
+        new android.app.AlertDialog.Builder(this)
+                .setMessage(f.signature
+                        ? PatchSettings.phrase("A tunnel map didn't pass the signature check, so it wasn't used. Nothing changed on the phone.",
+                                "Una mappa delle gallerie non ha passato il controllo della firma e non è stata usata. Sul telefono non è cambiato niente.")
+                        : PatchSettings.phrase("The tunnel maps couldn't be loaded (" + f.getMessage() + "). Check the connection and try again.",
+                                "Non è stato possibile caricare le mappe delle gallerie (" + f.getMessage() + "). Controlla la connessione e riprova."))
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    private void toast(String message) {
+        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    // endregion
 
     private String diagnostics() {
         StringBuilder b = new StringBuilder("AARE Patches diagnostics\n");

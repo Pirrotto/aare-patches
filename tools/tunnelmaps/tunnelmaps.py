@@ -11,6 +11,9 @@ File format (README.md beside this script): a gzip of
 gzip with mtime 0, so the same tunnels give the same bytes and an unchanged country is not
 published again.
 
+The index (index.txt) is plain text the phone reads without a JSON parser: the line
+"AARETUN-INDEX 1", then one line per country, sorted: "<CC> <sha256> <bytes> <ways>".
+
 Data © OpenStreetMap contributors, ODbL 1.0.
 """
 import argparse
@@ -18,6 +21,7 @@ import gzip
 import hashlib
 import json
 import math
+import re
 import sys
 import time
 import urllib.parse
@@ -247,6 +251,36 @@ def country_ways(code):
 
 # endregion
 
+# region Index
+
+INDEX_HEADER = "AARETUN-INDEX 1"
+_INDEX_LINE = re.compile(r"^([A-Z]{2}) ([0-9a-f]{64}) ([0-9]+) ([0-9]+)$")
+
+
+def write_index(countries):
+    """[countries]: code -> {"sha256", "bytes", "ways"}. Sorted, so the same maps give the same index."""
+    lines = [INDEX_HEADER]
+    for code in sorted(countries):
+        c = countries[code]
+        lines.append("%s %s %d %d" % (code, c["sha256"], c["bytes"], c["ways"]))
+    return "\n".join(lines) + "\n"
+
+
+def read_index(text):
+    """The reverse of [write_index]; a malformed index raises ValueError."""
+    lines = text.splitlines()
+    if not lines or lines[0] != INDEX_HEADER:
+        raise ValueError("not a tunnel maps index")
+    out = {}
+    for line in lines[1:]:
+        m = _INDEX_LINE.match(line)
+        if not m or m.group(1) in out:
+            raise ValueError("bad index line")
+        out[m.group(1)] = {"sha256": m.group(2), "bytes": int(m.group(3)), "ways": int(m.group(4))}
+    return out
+
+# endregion
+
 
 def build(code, ways):
     """The map file of [code] from its tunnel ways: long tunnels only, simplified."""
@@ -260,18 +294,18 @@ def build(code, ways):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     ap.add_argument("--countries", default="all", help="comma-separated ISO codes, or all")
-    ap.add_argument("--out", required=True, help="folder for <CC>.tun and index.json")
-    ap.add_argument("--previous", help="the index.json published before: a country that fails now keeps its entry")
+    ap.add_argument("--out", required=True, help="folder for <CC>.tun and index.txt")
+    ap.add_argument("--previous", help="the index.txt published before: a country that fails now keeps its entry")
     args = ap.parse_args(argv)
     previous = {}
     if args.previous:
         try:
             with open(args.previous) as f:
-                previous = json.load(f).get("countries", {})
+                previous = read_index(f.read())
         except (OSError, ValueError) as e:
             print("previous index unreadable (%s): starting afresh" % e, file=sys.stderr)
     codes = countries() if args.countries == "all" else [c.strip().upper() for c in args.countries.split(",") if c.strip()]
-    index = {"version": VERSION, "source": "© OpenStreetMap contributors, ODbL 1.0", "countries": {}}
+    found = {}
     failed = []
     for code in codes:
         try:
@@ -284,7 +318,7 @@ def main(argv=None):
             continue
         with open("%s/%s.tun" % (args.out, code), "wb") as f:
             f.write(data)
-        index["countries"][code] = {"bytes": len(data), "ways": n, "sha256": hashlib.sha256(data).hexdigest()}
+        found[code] = {"bytes": len(data), "ways": n, "sha256": hashlib.sha256(data).hexdigest()}
         print("%s: %d ways, %d bytes" % (code, n, len(data)))
         time.sleep(5)  # Overpass is shared: one country at a time
     if failed:
@@ -292,10 +326,10 @@ def main(argv=None):
         # Overpass busy or a country too big this time: its published file stays as it was.
         for code in failed:
             if code in previous:
-                index["countries"][code] = previous[code]
-    with open("%s/index.json" % args.out, "w") as f:
-        json.dump(index, f, sort_keys=True, indent=1)
-    return 1 if failed and not index["countries"] else 0
+                found[code] = previous[code]
+    with open("%s/index.txt" % args.out, "w") as f:
+        f.write(write_index(found))
+    return 1 if failed and not found else 0
 
 
 if __name__ == "__main__":

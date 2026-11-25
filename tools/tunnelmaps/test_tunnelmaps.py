@@ -94,5 +94,21 @@ class OverpassTest(unittest.TestCase):
         self.assertEqual("CH", tm.decode(data)[0])
 
 
+
+class IndexTest(unittest.TestCase):
+    def test_roundtrip_and_order(self):
+        c = {"DE": {"sha256": "b" * 64, "bytes": 2, "ways": 3}, "CH": {"sha256": "a" * 64, "bytes": 23783, "ways": 940}}
+        text = tm.write_index(c)
+        self.assertEqual("AARETUN-INDEX 1\nCH " + "a" * 64 + " 23783 940\nDE " + "b" * 64 + " 2 3\n", text)
+        self.assertEqual(c, tm.read_index(text))
+
+    def test_a_bad_index_is_refused(self):
+        for bad in ["", "AARETUN-INDEX 2\n", "AARETUN-INDEX 1\nch " + "a" * 64 + " 1 1",
+                    "AARETUN-INDEX 1\nCH " + "a" * 63 + " 1 1", "AARETUN-INDEX 1\nCH " + "a" * 64 + " -1 1",
+                    "AARETUN-INDEX 1\nCH " + "a" * 64 + " 1 1\nCH " + "a" * 64 + " 1 1"]:
+            with self.assertRaises(ValueError, msg=bad):
+                tm.read_index(bad)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -43,6 +43,10 @@ public final class PatchSettings {
     public static final String LOCATION_CHECK = "location_check";
     /** Test fix: AARE's service restarted through Shizuku so navigation apps get the location (Tunnel navigation patch). */
     public static final String LOCATION_FIX = "location_fix";
+    /** Tunnel maps: the downloaded countries updated by themselves, at most once a day (Tunnel navigation patch). */
+    public static final String TUNNEL_MAPS_AUTO = "tunnel_maps_auto";
+    /** Tunnel maps: the mobile network's country added by itself (Tunnel navigation patch). */
+    public static final String TUNNEL_MAPS_HERE = "tunnel_maps_here";
 
     /** One switch of the screen. */
     static final class Feature {
@@ -110,14 +114,15 @@ public final class PatchSettings {
         for (Feature f : known()) {
             // "Ask by voice to reply" comes with the Voice reply patch.
             String patch = VOICE_REPLY_ASK.equals(f.key) || VOICE_REPLY_BEEP.equals(f.key) ? VOICE_REPLY
-                    : LOCATION_CHECK.equals(f.key) || LOCATION_FIX.equals(f.key) ? TUNNEL_NAVIGATION : f.key;
+                    : LOCATION_CHECK.equals(f.key) || LOCATION_FIX.equals(f.key) || TUNNEL_MAPS_AUTO.equals(f.key)
+                    || TUNNEL_MAPS_HERE.equals(f.key) ? TUNNEL_NAVIGATION : f.key;
             if (registered.contains(patch)) list.add(f);
         }
         return list;
     }
 
     // Material icons (Apache License 2.0): navigation, reply, graphic_eq, record_voice_over,
-    // notifications_active, volume_down, place, near_me.
+    // notifications_active, volume_down, place, near_me, update, public.
     static final String ICON_TUNNEL = "M12,2L4.5,20.29l0.71,0.71L12,18l6.79,3 0.71,-0.71z";
     private static final String ICON_REPLY = "M10,9V5l-7,7 7,7v-4.1c5,0 8.5,1.6 11,5.1 -1,-5 -4,-10 -11,-11z";
     private static final String ICON_VOICE_MESSAGE = "M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z";
@@ -126,6 +131,12 @@ public final class PatchSettings {
             + "M20.07 2l-1.63 1.63c2.77 3.02 2.77 7.56 0 10.74L20.07 16c3.9-3.89 3.91-9.95 0-14z";
     private static final String ICON_LOCATION_CHECK = "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z";
     private static final String ICON_LOCATION_FIX = "M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z";
+    private static final String ICON_MAPS_AUTO = "M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79"
+            + "s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0"
+            + "-3.5-3.47-3.53-9.11-.02-12.58s9.14-3.47 12.65 0L21 3v7.12zM12.5 8v4.25l3.5 2.08-.72 1.21L11 13V8h1.5z";
+    private static final String ICON_MAPS_HERE = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93"
+            + "c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3"
+            + "c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z";
     private static final String ICON_RADIO_PAUSE = "M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z";
     private static final String ICON_BEEP = "M7.58 4.08L6.15 2.65C3.75 4.48 2.17 7.3 2.03 10.5h2c.15-2.65 1.51-4.97 3.55-6.42z"
             + "m12.39 6.42h2c-.15-3.2-1.73-6.02-4.12-7.85l-1.42 1.43c2.02 1.45 3.39 3.77 3.54 6.42z"
@@ -138,11 +149,27 @@ public final class PatchSettings {
                         phrase("Tunnel navigation", "Navigazione in galleria"),
                         phrase("With the car's GPS for the phone: in tunnels the position keeps moving, estimated from the car's "
                                         + "speed, compass and gyroscope, for as long as it stays within 45 m (about 400 m of tunnel at first, longer as it measures the car's error). What it learns "
-                                        + "about each car is kept, and deleted when switched off.",
+                                        + "about each car is kept, and deleted when switched off. Tunnel maps per country can be downloaded below.",
                                 "Col GPS dell'auto per il telefono: in galleria la posizione continua ad avanzare, stimata da "
                                         + "velocità, bussola e giroscopio dell'auto, finché resta entro 45 m (all'inizio circa 400 m di galleria, di più man mano che misura l'errore dell'auto). Ricorda ciò "
-                                        + "che impara di ogni auto e lo cancella quando la spegni."),
+                                        + "che impara di ogni auto e lo cancella quando la spegni. Qui sotto si possono scaricare le mappe delle gallerie per paese."),
                         ICON_TUNNEL),
+                new Feature(TUNNEL_MAPS_AUTO,
+                        phrase("Update the tunnel maps", "Aggiorna le mappe delle gallerie"),
+                        phrase("The tunnel maps downloaded under \"Tunnel maps\" below are checked at most once a day, never while "
+                                        + "a car is connected, and downloaded again when OpenStreetMap changed. It contacts only this "
+                                        + "project's GitHub page and asks only for the map files, never your position.",
+                                "Le mappe delle gallerie scaricate da «Mappe delle gallerie» qui sotto vengono controllate al massimo "
+                                        + "una volta al giorno, mai con l'auto collegata, e riscaricate quando OpenStreetMap è cambiato. "
+                                        + "Contatta solo la pagina GitHub del progetto e chiede solo i file delle mappe, mai la tua posizione."),
+                        ICON_MAPS_AUTO, TUNNEL_NAVIGATION),
+                new Feature(TUNNEL_MAPS_HERE,
+                        phrase("Add the country I'm in", "Aggiungi il paese in cui sono"),
+                        phrase("At the same daily check, downloads the map of the mobile network's country if it isn't on the "
+                                        + "phone (no GPS, no permission). GitHub then sees which country's file was asked for.",
+                                "Allo stesso controllo giornaliero scarica la mappa del paese della rete mobile, se non è già sul "
+                                        + "telefono (senza GPS e senza permessi). GitHub vede quindi di quale paese è il file chiesto."),
+                        ICON_MAPS_HERE, TUNNEL_NAVIGATION),
                 new Feature(LOCATION_CHECK,
                         phrase("Location check (test)", "Controllo posizione (prova)"),
                         phrase("Diagnostics only: for 5 minutes after the car connects, notes every 15 s whether AARE and the "
@@ -215,7 +242,7 @@ public final class PatchSettings {
      * Features off until the user turns them on, as AARE would ship them: they change what other apps
      * get (tunnel navigation's estimated position) or read another app's files (voice messages).
      */
-    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, LOCATION_CHECK, LOCATION_FIX));
+    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, LOCATION_CHECK, LOCATION_FIX, TUNNEL_MAPS_AUTO, TUNNEL_MAPS_HERE));
 
     /**
      * The voice features use Android 8's audio focus requests; AARE also runs on Android 6 and 7,

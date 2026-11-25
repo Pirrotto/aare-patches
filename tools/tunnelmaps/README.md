@@ -21,8 +21,9 @@ Data © OpenStreetMap contributors, [ODbL 1.0](https://opendatacommons.org/licen
 ## Files
 
 - `<CC>.tun`: one country, by its ISO 3166-1 code.
-- `index.json`: every country with its size, its number of ways and its SHA-256 (`countries`). It
-  is published last, so it never names a file that isn't there yet.
+- `index.txt`: the line `AARETUN-INDEX 1`, then one line per country, sorted:
+  `<CC> <sha256> <bytes> <ways>`. Plain text, so the phone reads it without a JSON parser. It is
+  published last, so it never names a file that isn't there yet.
 - `<file>.sig`: the ECDSA P-256 / SHA-256 signature (DER) of each file, made with the key in the
   `TUNNEL_MAPS_KEY` secret. The phone accepts a file only if its signature matches the public key
   pinned in the code, and only if the country's SHA-256 matches the signed index.
