@@ -4,10 +4,17 @@ name: Tunnel maps
 # published as assets of the "tunnel-maps" release (a pre-release, never "latest", so Morphe and the
 # patch releases ignore it). Only countries whose file changed are uploaded again. On a pull request
 # that touches the builder, only its tests and a dry run for one country, nothing published.
+# GitHub runs the schedule and the manual start only from main; a push to dev that changes the
+# builder publishes too, so the maps can be tried with the test builds before a release.
 on:
   schedule:
     - cron: '17 3 3 * *'
   workflow_dispatch:
+  push:
+    branches: [dev]
+    paths:
+      - 'tools/tunnelmaps/**'
+      - '.github/workflows/tunnel-maps.yml'
   pull_request:
     paths:
       - 'tools/tunnelmaps/**'
