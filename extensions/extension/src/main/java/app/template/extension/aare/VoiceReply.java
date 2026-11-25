@@ -706,6 +706,11 @@ public final class VoiceReply {
                 // Let the user pause between words while dictating.
                 intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
                         .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L);
+                // Punctuation and capitals in the dictated text, by the recognizer itself (Android 13+;
+                // one that can't simply ignores it). Not for yes/no answers: ReplyWords reads those bare.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.putExtra(RecognizerIntent.EXTRA_ENABLE_FORMATTING, RecognizerIntent.FORMATTING_OPTIMIZE_QUALITY);
+                }
             }
             requestListenFocus(context);
             // With AARE's "Car microphone for phone apps" on, the recognizer hears the car by itself.
@@ -763,6 +768,8 @@ public final class VoiceReply {
         if (state != State.DICTATING) return;
         stopListening();
         if (dictatedPieces > 1) PatchLog.add("reply", "dictation ends after a pause (" + dictatedPieces + " pieces)");
+        // Technical only (whether any punctuation came), never the text: tells if the recognizer formats.
+        PatchLog.add("reply", "dictation punctuated: " + DictationText.punctuated(dictated));
         endTone();
         onDictated(dictated);
     }
