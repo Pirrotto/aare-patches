@@ -16,7 +16,9 @@ import java.util.Map;
  * kept: it is read through the Car App Library's public getters, by reflection (AARE carries the
  * library, the patches don't).
  */
-final class TunnelManeuver {
+// Public: AARE's NavStatusBridge (another package) calls onTrip; package-private made ART refuse the
+// call with an IllegalAccessError, which stopped AARE when a destination was set (26.11).
+public final class TunnelManeuver {
     private static final String TAG = "AarePatchesManeuver";
     /** A maneuver older than this is no longer the app's word: Vela sends one about every second while guiding. */
     static final long FRESH_MS = 5_000;
