@@ -96,6 +96,21 @@ final class TunnelMath {
         return 100.0 * offM / travelledM;
     }
 
+    /** The gyroscope stretch a map estimate may end with and still teach the map's error (m, or share). */
+    static final double MAP_TAIL_M = 100;
+    static final double MAP_TAIL_SHARE = 0.10;
+
+    /**
+     * Whether an estimate that followed a tunnel map teaches the map's error, though it ended with
+     * [gyroM] of its [travelledM] on the gyroscope: there always are a few metres between the map's
+     * end and the GPS's return. Up to 100 m, or 10 % of the way, it counts: that stretch can only make
+     * the measured error bigger, so the map's learned error stays honest (pessimistic if anything).
+     */
+    static boolean mapLearned(double travelledM, double gyroM) {
+        if (!(travelledM > 0) || !(gyroM >= 0)) return false;
+        return gyroM <= Math.max(MAP_TAIL_M, MAP_TAIL_SHARE * travelledM);
+    }
+
     /** Whether an estimate with this honest accuracy may still be sent. */
     static boolean accurateEnough(float accuracy) {
         return accuracy <= STOP_ACCURACY_M;

@@ -197,4 +197,18 @@ public class TunnelMathTest {
         assertTrue(Double.isNaN(TunnelMath.errorPer100m(20, Double.NaN)));
         assertTrue(Double.isNaN(TunnelMath.errorPer100m(Double.POSITIVE_INFINITY, 500)));
     }
+
+    @Test
+    public void aMapEstimateEndingOnTheGyroscopeStillTeachesTheMap() {
+        // 26.11: 3406 m, 3385 along the map, 21 m of gyroscope after its end: learned.
+        assertTrue(TunnelMath.mapLearned(3406, 21));
+        assertTrue(TunnelMath.mapLearned(590, 23));
+        assertTrue(TunnelMath.mapLearned(400, 100)); // up to 100 m always
+        assertTrue(TunnelMath.mapLearned(3000, 300)); // or 10 %
+        // A long stretch on the gyroscope after the map: not the map's error any more.
+        assertFalse(TunnelMath.mapLearned(800, 150));
+        assertFalse(TunnelMath.mapLearned(3000, 301));
+        assertFalse(TunnelMath.mapLearned(0, 0));
+        assertFalse(TunnelMath.mapLearned(500, Double.NaN));
+    }
 }
