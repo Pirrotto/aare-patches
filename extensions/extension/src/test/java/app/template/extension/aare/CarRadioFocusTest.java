@@ -16,6 +16,15 @@ public class CarRadioFocusTest {
     }
 
     @Test
+    public void recordingHoldsOnlyWithBothSwitchesOn() {
+        assertTrue(CarRadioFocus.holdsForRecording(true, true, true));
+        // Car radio pause off, its sub-option off, or nothing recording: the radio is left alone.
+        assertFalse(CarRadioFocus.holdsForRecording(false, true, true));
+        assertFalse(CarRadioFocus.holdsForRecording(true, false, true));
+        assertFalse(CarRadioFocus.holdsForRecording(true, true, false));
+    }
+
+    @Test
     public void theRadioAlwaysComesBack() {
         assertTrue(CarRadioFocus.mustRelease(false, 0));
         assertFalse(CarRadioFocus.mustRelease(true, CarRadioFocus.MAX_HOLD_MS - 1));
