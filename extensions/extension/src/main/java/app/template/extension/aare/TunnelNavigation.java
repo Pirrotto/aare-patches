@@ -207,6 +207,9 @@ public final class TunnelNavigation {
         bearing = Double.NaN;
         passLogged = false;
         PatchLog.add("tunnel", why + ": last position dropped");
+        // Like AARE's certificate update: the tunnel maps are checked once the car is gone, if due.
+        Context app = PatchSettings.application();
+        if (app != null && !connected()) TunnelMaps.refresh(app);
     }
 
     private static synchronized void ensureWorker() {

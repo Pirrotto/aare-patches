@@ -16,5 +16,7 @@ public class PatchSettingsTest {
         assertTrue(PatchSettings.offByDefault(PatchSettings.RADIO_PAUSE));
         assertTrue(PatchSettings.offByDefault(PatchSettings.LOCATION_CHECK));
         assertTrue(PatchSettings.offByDefault(PatchSettings.LOCATION_FIX));
+        assertTrue(PatchSettings.offByDefault(PatchSettings.TUNNEL_MAPS_AUTO));
+        assertTrue(PatchSettings.offByDefault(PatchSettings.TUNNEL_MAPS_HERE));
     }
 }
