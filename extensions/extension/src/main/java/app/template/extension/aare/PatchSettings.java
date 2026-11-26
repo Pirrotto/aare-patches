@@ -39,6 +39,8 @@ public final class PatchSettings {
     public static final String VOICE_REPLY_BEEP = "voice_reply_beep";
     /** Pause the car's radio while AARE speaks (Car radio pause patch). */
     public static final String RADIO_PAUSE = "radio_pause";
+    /** A setting of Car radio pause: the radio also pauses while a phone app records. */
+    public static final String RADIO_PAUSE_RECORDING = "radio_pause_recording";
     /** Test diagnostics: whether AARE and the navigation apps may read the location (Tunnel navigation patch). */
     public static final String LOCATION_CHECK = "location_check";
     /** Test fix: AARE's service restarted through Shizuku so navigation apps get the location (Tunnel navigation patch). */
@@ -119,7 +121,8 @@ public final class PatchSettings {
             String patch = VOICE_REPLY_ASK.equals(f.key) || VOICE_REPLY_BEEP.equals(f.key) ? VOICE_REPLY
                     : LOCATION_CHECK.equals(f.key) || LOCATION_FIX.equals(f.key) || TUNNEL_MAPS_AUTO.equals(f.key)
                     || TUNNEL_MAPS_HERE.equals(f.key) ? TUNNEL_NAVIGATION
-                    : ASSISTANT_CAR_SCREEN_DRIVING.equals(f.key) ? ASSISTANT_CAR_SCREEN : f.key;
+                    : ASSISTANT_CAR_SCREEN_DRIVING.equals(f.key) ? ASSISTANT_CAR_SCREEN
+                    : RADIO_PAUSE_RECORDING.equals(f.key) ? RADIO_PAUSE : f.key;
             if (registered.contains(patch)) list.add(f);
         }
         return list;
@@ -168,6 +171,10 @@ public final class PatchSettings {
                         phrase("Pause the radio", "Pausa della radio"),
                         phrase("The radio pauses while AARE reads or listens, instead of getting lower.",
                                 "La radio va in pausa mentre AARE legge o ascolta, invece di abbassarsi.")),
+                new Feature(RADIO_PAUSE_RECORDING,
+                        phrase("Also while an app records", "Anche quando un'app registra"),
+                        phrase("The car's radio pauses while you record a voice message or dictate on the phone.",
+                                "La radio dell'auto va in pausa mentre registri un vocale o detti sul telefono."), RADIO_PAUSE),
                 new Feature(ASSISTANT_CAR_SCREEN,
                         phrase("Assistant on the car screen", "Assistente sullo schermo dell'auto"),
                         phrase("If its car app doesn't answer AARE (Google), the voice button opens it on the car screen or the phone.",
@@ -195,7 +202,7 @@ public final class PatchSettings {
      * Features off until the user turns them on, as AARE would ship them: they change what other apps
      * get (tunnel navigation's estimated position) or read another app's files (voice messages).
      */
-    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, LOCATION_CHECK, LOCATION_FIX, TUNNEL_MAPS_AUTO, TUNNEL_MAPS_HERE, ASSISTANT_CAR_SCREEN, ASSISTANT_CAR_SCREEN_DRIVING, MAP_AREA_NOTE));
+    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, RADIO_PAUSE_RECORDING, LOCATION_CHECK, LOCATION_FIX, TUNNEL_MAPS_AUTO, TUNNEL_MAPS_HERE, ASSISTANT_CAR_SCREEN, ASSISTANT_CAR_SCREEN_DRIVING, MAP_AREA_NOTE));
 
     /**
      * The voice features use Android 8's audio focus requests; AARE also runs on Android 6 and 7,
@@ -207,7 +214,7 @@ public final class PatchSettings {
     }
 
     private static final Set<String> NEEDS_ANDROID_8 = new HashSet<>(Arrays.asList(
-            VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE));
+            VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, RADIO_PAUSE_RECORDING));
 
     /** Whether [key]'s feature can run on this phone's Android version. */
     public static boolean available(String key) {

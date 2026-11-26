@@ -33,6 +33,12 @@ public final class CarRadioFocus {
 
     private static volatile boolean replySpeaking;
     private static volatile boolean playerSpeaking;
+    /** A phone app records (see {@link RecordingPause}), with "While an app records" on. */
+    private static volatile boolean recording;
+    /** The car's sound was asked for by {@link #recording} itself, not by audio AARE plays. */
+    private static volatile boolean ownRequest;
+    /** Set on the thread that calls request() for a recording, so the hooks know it is ours. */
+    private static final ThreadLocal<Boolean> selfCalling = new ThreadLocal<>();
     /** The guidance focus whose release is being kept back, or null. */
     private static volatile WeakReference<Object> pending;
     private static volatile long pendingSince;
@@ -71,8 +77,69 @@ public final class CarRadioFocus {
         return !speaking || heldMs >= MAX_HOLD_MS;
     }
 
+    /** Pure: whether a phone app's recording holds the car's sound now. */
+    static boolean holdsForRecording(boolean enabled, boolean whileRecording, boolean recording) {
+        return enabled && whileRecording && recording;
+    }
+
     private static boolean active() {
-        return holds(PatchSettings.isEnabled(null, KEY), replySpeaking, playerSpeaking);
+        boolean enabled = PatchSettings.isEnabled(null, KEY);
+        return holds(enabled, replySpeaking, playerSpeaking)
+                || (recording && holdsForRecording(enabled, PatchSettings.isEnabled(null, PatchSettings.RADIO_PAUSE_RECORDING), true));
+    }
+
+    /**
+     * Main thread: a phone app started or stopped recording, while a car is connected. On start, asks
+     * the car for its sound through AARE's guidance focus ([guidanceFocus], CarAudioOut.Focus), so
+     * {@link #guidanceType} makes it a pause; at the end gives it back, unless AARE's own audio still
+     * holds it (then that audio's kept-back release goes out once it is done).
+     */
+    static void recording(boolean on, Object guidanceFocus) {
+        if (on == recording) return;
+        recording = on;
+        if (on) {
+            if (!active()) {
+                recording = false;
+                return;
+            }
+            PatchLog.add("radio", "an app records: asking the car to pause its sound");
+            ownRequest = true;
+            request(guidanceFocus, true);
+            return;
+        }
+        if (pending != null) {
+            releaseIfDone();
+        } else if (ownRequest) {
+            ownRequest = false;
+            PatchLog.add("radio", "recording over: car's sound given back");
+            // Through holdRelease: kept back if AARE itself is speaking meanwhile.
+            request(guidanceFocus, false);
+        }
+    }
+
+    /** The car connection ended: nothing to give back, nothing kept. */
+    static void sessionClosed() {
+        recording = false;
+        ownRequest = false;
+        pending = null;
+    }
+
+    private static void request(Object focus, boolean playing) {
+        if (focus == null) return;
+        selfCalling.set(Boolean.TRUE);
+        try {
+            focusRequest().invoke(focus, playing);
+        } catch (Throwable t) {
+            Log.w(TAG, "request", t);
+            PatchLog.add("radio", "could not ask the car for its sound: " + t.getClass().getSimpleName());
+        } finally {
+            selfCalling.remove();
+        }
+    }
+
+    private static Method focusRequest() throws ReflectiveOperationException {
+        return Class.forName("net.prototux.aare.audio.CarAudioOut$Focus", false, CarRadioFocus.class.getClassLoader())
+                .getMethod("request", boolean.class);
     }
 
     /**
@@ -103,8 +170,10 @@ public final class CarRadioFocus {
     public static boolean holdRelease(Object focus, boolean playing) {
         try {
             if (playing) {
-                // The channel plays again: nothing is kept back any more.
+                // The channel plays again: nothing is kept back any more. AARE's own audio now owns
+                // the request, and its release ends it.
                 pending = null;
+                if (selfCalling.get() == null) ownRequest = false;
                 return false;
             }
             if (!active()) return false;
@@ -137,12 +206,13 @@ public final class CarRadioFocus {
         // Not kept again: replySpeaking/playerSpeaking may still say true if the maximum was reached.
         boolean reply = replySpeaking;
         boolean player = playerSpeaking;
+        boolean rec = recording;
         replySpeaking = false;
         playerSpeaking = false;
+        recording = false;
+        ownRequest = false;
         try {
-            Method request = Class.forName("net.prototux.aare.audio.CarAudioOut$Focus", false, CarRadioFocus.class.getClassLoader())
-                    .getMethod("request", boolean.class);
-            request.invoke(focus, false);
+            focusRequest().invoke(focus, false);
             PatchLog.add("radio", "AARE done speaking: car's sound given back");
         } catch (Throwable t) {
             Log.w(TAG, "release", t);
@@ -150,6 +220,7 @@ public final class CarRadioFocus {
         } finally {
             replySpeaking = reply;
             playerSpeaking = player;
+            recording = rec;
         }
     }
 }

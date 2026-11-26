@@ -191,7 +191,7 @@ public final class PatchSettingsActivity extends Activity {
     private static String group(String key) {
         if (PatchSettings.VOICE_REPLY.equals(key) || PatchSettings.VOICE_REPLY_ASK.equals(key)
                 || PatchSettings.VOICE_REPLY_BEEP.equals(key) || PatchSettings.VOICE_MESSAGES.equals(key)
-                || PatchSettings.RADIO_PAUSE.equals(key)) {
+                || PatchSettings.RADIO_PAUSE.equals(key) || PatchSettings.RADIO_PAUSE_RECORDING.equals(key)) {
             return PatchSettings.phrase("Messages", "Messaggi");
         }
         if (PatchSettings.TUNNEL_NAVIGATION.equals(key) || PatchSettings.LOCATION_CHECK.equals(key)
