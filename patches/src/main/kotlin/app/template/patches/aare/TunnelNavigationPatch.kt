@@ -28,7 +28,8 @@ val tunnelNavigationPatch = patch(
         "navigation at the start\" has the Shizuku shell start a small location service in AARE, so the navigation app " +
         "gets the location without opening AARE on the phone. \"Tunnel maps\" in the patches' Settings downloads, on a " +
         "tap, the road tunnels of the chosen countries (OpenStreetMap, signed, from this project's GitHub page; " +
-        "optional daily update and \"Add the country I'm in\", both off by default).",
+        "optional daily update and \"Add the country I'm in\", both off by default); in those tunnels the estimate " +
+        "follows the tunnel's shape, and goes back to the gyroscope at a junction or where it isn't sure.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)

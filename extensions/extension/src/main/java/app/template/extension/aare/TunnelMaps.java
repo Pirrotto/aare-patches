@@ -101,6 +101,43 @@ final class TunnelMaps {
         return n == null || n.isEmpty() ? country : n;
     }
 
+    // region For the estimate
+
+    private static TunnelMatch.Map cached;
+    private static String cachedKey;
+
+    /**
+     * The maps on the phone, read once and kept while they don't change, or null with none. A file
+     * that can't be read is left out (it was checked when downloaded: it would be a damaged disk).
+     */
+    static synchronized TunnelMatch.Map loaded(Context context) {
+        List<String> countries = installed(context);
+        if (countries.isEmpty()) {
+            cached = null;
+            cachedKey = null;
+            return null;
+        }
+        StringBuilder key = new StringBuilder();
+        for (String c : countries) {
+            File f = file(context, c);
+            key.append(c).append(':').append(f.length()).append(':').append(f.lastModified()).append(';');
+        }
+        if (key.toString().equals(cachedKey)) return cached;
+        List<TunnelMapFile.Way> ways = new ArrayList<>();
+        int bad = 0;
+        for (String c : countries) {
+            try {
+                ways.addAll(TunnelMapFile.read(readFile(file(context, c)), c));
+            } catch (IOException e) {
+                bad++;
+            }
+        }
+        if (bad > 0) PatchLog.add("maps", bad + " map files on the phone can't be read: left out");
+        cached = ways.isEmpty() ? null : new TunnelMatch.Map(ways);
+        cachedKey = key.toString();
+        return cached;
+    }
+
     // endregion
 
     // region Download

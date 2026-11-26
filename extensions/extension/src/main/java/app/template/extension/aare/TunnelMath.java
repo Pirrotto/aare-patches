@@ -65,7 +65,15 @@ final class TunnelMath {
 
     /** The same with the car's learned error [perM] (ErrorLearner.rate) instead of ERROR_PER_M. */
     static float accuracy(float start, double travelledM, double perM) {
-        return (float) (Math.max(start, 3f) + perM * travelledM);
+        return withError(start, perM * travelledM);
+    }
+
+    /**
+     * The accuracy from a fix of accuracy [start] with [errorM] of error added on the way: the sum of
+     * each stretch's distance times its own rate (the tunnel map's, then the gyroscope's after it).
+     */
+    static float withError(float start, double errorM) {
+        return (float) (Math.max(start, 3f) + errorM);
     }
 
     /**
@@ -467,18 +475,18 @@ final class TunnelMath {
      */
     static final class Learned {
         /**
-         * Format of [encode]. "3" adds the measured tunnel error, "2" the gyroscope offset; "1" and
-         * "2" (before) are still read, with what they lack to learn. Any other is ignored, so an
-         * update can change it safely.
+         * Format of [encode]. "4" adds the error measured while following a tunnel map, "3" the one
+         * with the gyroscope, "2" the gyroscope offset; "1" to "3" (before) are still read, with what
+         * they lack to learn. Any other is ignored, so an update can change it safely.
          */
-        static final String VERSION = "3";
+        static final String VERSION = "4";
         /** Same bound as while learning. */
         static final double MAX_CORRELATION = 50;
 
         static String encode(long savedAtMs, double gyroCorrelation, GainLearner turn, GainLearner speed, BiasLearner bias,
-                ErrorLearner error) {
+                ErrorLearner error, ErrorLearner mapError) {
             return VERSION + ";" + savedAtMs + ";" + gyroCorrelation + ";" + turn.save() + ";" + speed.save() + ";" + bias.save()
-                    + ";" + error.save();
+                    + ";" + error.save() + ";" + mapError.save();
         }
 
         /**
@@ -486,27 +494,31 @@ final class TunnelMath {
          * (with both learners at nothing learned) if [saved] is missing, malformed or of another
          * version.
          */
-        static double decode(String saved, GainLearner turn, GainLearner speed, BiasLearner bias, ErrorLearner error) {
+        static double decode(String saved, GainLearner turn, GainLearner speed, BiasLearner bias, ErrorLearner error,
+                ErrorLearner mapError) {
             turn.reset();
             speed.reset();
             bias.reset();
             error.reset();
+            mapError.reset();
             if (saved == null) return Double.NaN;
             String[] p = saved.split(";", -1);
             boolean v1 = "1".equals(p[0]) && p.length == 5;
             boolean v2 = "2".equals(p[0]) && p.length == 6;
-            boolean v3 = VERSION.equals(p[0]) && p.length == 7;
-            if (!v1 && !v2 && !v3) return Double.NaN;
+            boolean v3 = "3".equals(p[0]) && p.length == 7;
+            boolean v4 = VERSION.equals(p[0]) && p.length == 8;
+            if (!v1 && !v2 && !v3 && !v4) return Double.NaN;
             try {
                 Long.parseLong(p[1]);
                 double corr = Double.parseDouble(p[2]);
                 if (!finite(corr) || Math.abs(corr) > MAX_CORRELATION) return Double.NaN;
                 if (!turn.restore(p[3]) || !speed.restore(p[4]) || (!v1 && !bias.restore(p[5]))
-                        || (v3 && !error.restore(p[6]))) {
+                        || ((v3 || v4) && !error.restore(p[6])) || (v4 && !mapError.restore(p[7]))) {
                     turn.reset();
                     speed.reset();
                     bias.reset();
                     error.reset();
+                    mapError.reset();
                     return Double.NaN;
                 }
                 return corr;
