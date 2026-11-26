@@ -112,6 +112,18 @@ public final class VoiceReply {
     private static long cardSeq;
 
     private static SpeechRecognizer recognizer;
+    /**
+     * What the current listening got from the recognizer, for the diagnostics (technical only, never
+     * what was said): whether it started (onReadyForSpeech), when, whether a voice began, the loudest
+     * level. A recognizer that never starts is replaced by a new one at the next listening.
+     */
+    private static boolean listenReady, listenHeard;
+    private static long listenReadyAfterMs = -1;
+    private static float loudestDb = Float.NEGATIVE_INFINITY;
+
+    private static String listenSummary() {
+        return ListenNote.of(listenReady, listenReadyAfterMs, listenHeard, loudestDb);
+    }
     private static AudioFocusRequest listenFocus;
 
     private VoiceReply() {
@@ -694,7 +706,12 @@ public final class VoiceReply {
                         && SpeechRecognizer.isOnDeviceRecognitionAvailable(context);
                 recognizer = onDevice ? SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
                         : SpeechRecognizer.createSpeechRecognizer(context);
+                PatchLog.add("reply", "speech recognizer created: " + (onDevice ? "on the phone" : "the default one"));
             }
+            listenReady = false;
+            listenHeard = false;
+            listenReadyAfterMs = -1;
+            loudestDb = Float.NEGATIVE_INFINITY;
             recognizer.setRecognitionListener(new Listener(expected));
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                     .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -789,8 +806,9 @@ public final class VoiceReply {
             listenTimeout = null;
             if (state != expected) return;
             if (!(expected == State.DICTATING && !dictated.isEmpty())) {
-                PatchLog.add("reply", "speech recognizer gave no answer in time");
+                PatchLog.add("reply", "speech recognizer gave no answer in time (" + listenSummary() + ")");
             }
+            if (!listenReady) replaceRecognizer();
             if (expected == State.ASKING) {
                 backToOffer();
                 return;
@@ -808,6 +826,20 @@ public final class VoiceReply {
             }
         };
         main.postDelayed(listenTimeout, Math.max(0, afterMs));
+    }
+
+    /** A recognizer that never started listening is stuck: the next listening gets a new one. */
+    private static void replaceRecognizer() {
+        SpeechRecognizer stuck = recognizer;
+        recognizer = null;
+        if (stuck == null) return;
+        try {
+            stuck.cancel();
+            stuck.destroy();
+        } catch (RuntimeException e) {
+            Log.w(TAG, "destroy", e);
+        }
+        PatchLog.add("reply", "speech recognizer never started: a new one at the next listening");
     }
 
     private static void cancelListenTimeout() {
@@ -837,18 +869,23 @@ public final class VoiceReply {
 
         @Override
         public void onReadyForSpeech(Bundle params) {
+            if (!current()) return;
+            listenReady = true;
+            listenReadyAfterMs = SystemClock.uptimeMillis() - listenStartedAt;
         }
 
         @Override
         public void onBeginningOfSpeech() {
             // Speech started: the recognizer ends on the silence after it; only the overall limit stays.
             if (!current()) return;
+            listenHeard = true;
             long since = expected == State.DICTATING ? dictationStartedAt : listenStartedAt;
             scheduleListenTimeout(expected, MAX_LISTEN_MS - (SystemClock.uptimeMillis() - since));
         }
 
         @Override
         public void onRmsChanged(float rmsdB) {
+            if (current() && rmsdB > loudestDb) loudestDb = rmsdB;
         }
 
         @Override
@@ -870,7 +907,7 @@ public final class VoiceReply {
             releaseListenFocus();
             if (!current()) return;
             Log.i(TAG, "recognition error " + error);
-            PatchLog.add("reply", "speech recognition error " + error);
+            PatchLog.add("reply", "speech recognition error " + error + " (" + listenSummary() + ")");
             if (expected == State.ASKING) {
                 backToOffer();
                 return;
