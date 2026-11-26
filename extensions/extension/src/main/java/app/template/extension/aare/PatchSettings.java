@@ -53,20 +53,17 @@ public final class PatchSettings {
         final String key;
         final String title;
         final String summary;
-        /** A Material icon, as SVG path data on a 24 x 24 grid. */
-        final String icon;
-        /** The switch this one depends on (shown below it, indented), or null. */
+        /** The switch this one depends on (shown below it only while that one is on, as in AARE), or null. */
         final String parent;
 
-        Feature(String key, String title, String summary, String icon) {
-            this(key, title, summary, icon, null);
+        Feature(String key, String title, String summary) {
+            this(key, title, summary, null);
         }
 
-        Feature(String key, String title, String summary, String icon, String parent) {
+        Feature(String key, String title, String summary, String parent) {
             this.key = key;
             this.title = title;
             this.summary = summary;
-            this.icon = icon;
             this.parent = parent;
         }
     }
@@ -121,28 +118,6 @@ public final class PatchSettings {
         return list;
     }
 
-    // Material icons (Apache License 2.0): navigation, reply, graphic_eq, record_voice_over,
-    // notifications_active, volume_down, place, near_me, update, public.
-    static final String ICON_TUNNEL = "M12,2L4.5,20.29l0.71,0.71L12,18l6.79,3 0.71,-0.71z";
-    private static final String ICON_REPLY = "M10,9V5l-7,7 7,7v-4.1c5,0 8.5,1.6 11,5.1 -1,-5 -4,-10 -11,-11z";
-    private static final String ICON_VOICE_MESSAGE = "M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z";
-    private static final String ICON_ASK = "M9 13c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2"
-            + "c0-2.66-5.33-4-8-4zm7.76-9.64l-1.68 1.69c.84 1.18.84 2.71 0 3.89l1.68 1.69c2.02-2.02 2.02-5.07 0-7.27z"
-            + "M20.07 2l-1.63 1.63c2.77 3.02 2.77 7.56 0 10.74L20.07 16c3.9-3.89 3.91-9.95 0-14z";
-    private static final String ICON_LOCATION_CHECK = "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z";
-    private static final String ICON_LOCATION_FIX = "M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z";
-    private static final String ICON_MAPS_AUTO = "M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79"
-            + "s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0"
-            + "-3.5-3.47-3.53-9.11-.02-12.58s9.14-3.47 12.65 0L21 3v7.12zM12.5 8v4.25l3.5 2.08-.72 1.21L11 13V8h1.5z";
-    private static final String ICON_MAPS_HERE = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93"
-            + "c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3"
-            + "c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z";
-    private static final String ICON_RADIO_PAUSE = "M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z";
-    private static final String ICON_BEEP = "M7.58 4.08L6.15 2.65C3.75 4.48 2.17 7.3 2.03 10.5h2c.15-2.65 1.51-4.97 3.55-6.42z"
-            + "m12.39 6.42h2c-.15-3.2-1.73-6.02-4.12-7.85l-1.42 1.43c2.02 1.45 3.39 3.77 3.54 6.42z"
-            + "M18 11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2v-5z"
-            + "m-6 11c.14 0 .27-.01.4-.04.65-.14 1.18-.58 1.44-1.18.1-.24.15-.5.15-.78h-4c.01 1.1.9 2 2.01 2z";
-
     static List<Feature> known() {
         return Arrays.asList(
                 new Feature(TUNNEL_NAVIGATION,
@@ -152,8 +127,7 @@ public final class PatchSettings {
                                         + "about each car is kept, and deleted when switched off. With the tunnel maps per country downloaded below, it follows the tunnel's shape, and at a junction the side of the navigation's next maneuver.",
                                 "Col GPS dell'auto per il telefono: in galleria la posizione continua ad avanzare, stimata da "
                                         + "velocità, bussola e giroscopio dell'auto, finché resta entro 45 m (all'inizio circa 400 m di galleria, di più man mano che misura l'errore dell'auto). Ricorda ciò "
-                                        + "che impara di ogni auto e lo cancella quando la spegni. Con le mappe delle gallerie per paese scaricate qui sotto, segue la forma della galleria e, a un bivio, il lato della prossima manovra della navigazione."),
-                        ICON_TUNNEL),
+                                        + "che impara di ogni auto e lo cancella quando la spegni. Con le mappe delle gallerie per paese scaricate qui sotto, segue la forma della galleria e, a un bivio, il lato della prossima manovra della navigazione.")),
                 new Feature(TUNNEL_MAPS_AUTO,
                         phrase("Update the tunnel maps", "Aggiorna le mappe delle gallerie"),
                         phrase("The tunnel maps downloaded under \"Tunnel maps\" below are checked at most once a day, never while "
@@ -161,22 +135,19 @@ public final class PatchSettings {
                                         + "project's GitHub page and asks only for the map files, never your position.",
                                 "Le mappe delle gallerie scaricate da «Mappe delle gallerie» qui sotto vengono controllate al massimo "
                                         + "una volta al giorno, mai con l'auto collegata, e riscaricate quando OpenStreetMap è cambiato. "
-                                        + "Contatta solo la pagina GitHub del progetto e chiede solo i file delle mappe, mai la tua posizione."),
-                        ICON_MAPS_AUTO, TUNNEL_NAVIGATION),
+                                        + "Contatta solo la pagina GitHub del progetto e chiede solo i file delle mappe, mai la tua posizione."), TUNNEL_NAVIGATION),
                 new Feature(TUNNEL_MAPS_HERE,
                         phrase("Add the country I'm in", "Aggiungi il paese in cui sono"),
                         phrase("At the same daily check, downloads the map of the mobile network's country if it isn't on the "
                                         + "phone (no GPS, no permission). GitHub then sees which country's file was asked for.",
                                 "Allo stesso controllo giornaliero scarica la mappa del paese della rete mobile, se non è già sul "
-                                        + "telefono (senza GPS e senza permessi). GitHub vede quindi di quale paese è il file chiesto."),
-                        ICON_MAPS_HERE, TUNNEL_NAVIGATION),
+                                        + "telefono (senza GPS e senza permessi). GitHub vede quindi di quale paese è il file chiesto."), TUNNEL_NAVIGATION),
                 new Feature(LOCATION_CHECK,
                         phrase("Location check (test)", "Controllo posizione (prova)"),
                         phrase("Diagnostics only: for 5 minutes after the car connects, notes every 15 s whether AARE and the "
                                         + "navigation apps may read the location (needs Shizuku). For the black map at the start.",
                                 "Solo diagnostica: per 5 minuti dopo il collegamento annota ogni 15 s se AARE e le app di "
-                                        + "navigazione possono leggere la posizione (serve Shizuku). Per la mappa nera all'avvio."),
-                        ICON_LOCATION_CHECK, TUNNEL_NAVIGATION),
+                                        + "navigazione possono leggere la posizione (serve Shizuku). Per la mappa nera all'avvio."), TUNNEL_NAVIGATION),
                 new Feature(LOCATION_FIX,
                         phrase("Location for navigation at the start (test)", "Posizione per la navigazione all'avvio (prova)"),
                         phrase("When the car connects with AARE in the background, the navigation app may get no location until "
@@ -186,13 +157,11 @@ public final class PatchSettings {
                                 "Quando l'auto si collega con AARE in background, l'app di navigazione può restare senza "
                                         + "posizione finché non apri AARE sul telefono (mappa nera). Con questa opzione la shell di "
                                         + "Shizuku avvia in AARE un piccolo servizio di posizione mentre l'auto è collegata, come "
-                                        + "fa Android Auto, così AARE può passare la posizione. Intanto compare una notifica di AARE."),
-                        ICON_LOCATION_FIX, TUNNEL_NAVIGATION),
+                                        + "fa Android Auto, così AARE può passare la posizione. Intanto compare una notifica di AARE."), TUNNEL_NAVIGATION),
                 new Feature(VOICE_MESSAGES,
                         phrase("Voice messages", "Messaggi vocali"),
                         phrase("Plays WhatsApp voice messages in the car when AARE reads a message. Needs Shizuku running.",
-                                "Riproduce in auto i vocali di WhatsApp quando AARE legge un messaggio. Serve Shizuku attivo."),
-                        ICON_VOICE_MESSAGE),
+                                "Riproduce in auto i vocali di WhatsApp quando AARE legge un messaggio. Serve Shizuku attivo.")),
                 new Feature(VOICE_REPLY,
                         phrase("Voice reply", "Risposta vocale"),
                         phrase("After reading a message, shows \"Reply\" for 15 seconds and in the notification centre: "
@@ -200,8 +169,7 @@ public final class PatchSettings {
                                         + "phone apps on, it listens through the car. Off by default.",
                                 "Dopo la lettura mostra «Rispondi» per 15 secondi e nel centro notifiche: "
                                         + "detti la risposta (con la punteggiatura da Android 13) e confermi l'invio («riprova» la fa dettare di nuovo). Con «Microfono dell'auto per le app» "
-                                        + "di AARE attivo, ascolta dal microfono dell'auto. Disattivata di default."),
-                        ICON_REPLY),
+                                        + "di AARE attivo, ascolta dal microfono dell'auto. Disattivata di default.")),
                 new Feature(VOICE_REPLY_ASK,
                         phrase("Ask by voice to reply", "Chiedi a voce se rispondere"),
                         phrase("With Voice reply: after reading a message that can be answered, asks \"Do you want to reply?\" "
@@ -209,15 +177,13 @@ public final class PatchSettings {
                                         + "\"no\" to close; otherwise the Reply card stays.",
                                 "Con Risposta vocale: dopo la lettura di un messaggio a cui si può rispondere chiede "
                                         + "«Vuoi rispondere?» e ascolta qualche secondo (intanto la musica va in pausa). "
-                                        + "Di' «sì» per dettare, «no» per chiudere; altrimenti resta la scheda Rispondi."),
-                        ICON_ASK, VOICE_REPLY),
+                                        + "Di' «sì» per dettare, «no» per chiudere; altrimenti resta la scheda Rispondi."), VOICE_REPLY),
                 new Feature(VOICE_REPLY_BEEP,
                         phrase("Listening beep", "Bip quando ascolta"),
                         phrase("With Voice reply: a short tone going up when it starts listening and going down when it stops, "
                                         + "as Android Auto's assistant does.",
                                 "Con Risposta vocale: un breve suono che sale quando inizia ad ascoltare e che scende quando "
-                                        + "smette, come l'assistente di Android Auto."),
-                        ICON_BEEP, VOICE_REPLY),
+                                        + "smette, come l'assistente di Android Auto."), VOICE_REPLY),
                 new Feature(RADIO_PAUSE,
                         phrase("Pause the car's radio while AARE speaks", "Pausa della radio dell'auto quando AARE parla"),
                         phrase("While a message is read aloud and during a voice reply, the car's own sound (radio) pauses "
@@ -225,8 +191,7 @@ public final class PatchSettings {
                                         + "Auto's assistant. Navigation prompts are unchanged.",
                                 "Mentre AARE legge un messaggio e durante la risposta vocale, il suono dell'auto (radio) va "
                                         + "in pausa invece di abbassarsi solo un po', e resta in pausa finché AARE ha finito, come "
-                                        + "con l'assistente di Android Auto. Le indicazioni stradali restano come prima."),
-                        ICON_RADIO_PAUSE));
+                                        + "con l'assistente di Android Auto. Le indicazioni stradali restano come prima.")));
     }
 
     // endregion

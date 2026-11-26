@@ -140,7 +140,11 @@ public final class PatchSettingsActivity extends Activity {
         scroll.addView(content, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         page.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        content.addView(section());
+        for (View card : sections()) {
+            LinearLayout.LayoutParams p = wrap();
+            p.bottomMargin = dp(16); // AARE's Column(spacedBy(16.dp)) between Sections
+            content.addView(card, p);
+        }
 
         setContentView(page);
     }
@@ -167,8 +171,8 @@ public final class PatchSettingsActivity extends Activity {
         return bar;
     }
 
-    /** One card like AARE's Section: title, hint, a group label and the rows. */
-    private View section() {
+    /** AARE's Section: a rounded card (24 dp, surfaceContainer, 20 dp padding) with a title. */
+    private LinearLayout card(String title) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         GradientDrawable shape = new GradientDrawable();
@@ -177,66 +181,92 @@ public final class PatchSettingsActivity extends Activity {
         card.setBackground(shape);
         card.setClipToOutline(true);
         card.setPadding(dp(20), dp(20), dp(20), dp(20));
+        card.addView(text(title, Type.TITLE_MEDIUM, colors.onSurface));
+        View gap = new View(this);
+        card.addView(gap, new LinearLayout.LayoutParams(1, dp(8)));
+        return card;
+    }
 
-        card.addView(text(PatchSettings.phrase("Morphe patches", "Patch Morphe"), Type.TITLE_MEDIUM, colors.onSurface));
-        TextView hint = text(PatchSettings.phrase(
-                "Turn off the features you don't want in the car. Each new release of the patches adds its own here.",
-                "Disattiva le funzioni che non vuoi in auto. Ogni nuova release delle patch aggiunge qui le sue."),
-                Type.BODY_SMALL, colors.onSurfaceVariant);
-        LinearLayout.LayoutParams hintParams = wrap();
-        hintParams.topMargin = dp(8);
-        card.addView(hint, hintParams);
-
-        TextView group = text(PatchSettings.phrase("Installed patches", "Patch installate"), Type.LABEL_LARGE, colors.primary);
-        LinearLayout.LayoutParams groupParams = wrap();
-        groupParams.topMargin = dp(16);
-        groupParams.bottomMargin = dp(4);
-        card.addView(group, groupParams);
-
-        List<PatchSettings.Feature> features = PatchSettings.features();
-        if (features.isEmpty()) {
-            card.addView(text(PatchSettings.phrase("No patch with settings is installed.",
-                    "Nessuna patch con impostazioni installata."), Type.BODY_SMALL, colors.onSurfaceVariant));
+    /** Which card a setting goes in, as AARE groups its own settings. */
+    private static String group(String key) {
+        if (PatchSettings.VOICE_REPLY.equals(key) || PatchSettings.VOICE_REPLY_ASK.equals(key)
+                || PatchSettings.VOICE_REPLY_BEEP.equals(key) || PatchSettings.VOICE_MESSAGES.equals(key)) {
+            return PatchSettings.phrase("Messages", "Messaggi");
         }
-        for (PatchSettings.Feature f : features) card.addView(row(f));
+        if (PatchSettings.RADIO_PAUSE.equals(key)) return PatchSettings.phrase("Audio", "Audio");
+        if (PatchSettings.TUNNEL_NAVIGATION.equals(key) || PatchSettings.LOCATION_CHECK.equals(key)
+                || PatchSettings.LOCATION_FIX.equals(key) || PatchSettings.TUNNEL_MAPS_AUTO.equals(key)
+                || PatchSettings.TUNNEL_MAPS_HERE.equals(key)) {
+            return PatchSettings.phrase("Location", "Posizione");
+        }
+        return PatchSettings.phrase("Other", "Altro");
+    }
+
+    /** The cards: one per group of settings, then the tunnel maps and the diagnostics, as AARE's pages. */
+    private List<View> sections() {
+        List<View> out = new java.util.ArrayList<>();
+        List<PatchSettings.Feature> features = PatchSettings.features();
+        java.util.Map<String, LinearLayout> cards = new java.util.LinkedHashMap<>();
+        for (PatchSettings.Feature f : features) {
+            String g = group(f.key);
+            LinearLayout c = cards.get(g);
+            if (c == null) {
+                c = card(g);
+                cards.put(g, c);
+            }
+            c.addView(row(f));
+            View check = requirement(f.key);
+            if (check != null) c.addView(check);
+        }
+        if (features.isEmpty()) {
+            LinearLayout c = card(PatchSettings.phrase("Morphe patches", "Patch Morphe"));
+            c.addView(text(PatchSettings.phrase("No patch with settings is installed.",
+                    "Nessuna patch con impostazioni installata."), Type.BODY_SMALL, colors.onSurfaceVariant));
+            out.add(c);
+        }
+        out.addAll(cards.values());
         refreshDependents();
+
         if (PatchSettings.isRegistered(PatchSettings.TUNNEL_NAVIGATION)) {
-            card.addView(mapsRow());
+            LinearLayout maps = card(PatchSettings.phrase("Tunnel maps", "Mappe delle gallerie"));
+            maps.addView(mapsRow());
+            out.add(maps);
             TunnelMaps.refresh(this);
         }
 
+        LinearLayout diag = card(PatchSettings.phrase("Diagnostics", "Diagnostica"));
         // Technical state only (see PatchLog): for reporting a problem.
-        TextView copy = text(PatchSettings.phrase("Copy diagnostics", "Copia diagnostica"), Type.LABEL_LARGE, colors.primary);
-        copy.setPadding(0, dp(12), 0, dp(4));
-        copy.setOnClickListener(v -> {
+        diag.addView(action(PatchSettings.phrase("Copy diagnostics", "Copia diagnostica"), v -> {
             android.content.ClipboardManager clipboard = getSystemService(android.content.ClipboardManager.class);
             if (clipboard != null) clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AARE Patches", diagnostics()));
-            android.widget.Toast.makeText(this, PatchSettings.phrase("Copied", "Copiata"), android.widget.Toast.LENGTH_SHORT).show();
-        });
-        LinearLayout.LayoutParams copyParams = wrap();
-        copyParams.topMargin = dp(8);
-        card.addView(copy, copyParams);
-
+            toast(PatchSettings.phrase("Copied", "Copiata"));
+        }));
         // The user's own data: it can be seen (copied) and deleted.
-        TextView clear = text(PatchSettings.phrase("Delete diagnostics", "Cancella diagnostica"), Type.LABEL_LARGE, colors.primary);
-        clear.setPadding(0, dp(12), 0, dp(4));
-        clear.setOnClickListener(v -> new android.app.AlertDialog.Builder(this)
+        diag.addView(action(PatchSettings.phrase("Delete diagnostics", "Cancella diagnostica"), v -> new android.app.AlertDialog.Builder(this)
                 .setMessage(PatchSettings.phrase("Delete the patches' diagnostics on this phone?",
                         "Cancellare la diagnostica delle patch su questo telefono?"))
                 .setPositiveButton(PatchSettings.phrase("Delete", "Cancella"), (d, w) -> {
                     PatchLog.clear();
-                    android.widget.Toast.makeText(this, PatchSettings.phrase("Deleted", "Cancellata"), android.widget.Toast.LENGTH_SHORT).show();
+                    toast(PatchSettings.phrase("Deleted", "Cancellata"));
                 })
                 .setNegativeButton(PatchSettings.phrase("Cancel", "Annulla"), null)
-                .show());
-        card.addView(clear, wrap());
-
+                .show()));
         // Which patches these are: the release, or the test build's date, time and change.
         TextView version = text(PatchSettings.phrase("Patches: ", "Patch: ") + PatchVersion.LABEL, Type.BODY_SMALL, colors.onSurfaceVariant);
         LinearLayout.LayoutParams versionParams = wrap();
-        versionParams.topMargin = dp(12);
-        card.addView(version, versionParams);
-        return card;
+        versionParams.topMargin = dp(8);
+        diag.addView(version, versionParams);
+        out.add(diag);
+        return out;
+    }
+
+    /** A text button in AARE's primary colour (labelLarge), like its TextButtons. */
+    private View action(String label, View.OnClickListener click) {
+        TextView t = text(label, Type.LABEL_LARGE, colors.primary);
+        t.setPadding(0, dp(10), 0, dp(10));
+        t.setBackground(new RippleDrawable(ColorStateList.valueOf(withAlpha(colors.onSurface, 0x1F)), null, null));
+        t.setOnClickListener(click);
+        return t;
     }
 
     // region Tunnel maps
@@ -247,15 +277,10 @@ public final class PatchSettingsActivity extends Activity {
     private View mapsRow() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(0, dp(12), 0, dp(4));
-        box.addView(text(PatchSettings.phrase("Tunnel maps", "Mappe delle gallerie"), Type.LABEL_LARGE, colors.primary));
         mapsSummary = text("", Type.BODY_SMALL, colors.onSurfaceVariant);
         box.addView(mapsSummary);
         updateMapsSummary();
-        box.setOnClickListener(v -> loadMapList());
-        LinearLayout.LayoutParams params = wrap();
-        params.topMargin = dp(8);
-        box.setLayoutParams(params);
+        box.addView(action(PatchSettings.phrase("Choose the countries", "Scegli i paesi"), v -> loadMapList()));
         return box;
     }
 
@@ -514,35 +539,129 @@ public final class PatchSettingsActivity extends Activity {
     /** The rows of the settings that depend on another one, with the key they depend on. */
     private final java.util.Map<View, String> dependents = new java.util.LinkedHashMap<>();
 
-    /** A setting that depends on one turned off is greyed out and can't be changed. */
     /** Rows of features this phone's Android version can't run: always greyed out. */
     private final java.util.Set<View> unavailable = new java.util.HashSet<>();
 
-    private void refreshDependents() {
-        for (java.util.Map.Entry<View, String> e : dependents.entrySet()) {
-            if (unavailable.contains(e.getKey())) continue;
-            boolean on = PatchSettings.isEnabled(this, e.getValue());
-            e.getKey().setEnabled(on);
-            e.getKey().setAlpha(on ? 1f : 0.38f);
+    // region Requirements (AARE's Check)
+
+    private static final String CHECK_CIRCLE = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z";
+    private static final String RADIO_UNCHECKED = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z";
+    private static final String SHIZUKU = "moe.shizuku.privileged.api";
+
+    /** Brings each requirement row up to date (after a switch changed, or back from Android's settings). */
+    private final java.util.List<Runnable> requirementUpdates = new java.util.ArrayList<>();
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshDependents();
+    }
+
+    /** What a setting needs from the phone, as AARE's Check rows show it; null if nothing. */
+    private View requirement(String key) {
+        if (PatchSettings.VOICE_MESSAGES.equals(key) || PatchSettings.LOCATION_FIX.equals(key)) {
+            return check(key, PatchSettings.phrase("Shizuku running, allowed for AARE", "Shizuku attivo e consentito ad AARE"),
+                    PatchSettings.phrase("Open Shizuku and start it; AARE asks for its permission",
+                            "Apri Shizuku e avvialo; AARE chiede il suo permesso"),
+                    PatchSettingsActivity::shizukuReady, () -> {
+                        android.content.Intent i = getPackageManager().getLaunchIntentForPackage(SHIZUKU);
+                        startSafely(i != null ? i : appDetails());
+                    });
+        }
+        if (PatchSettings.VOICE_REPLY.equals(key)) {
+            return check(key, PatchSettings.phrase("Microphone allowed", "Microfono consentito"),
+                    PatchSettings.phrase("Permissions > Microphone > Allow", "Autorizzazioni > Microfono > Consenti"),
+                    () -> checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                            == android.content.pm.PackageManager.PERMISSION_GRANTED,
+                    () -> startSafely(appDetails()));
+        }
+        return null;
+    }
+
+    /** Whether a requirement is met (java.util.function's BooleanSupplier needs Android 7). */
+    private interface Condition {
+        boolean getAsBoolean();
+    }
+
+    private static boolean shizukuReady() {
+        try {
+            return rikka.shizuku.Shizuku.pingBinder()
+                    && rikka.shizuku.Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        } catch (Throwable t) {
+            return false; // no Shizuku in this AARE, or not running
         }
     }
 
-    /** A row like AARE's AppRow: round icon, title and kind, switch. */
-    private View row(PatchSettings.Feature feature) {
+    /**
+     * AARE's Check: a filled circle when [done], else an empty one and "Set up", which opens where
+     * to fix it. Shown, like the setting's sub-options, only while [key] (and its parent) are on.
+     */
+    private View check(String key, String title, String subtitle, Condition done, Runnable fix) {
         LinearLayout row = new LinearLayout(this);
-        if (feature.parent != null) {
-            // Below the setting it depends on, indented.
-            row.setPadding(dp(28), 0, 0, 0);
-            dependents.put(row, feature.parent);
-        }
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(row.getPaddingLeft(), dp(8), 0, dp(8));
+        row.setPadding(0, dp(10), 0, dp(10));
         row.setBackground(new RippleDrawable(ColorStateList.valueOf(withAlpha(colors.onSurface, 0x1F)), null, null));
-
         ImageView icon = new ImageView(this);
-        icon.setImageDrawable(new RoundIcon(feature.icon, colors.primaryContainer, colors.onPrimaryContainer, dp(40), dp(24)));
-        row.addView(icon, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        row.addView(icon, new LinearLayout.LayoutParams(dp(24), dp(24)));
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.addView(text(title, Type.BODY_LARGE, colors.onSurface));
+        texts.addView(text(subtitle, Type.BODY_SMALL, colors.onSurfaceVariant));
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tp.leftMargin = dp(14);
+        row.addView(texts, tp);
+        TextView setUp = text(PatchSettings.phrase("Set up", "Configura"), Type.LABEL_LARGE, colors.primary);
+        row.addView(setUp, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        PatchSettings.Feature feature = null;
+        for (PatchSettings.Feature f : PatchSettings.features()) if (f.key.equals(key)) feature = f;
+        final String parent = feature == null ? null : feature.parent;
+        requirementUpdates.add(() -> {
+            boolean shown = PatchSettings.isEnabled(this, key) && (parent == null || PatchSettings.isEnabled(this, parent));
+            row.setVisibility(shown ? View.VISIBLE : View.GONE);
+            if (!shown) return;
+            boolean ok = done.getAsBoolean();
+            icon.setImageDrawable(new RoundIcon(ok ? CHECK_CIRCLE : RADIO_UNCHECKED, 0x00000000,
+                    ok ? colors.primary : colors.outline, dp(24), dp(24)));
+            setUp.setVisibility(ok ? View.GONE : View.VISIBLE);
+            row.setClickable(!ok);
+            row.setOnClickListener(ok ? null : v -> fix.run());
+        });
+        return row;
+    }
+
+    private android.content.Intent appDetails() {
+        return new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.fromParts("package", getPackageName(), null));
+    }
+
+    /** Opens a settings screen, or says there is none, instead of crashing (as AARE's startSafely). */
+    private void startSafely(android.content.Intent i) {
+        try {
+            startActivity(i);
+        } catch (RuntimeException e) {
+            toast(PatchSettings.phrase("Nothing to open on this phone.", "Su questo telefono non c'è niente da aprire."));
+        }
+    }
+
+    // endregion
+
+    /** As in AARE: a setting that depends on another is shown only while that one is on. */
+    private void refreshDependents() {
+        for (java.util.Map.Entry<View, String> e : dependents.entrySet()) {
+            e.getKey().setVisibility(PatchSettings.isEnabled(this, e.getValue()) ? View.VISIBLE : View.GONE);
+        }
+        for (Runnable r : requirementUpdates) r.run();
+    }
+
+    /** AARE's Toggle: title (bodyLarge), subtitle (bodySmall, onSurfaceVariant), Switch; no icon. */
+    private View row(PatchSettings.Feature feature) {
+        LinearLayout row = new LinearLayout(this);
+        if (feature.parent != null) dependents.put(row, feature.parent);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(10), 0, dp(10));
+        row.setBackground(new RippleDrawable(ColorStateList.valueOf(withAlpha(colors.onSurface, 0x1F)), null, null));
 
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
@@ -554,7 +673,6 @@ public final class PatchSettingsActivity extends Activity {
                     Type.BODY_SMALL, colors.onSurface));
         }
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        textParams.leftMargin = dp(12);
         textParams.rightMargin = dp(12);
         row.addView(texts, textParams);
 
