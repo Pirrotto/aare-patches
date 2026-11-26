@@ -223,18 +223,25 @@ def from_overpass(elements):
     return ways
 
 
-def overpass(query, attempts=4):
+# One request may take this long (s), and is tried this many times: a slow country is left for the
+# next run rather than holding the others (each country is published as soon as it is built).
+REQUEST_S = 300
+ATTEMPTS = 2
+
+
+def overpass(query, attempts=ATTEMPTS):
     data = urllib.parse.urlencode({"data": query}).encode()
     last = None
     for attempt in range(attempts):
         url = OVERPASS[attempt % len(OVERPASS)]
         try:
             req = urllib.request.Request(url, data=data, headers={"User-Agent": "aare-patches tunnel maps"})
-            with urllib.request.urlopen(req, timeout=900) as r:
+            with urllib.request.urlopen(req, timeout=REQUEST_S) as r:
                 return json.load(r)
         except Exception as e:  # network or server busy: wait and try the other server
             last = e
-            time.sleep(30 * (attempt + 1))
+            if attempt + 1 < attempts:
+                time.sleep(30)
     raise RuntimeError("Overpass failed: %s" % last)
 
 
@@ -245,8 +252,8 @@ def countries():
 
 
 def country_ways(code):
-    q = ('[out:json][timeout:900];area["ISO3166-1"="%s"]["admin_level"="2"]->.a;'
-         'way(area.a)["highway"~"^(%s)$"]["tunnel"="yes"];out tags geom;') % (code, HIGHWAYS)
+    q = ('[out:json][timeout:%d];area["ISO3166-1"="%s"]["admin_level"="2"]->.a;'
+         'way(area.a)["highway"~"^(%s)$"]["tunnel"="yes"];out tags geom;') % (REQUEST_S, code, HIGHWAYS)
     return from_overpass(overpass(q)["elements"])
 
 # endregion
@@ -291,45 +298,64 @@ def build(code, ways):
     return data, len(kept)
 
 
+def ordered(codes, first):
+    """[codes] with [first] (the ones wanted soonest) at the front, in that order."""
+    head = [c for c in first if c in codes]
+    return head + [c for c in codes if c not in head]
+
+
+def merge_index(text, code, entry):
+    """The index [text] (empty for none yet) with [code] set to [entry], or removed for None."""
+    countries = read_index(text) if text else {}
+    if entry is None:
+        countries.pop(code, None)
+    else:
+        countries[code] = entry
+    return write_index(countries)
+
+
 def main(argv=None):
+    """
+    countries [--first CC,..]   the countries to build, one per line, the --first ones first
+    country CC --out DIR        builds DIR/CC.tun; prints its index line, nothing if it has no tunnel
+    merge INDEX "CC sha bytes ways"   sets that country in the index file (created if missing)
+    """
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--countries", default="all", help="comma-separated ISO codes, or all")
-    ap.add_argument("--out", required=True, help="folder for <CC>.tun and index.txt")
-    ap.add_argument("--previous", help="the index.txt published before: a country that fails now keeps its entry")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    c = sub.add_parser("countries")
+    c.add_argument("--first", default="")
+    one = sub.add_parser("country")
+    one.add_argument("code")
+    one.add_argument("--out", required=True)
+    m = sub.add_parser("merge")
+    m.add_argument("index")
+    m.add_argument("line")
     args = ap.parse_args(argv)
-    previous = {}
-    if args.previous:
-        try:
-            with open(args.previous) as f:
-                previous = read_index(f.read())
-        except (OSError, ValueError) as e:
-            print("previous index unreadable (%s): starting afresh" % e, file=sys.stderr)
-    codes = countries() if args.countries == "all" else [c.strip().upper() for c in args.countries.split(",") if c.strip()]
-    found = {}
-    failed = []
-    for code in codes:
-        try:
-            data, n = build(code, country_ways(code))
-        except Exception as e:
-            print("%s: %s" % (code, e), file=sys.stderr)
-            failed.append(code)
-            continue
+    if args.cmd == "countries":
+        first = [x.strip().upper() for x in args.first.split(",") if x.strip()]
+        for code in ordered(countries(), first):
+            print(code)
+        return 0
+    if args.cmd == "country":
+        code = args.code.strip().upper()
+        data, n = build(code, country_ways(code))
         if n == 0:
-            continue
+            return 0
         with open("%s/%s.tun" % (args.out, code), "wb") as f:
             f.write(data)
-        found[code] = {"bytes": len(data), "ways": n, "sha256": hashlib.sha256(data).hexdigest()}
-        print("%s: %d ways, %d bytes" % (code, n, len(data)))
-        time.sleep(5)  # Overpass is shared: one country at a time
-    if failed:
-        print("failed: %s" % ",".join(failed), file=sys.stderr)
-        # Overpass busy or a country too big this time: its published file stays as it was.
-        for code in failed:
-            if code in previous:
-                found[code] = previous[code]
-    with open("%s/index.txt" % args.out, "w") as f:
-        f.write(write_index(found))
-    return 1 if failed and not found else 0
+        print("%s %s %d %d" % (code, hashlib.sha256(data).hexdigest(), len(data), n))
+        return 0
+    # merge
+    line = read_index(INDEX_HEADER + "\n" + args.line + "\n")
+    try:
+        with open(args.index) as f:
+            text = f.read()
+    except FileNotFoundError:
+        text = ""
+    (code, entry), = line.items()
+    with open(args.index, "w") as f:
+        f.write(merge_index(text, code, entry))
+    return 0
 
 
 if __name__ == "__main__":
