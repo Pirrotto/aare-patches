@@ -47,6 +47,10 @@ public final class PatchSettings {
     public static final String TUNNEL_MAPS_AUTO = "tunnel_maps_auto";
     /** Tunnel maps: the mobile network's country added by itself (Tunnel navigation patch). */
     public static final String TUNNEL_MAPS_HERE = "tunnel_maps_here";
+    /** The voice button opens an assistant whose car app refuses AARE as one without a car app (Assistant on the car screen patch). */
+    public static final String ASSISTANT_CAR_SCREEN = "assistant_car_screen";
+    /** A setting of that patch: AARE's car-screen assistant also while driving. */
+    public static final String ASSISTANT_CAR_SCREEN_DRIVING = "assistant_car_screen_driving";
 
     /** One switch of the screen. */
     static final class Feature {
@@ -112,7 +116,8 @@ public final class PatchSettings {
             // "Ask by voice to reply" comes with the Voice reply patch.
             String patch = VOICE_REPLY_ASK.equals(f.key) || VOICE_REPLY_BEEP.equals(f.key) ? VOICE_REPLY
                     : LOCATION_CHECK.equals(f.key) || LOCATION_FIX.equals(f.key) || TUNNEL_MAPS_AUTO.equals(f.key)
-                    || TUNNEL_MAPS_HERE.equals(f.key) ? TUNNEL_NAVIGATION : f.key;
+                    || TUNNEL_MAPS_HERE.equals(f.key) ? TUNNEL_NAVIGATION
+                    : ASSISTANT_CAR_SCREEN_DRIVING.equals(f.key) ? ASSISTANT_CAR_SCREEN : f.key;
             if (registered.contains(patch)) list.add(f);
         }
         return list;
@@ -160,7 +165,15 @@ public final class PatchSettings {
                 new Feature(RADIO_PAUSE,
                         phrase("Pause the radio", "Pausa della radio"),
                         phrase("The radio pauses while AARE reads or listens, instead of getting lower.",
-                                "La radio va in pausa mentre AARE legge o ascolta, invece di abbassarsi.")));
+                                "La radio va in pausa mentre AARE legge o ascolta, invece di abbassarsi.")),
+                new Feature(ASSISTANT_CAR_SCREEN,
+                        phrase("Assistant on the car screen", "Assistente sullo schermo dell'auto"),
+                        phrase("If its car app doesn't answer AARE (Google), the voice button opens it on the car screen or the phone.",
+                                "Se la sua app per l'auto non risponde ad AARE (Google), il tasto voce lo apre sullo schermo dell'auto o sul telefono.")),
+                new Feature(ASSISTANT_CAR_SCREEN_DRIVING,
+                        phrase("Also while driving", "Anche durante la guida"),
+                        phrase("The assistant's panel on the car screen opens while driving too.",
+                                "Il riquadro dell'assistente sullo schermo dell'auto si apre anche in guida."), ASSISTANT_CAR_SCREEN));
     }
 
     // endregion
@@ -176,7 +189,7 @@ public final class PatchSettings {
      * Features off until the user turns them on, as AARE would ship them: they change what other apps
      * get (tunnel navigation's estimated position) or read another app's files (voice messages).
      */
-    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, LOCATION_CHECK, LOCATION_FIX, TUNNEL_MAPS_AUTO, TUNNEL_MAPS_HERE));
+    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, LOCATION_CHECK, LOCATION_FIX, TUNNEL_MAPS_AUTO, TUNNEL_MAPS_HERE, ASSISTANT_CAR_SCREEN, ASSISTANT_CAR_SCREEN_DRIVING));
 
     /**
      * The voice features use Android 8's audio focus requests; AARE also runs on Android 6 and 7,

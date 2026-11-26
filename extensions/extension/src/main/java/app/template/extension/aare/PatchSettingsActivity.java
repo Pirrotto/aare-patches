@@ -199,6 +199,9 @@ public final class PatchSettingsActivity extends Activity {
                 || PatchSettings.TUNNEL_MAPS_HERE.equals(key)) {
             return PatchSettings.phrase("Location", "Posizione");
         }
+        if (PatchSettings.ASSISTANT_CAR_SCREEN.equals(key) || PatchSettings.ASSISTANT_CAR_SCREEN_DRIVING.equals(key)) {
+            return PatchSettings.phrase("Assistant", "Assistente");
+        }
         return PatchSettings.phrase("Other", "Altro");
     }
 
@@ -215,8 +218,7 @@ public final class PatchSettingsActivity extends Activity {
                 cards.put(g, c);
             }
             c.addView(row(f));
-            View check = requirement(f.key);
-            if (check != null) c.addView(check);
+            for (View check : requirements(f.key)) c.addView(check);
         }
         if (features.isEmpty()) {
             LinearLayout c = card(PatchSettings.phrase("Morphe patches", "Patch Morphe"));
@@ -547,6 +549,9 @@ public final class PatchSettingsActivity extends Activity {
     private static final String CHECK_CIRCLE = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z";
     private static final String RADIO_UNCHECKED = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z";
     private static final String SHIZUKU = "moe.shizuku.privileged.api";
+    /** AARE's own settings file and its "assistants without a car app on the car screen" switch (Settings.kt). */
+    private static final String AARE_SETTINGS = "settings";
+    private static final String AARE_ASSISTANT_ON_CAR_SCREEN = "assistant_on_car_screen";
 
     /** Brings each requirement row up to date (after a switch changed, or back from Android's settings). */
     private final java.util.List<Runnable> requirementUpdates = new java.util.ArrayList<>();
@@ -557,24 +562,38 @@ public final class PatchSettingsActivity extends Activity {
         refreshDependents();
     }
 
-    /** What a setting needs from the phone, as AARE's Check rows show it; null if nothing. */
-    private View requirement(String key) {
-        if (PatchSettings.VOICE_MESSAGES.equals(key) || PatchSettings.LOCATION_FIX.equals(key)) {
-            return check(key, PatchSettings.phrase("Shizuku running, allowed for AARE", "Shizuku attivo e consentito ad AARE"),
-                    PatchSettings.phrase("Shizuku > Start; then allow AARE", "Shizuku > Avvia; poi consenti ad AARE"),
-                    PatchSettingsActivity::shizukuReady, () -> {
-                        android.content.Intent i = getPackageManager().getLaunchIntentForPackage(SHIZUKU);
-                        startSafely(i != null ? i : appDetails());
-                    });
+    /** What a setting needs from the phone, as AARE's Check rows show it; empty if nothing. */
+    private List<View> requirements(String key) {
+        List<View> out = new java.util.ArrayList<>();
+        if (PatchSettings.VOICE_MESSAGES.equals(key) || PatchSettings.LOCATION_FIX.equals(key)
+                || PatchSettings.ASSISTANT_CAR_SCREEN.equals(key)) {
+            out.add(shizukuCheck(key));
+        }
+        if (PatchSettings.ASSISTANT_CAR_SCREEN.equals(key)) {
+            // AARE's own switch shows the assistant on the car screen; without it, it opens on the phone.
+            out.add(check(key, PatchSettings.phrase("Assistant on the car screen in AARE", "Assistente sullo schermo dell'auto in AARE"),
+                    PatchSettings.phrase("AARE > Assistant > Open assistants without a car app on the car screen",
+                            "AARE > Assistente > Apri sullo schermo dell'auto gli assistenti senza app per l'auto"),
+                    () -> getSharedPreferences(AARE_SETTINGS, MODE_PRIVATE).getBoolean(AARE_ASSISTANT_ON_CAR_SCREEN, false),
+                    () -> startSafely(getPackageManager().getLaunchIntentForPackage(getPackageName()))));
         }
         if (PatchSettings.VOICE_REPLY.equals(key)) {
-            return check(key, PatchSettings.phrase("Microphone allowed", "Microfono consentito"),
+            out.add(check(key, PatchSettings.phrase("Microphone allowed", "Microfono consentito"),
                     PatchSettings.phrase("Permissions > Microphone > Allow", "Autorizzazioni > Microfono > Consenti"),
                     () -> checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
                             == android.content.pm.PackageManager.PERMISSION_GRANTED,
-                    () -> startSafely(appDetails()));
+                    () -> startSafely(appDetails())));
         }
-        return null;
+        return out;
+    }
+
+    private View shizukuCheck(String key) {
+        return check(key, PatchSettings.phrase("Shizuku running, allowed for AARE", "Shizuku attivo e consentito ad AARE"),
+                PatchSettings.phrase("Shizuku > Start; then allow AARE", "Shizuku > Avvia; poi consenti ad AARE"),
+                PatchSettingsActivity::shizukuReady, () -> {
+                    android.content.Intent i = getPackageManager().getLaunchIntentForPackage(SHIZUKU);
+                    startSafely(i != null ? i : appDetails());
+                });
     }
 
     /** Whether a requirement is met (java.util.function's BooleanSupplier needs Android 7). */
