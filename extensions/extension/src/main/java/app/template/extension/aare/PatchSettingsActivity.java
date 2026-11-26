@@ -202,6 +202,9 @@ public final class PatchSettingsActivity extends Activity {
         if (PatchSettings.ASSISTANT_CAR_SCREEN.equals(key) || PatchSettings.ASSISTANT_CAR_SCREEN_DRIVING.equals(key)) {
             return PatchSettings.phrase("Assistant", "Assistente");
         }
+        if (PatchSettings.MAP_AREA_NOTE.equals(key)) {
+            return PatchSettings.phrase("Car screen", "Schermo dell'auto");
+        }
         return PatchSettings.phrase("Other", "Altro");
     }
 
