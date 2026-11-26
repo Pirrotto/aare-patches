@@ -97,15 +97,19 @@ class OverpassTest(unittest.TestCase):
 
 class IndexTest(unittest.TestCase):
     def test_roundtrip_and_order(self):
-        c = {"DE": {"sha256": "b" * 64, "bytes": 2, "ways": 3}, "CH": {"sha256": "a" * 64, "bytes": 23783, "ways": 940}}
+        c = {"DE": {"sha256": "b" * 64, "bytes": 2, "ways": 3, "file": "Germany.aaretun"},
+             "CH": {"sha256": "a" * 64, "bytes": 23783, "ways": 940, "file": "Switzerland.aaretun"}}
         text = tm.write_index(c)
-        self.assertEqual("AARETUN-INDEX 1\nCH " + "a" * 64 + " 23783 940\nDE " + "b" * 64 + " 2 3\n", text)
+        self.assertEqual("AARETUN-INDEX 2\nCH " + "a" * 64 + " 23783 940 Switzerland.aaretun\nDE " + "b" * 64
+                         + " 2 3 Germany.aaretun\n", text)
         self.assertEqual(c, tm.read_index(text))
 
     def test_a_bad_index_is_refused(self):
-        for bad in ["", "AARETUN-INDEX 2\n", "AARETUN-INDEX 1\nch " + "a" * 64 + " 1 1",
-                    "AARETUN-INDEX 1\nCH " + "a" * 63 + " 1 1", "AARETUN-INDEX 1\nCH " + "a" * 64 + " -1 1",
-                    "AARETUN-INDEX 1\nCH " + "a" * 64 + " 1 1\nCH " + "a" * 64 + " 1 1"]:
+        f = " Switzerland.aaretun"
+        for bad in ["", "AARETUN-INDEX 1\n", "AARETUN-INDEX 2\nch " + "a" * 64 + " 1 1" + f,
+                    "AARETUN-INDEX 2\nCH " + "a" * 63 + " 1 1" + f, "AARETUN-INDEX 2\nCH " + "a" * 64 + " -1 1" + f,
+                    "AARETUN-INDEX 2\nCH " + "a" * 64 + " 1 1" + f + "\nCH " + "a" * 64 + " 1 1" + f,
+                    "AARETUN-INDEX 2\nCH " + "a" * 64 + " 1 1 ../x.aaretun", "AARETUN-INDEX 2\nCH " + "a" * 64 + " 1 1"]:
             with self.assertRaises(ValueError, msg=bad):
                 tm.read_index(bad)
 
@@ -117,14 +121,39 @@ class PublishEachTest(unittest.TestCase):
         self.assertEqual(["AT", "CH"], tm.ordered(["AT", "CH"], []))
 
     def test_merge_index(self):
-        e = {"sha256": "a" * 64, "bytes": 5, "ways": 1}
+        e = {"sha256": "a" * 64, "bytes": 5, "ways": 1, "file": "Switzerland.aaretun"}
         text = tm.merge_index("", "CH", e)
         self.assertEqual({"CH": e}, tm.read_index(text))
-        e2 = {"sha256": "b" * 64, "bytes": 7, "ways": 2}
+        e2 = {"sha256": "b" * 64, "bytes": 7, "ways": 2, "file": "Austria.aaretun"}
         text = tm.merge_index(text, "AT", e2)
         text = tm.merge_index(text, "CH", e2)
         self.assertEqual({"AT": e2, "CH": e2}, tm.read_index(text))
         self.assertEqual({"CH": e2}, tm.read_index(tm.merge_index(text, "AT", None)))
+
+
+
+class PackTest(unittest.TestCase):
+    def test_roundtrip(self):
+        m = tm.encode("CH", [(False, line(46.0, 8.0, 3))])
+        sig = bytes(range(70))
+        packed = tm.pack(m, sig)
+        self.assertEqual(b"AARETUNS\x01\x00\x46", packed[:11])
+        self.assertEqual((m, sig), tm.unpack(packed))
+
+    def test_bad_packs(self):
+        for bad in [b"", b"AARETUNX\x01\x00\x01xy", b"AARETUNS\x02\x00\x01xy", b"AARETUNS\x01\x00\x05xy",
+                    b"AARETUNS\x01\x00\x00y"]:
+            with self.assertRaises(ValueError, msg=bad):
+                tm.unpack(bad)
+        with self.assertRaises(ValueError):
+            tm.pack(b"m", b"")
+
+    def test_file_names(self):
+        self.assertEqual("Switzerland.aaretun", tm.file_name("Switzerland", "CH"))
+        self.assertEqual("United-States.aaretun", tm.file_name("United States", "US"))
+        self.assertEqual("Cote-d-Ivoire.aaretun", tm.file_name("Côte d'Ivoire", "CI"))
+        self.assertEqual("XK.aaretun", tm.file_name("", "XK"))
+        self.assertEqual("Congo-CG.aaretun", tm.file_name("Congo", "CG", {"Congo.aaretun"}))
 
 
 if __name__ == "__main__":

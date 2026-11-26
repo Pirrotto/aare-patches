@@ -166,21 +166,33 @@ final class TunnelMaps {
     static void download(Context context, String country, Map<String, TunnelMapFile.Entry> index) throws Failure {
         TunnelMapFile.Entry entry = index.get(country);
         if (entry == null) throw new Failure("no map for this country", false);
-        byte[] data = get(country + ".tun", (int) entry.bytes);
-        byte[] sig = get(country + ".tun.sig", 1024);
-        if (data.length != entry.bytes || !entry.sha256.equals(TunnelMapFile.sha256(data))
-                || !TunnelMapFile.verify(data, sig, key())) {
+        byte[] packed = get(entry.file, (int) entry.bytes);
+        byte[][] parts;
+        try {
+            parts = TunnelMapFile.unpack(packed);
+        } catch (IOException e) {
+            throw new Failure("the file can't be read", false);
+        }
+        if (packed.length != entry.bytes || !entry.sha256.equals(TunnelMapFile.sha256(parts[0]))
+                || !TunnelMapFile.verify(parts[0], parts[1], key())) {
             throw new Failure("the file's signature is wrong", true);
         }
-        save(context, country, data);
+        save(context, country, parts[0]);
     }
 
     /**
-     * A map file the user picked on the phone (with its signature file): kept only if the signature
+     * A map file the user picked on the phone ("Switzerland.aaretun"): kept only if its signature
      * matches the pinned key, like a downloaded one. Returns its country. Blocking.
      */
-    static String install(Context context, byte[] data, byte[] sig) throws Failure {
-        if (!TunnelMapFile.verify(data, sig, key())) throw new Failure("the file's signature is wrong", true);
+    static String install(Context context, byte[] packed) throws Failure {
+        byte[][] parts;
+        try {
+            parts = TunnelMapFile.unpack(packed);
+        } catch (IOException e) {
+            throw new Failure("not a tunnel map", false);
+        }
+        byte[] data = parts[0];
+        if (!TunnelMapFile.verify(data, parts[1], key())) throw new Failure("the file's signature is wrong", true);
         String country;
         try {
             country = TunnelMapFile.countryOf(data);
