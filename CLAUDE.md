@@ -149,6 +149,7 @@ dependencies weighed and needed.
   in `patches-list.json`), and the README (patch description and "What's new / Novità").
 - Things CI can't test (car audio, microphone, tunnels) are tested by the owner in the car before being
   recommended to others.
-- With every option added to or removed from the patches' Settings, check the icons: each option has its own
-  Material icon (no two alike), drawn only with the path commands the settings screen supports (no arcs), and
-  sub-options greyed under their parent. `FeatureIconsTest` checks the first two.
+- The patches' Settings look like AARE's own settings (its `Section`, `Toggle` and `Check`): a rounded card per
+  group with a title; switches with title and description and no icon; sub-options shown only while their
+  parent is on; what a setting needs from the phone (Shizuku, a permission) as AARE's Check row, with "Set up".
+  With every option added or removed, keep it so.
