@@ -172,6 +172,27 @@ final class TunnelMaps {
                 || !TunnelMapFile.verify(data, sig, key())) {
             throw new Failure("the file's signature is wrong", true);
         }
+        save(context, country, data);
+    }
+
+    /**
+     * A map file the user picked on the phone (with its signature file): kept only if the signature
+     * matches the pinned key, like a downloaded one. Returns its country. Blocking.
+     */
+    static String install(Context context, byte[] data, byte[] sig) throws Failure {
+        if (!TunnelMapFile.verify(data, sig, key())) throw new Failure("the file's signature is wrong", true);
+        String country;
+        try {
+            country = TunnelMapFile.countryOf(data);
+        } catch (IOException e) {
+            throw new Failure("not a tunnel map", false);
+        }
+        save(context, country, data);
+        return country;
+    }
+
+    /** Checks [data] is a map of [country] and writes it (signature already checked). */
+    private static void save(Context context, String country, byte[] data) throws Failure {
         try {
             TunnelMapFile.read(data, country);
         } catch (IOException e) {
