@@ -190,10 +190,10 @@ public final class PatchSettingsActivity extends Activity {
     /** Which card a setting goes in, as AARE groups its own settings. */
     private static String group(String key) {
         if (PatchSettings.VOICE_REPLY.equals(key) || PatchSettings.VOICE_REPLY_ASK.equals(key)
-                || PatchSettings.VOICE_REPLY_BEEP.equals(key) || PatchSettings.VOICE_MESSAGES.equals(key)) {
+                || PatchSettings.VOICE_REPLY_BEEP.equals(key) || PatchSettings.VOICE_MESSAGES.equals(key)
+                || PatchSettings.RADIO_PAUSE.equals(key)) {
             return PatchSettings.phrase("Messages", "Messaggi");
         }
-        if (PatchSettings.RADIO_PAUSE.equals(key)) return PatchSettings.phrase("Audio", "Audio");
         if (PatchSettings.TUNNEL_NAVIGATION.equals(key) || PatchSettings.LOCATION_CHECK.equals(key)
                 || PatchSettings.LOCATION_FIX.equals(key) || PatchSettings.TUNNEL_MAPS_AUTO.equals(key)
                 || PatchSettings.TUNNEL_MAPS_HERE.equals(key)) {
@@ -561,8 +561,7 @@ public final class PatchSettingsActivity extends Activity {
     private View requirement(String key) {
         if (PatchSettings.VOICE_MESSAGES.equals(key) || PatchSettings.LOCATION_FIX.equals(key)) {
             return check(key, PatchSettings.phrase("Shizuku running, allowed for AARE", "Shizuku attivo e consentito ad AARE"),
-                    PatchSettings.phrase("Open Shizuku and start it; AARE asks for its permission",
-                            "Apri Shizuku e avvialo; AARE chiede il suo permesso"),
+                    PatchSettings.phrase("Shizuku > Start; then allow AARE", "Shizuku > Avvia; poi consenti ad AARE"),
                     PatchSettingsActivity::shizukuReady, () -> {
                         android.content.Intent i = getPackageManager().getLaunchIntentForPackage(SHIZUKU);
                         startSafely(i != null ? i : appDetails());
