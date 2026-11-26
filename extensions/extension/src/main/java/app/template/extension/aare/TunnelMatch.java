@@ -145,6 +145,7 @@ final class TunnelMatch {
     private double along;
     /** At a stop: how far the car went past the point it stopped at (m), to go on from there. */
     private double overshoot;
+    private int branches;
 
     private TunnelMatch(Map map, int way, int dir, int seg, double along) {
         this.map = map;
@@ -171,10 +172,11 @@ final class TunnelMatch {
     }
 
     /**
-     * Moves [meters] further along the tunnel. Null if it went on; else why it stopped, with the
-     * position left at the last point it could follow.
+     * Moves [meters] further along the tunnel. Where it splits, [side] (the navigation's maneuver
+     * here, TunnelBranch.Side) picks the branch when the choice is clear. Null if it went on; else why
+     * it stopped, with the position left at the last point it could follow.
      */
-    Stop advance(double meters) {
+    Stop advance(double meters, TunnelBranch.Side side) {
         along += Math.max(0, meters);
         while (true) {
             TunnelMapFile.Way w = w();
@@ -185,47 +187,53 @@ final class TunnelMatch {
                 seg++;
                 continue;
             }
-            // The end of this way: on to the one way that goes on from here, if there is exactly one.
+            // The end of this way: on to a way that can be driven on from here.
             int endPoint = b();
             double inHeading = bearing();
-            List<int[]> next = map.ends.get(Map.key(w.lat[endPoint], w.lon[endPoint]));
-            int[] only = null;
-            int count = 0;
-            if (next != null) {
-                for (int[] e : next) {
+            List<int[]> ends = map.ends.get(Map.key(w.lat[endPoint], w.lon[endPoint]));
+            List<int[]> ways = new ArrayList<>();
+            List<Double> turns = new ArrayList<>();
+            boolean sharp = false;
+            if (ends != null) {
+                for (int[] e : ends) {
                     if (e[0] == way) continue;
                     TunnelMapFile.Way o = map.ways.get(e[0]);
                     int d = e[1] == 0 ? 1 : -1;
                     if (d < 0 && o.oneWay) continue; // that one comes in here: can't be driven out
-                    count++;
-                    only = new int[] {e[0], d};
+                    int p0 = d > 0 ? 0 : o.lat.length - 1, p1 = d > 0 ? 1 : o.lat.length - 2;
+                    double turn = TunnelMath.wrap(heading(o.lat[p0], o.lon[p0], o.lat[p1], o.lon[p1]) - inHeading);
+                    if (Math.abs(turn) > MAX_JOIN_TURN_DEG) {
+                        sharp = true; // not the road going on
+                        continue;
+                    }
+                    ways.add(new int[] {e[0], d});
+                    turns.add(turn);
                 }
             }
-            if (count == 0) {
+            int pick = -1;
+            if (ways.size() == 1) {
+                pick = 0;
+            } else if (ways.size() > 1) {
+                double[] t = new double[turns.size()];
+                for (int i = 0; i < t.length; i++) t[i] = turns.get(i);
+                pick = TunnelBranch.choose(t, side);
+            }
+            if (pick < 0) {
                 overshoot = along - len;
                 along = len;
-                return Stop.END;
+                return ways.isEmpty() && !sharp ? Stop.END : Stop.JUNCTION;
             }
-            if (count > 1) {
-                overshoot = along - len;
-                along = len;
-                return Stop.JUNCTION;
-            }
-            double rest = along - len;
-            int oldWay = way, oldDir = dir, oldSeg = seg;
-            way = only[0];
-            dir = only[1];
+            along -= len;
+            way = ways.get(pick)[0];
+            dir = ways.get(pick)[1];
             seg = 0;
-            along = rest;
-            if (Math.abs(TunnelMath.wrap(bearing() - inHeading)) > MAX_JOIN_TURN_DEG) {
-                way = oldWay;
-                dir = oldDir;
-                seg = oldSeg;
-                overshoot = rest;
-                along = len;
-                return Stop.JUNCTION;
-            }
+            if (ways.size() > 1) branches++;
         }
+    }
+
+    /** How many times a branch was chosen at a junction (for the diagnostics). */
+    int branches() {
+        return branches;
     }
 
     /** After a stop: the metres driven past the point where it stopped. */

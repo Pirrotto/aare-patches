@@ -226,6 +226,7 @@ public final class TunnelNavigation {
         bearing = Double.NaN;
         passLogged = false;
         PatchLog.add("tunnel", why + ": last position dropped");
+        TunnelManeuver.forget();
         // Like AARE's certificate update: the tunnel maps are checked once the car is gone, if due.
         Context app = PatchSettings.application();
         if (app != null && !connected()) TunnelMaps.refresh(app);
@@ -344,7 +345,13 @@ public final class TunnelNavigation {
         Location next;
         if (match != null) {
             // Along the tunnel's shape: its heading is the map's, only the distance can be off.
-            TunnelMatch.Stop stop = match.advance(distance);
+            TunnelBranch.Side side = TunnelManeuver.here();
+            int branchesBefore = match.branches();
+            TunnelMatch.Stop stop = match.advance(distance, side);
+            if (match.branches() > branchesBefore) {
+                PatchLog.add("tunnel", "a junction on the map after " + (int) travelledM + " m: took the branch "
+                        + (side == TunnelBranch.Side.STRAIGHT ? "straight on (no maneuver here)" : "on the maneuver's side (" + side + ")"));
+            }
             double[] p = match.position();
             next = new Location(estimate);
             next.setLatitude(p[0]);

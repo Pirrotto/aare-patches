@@ -3,6 +3,7 @@ package app.template.extension.aare;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 import java.util.List;
@@ -38,7 +39,7 @@ public class TunnelMatchTest {
     public void aFixBeforeThePortalFollowsTheTunnel() {
         TunnelMatch m = map(NORTH).match(46.0 - 55 / M, 8.0 + eastDeg(5), 3);
         assertNotNull(m);
-        assertNull(m.advance(600));
+        assertNull(m.advance(600, TunnelBranch.Side.UNKNOWN));
         double[] p = m.position();
         assertEquals(545, (p[0] - 46.0) * M, 1);
         assertEquals(8.0, p[1], 1e-9); // on the tunnel's line, not 5 m beside it
@@ -64,7 +65,7 @@ public class TunnelMatchTest {
         TunnelMapFile.Way twoWay = way(false, 46.0, 8.0, 46.0 + 1100 / M, 8.0);
         TunnelMatch m = map(twoWay).match(46.0 + 1150 / M, 8.0, 182);
         assertNotNull(m);
-        assertNull(m.advance(150));
+        assertNull(m.advance(150, TunnelBranch.Side.UNKNOWN));
         assertEquals(1000, (m.position()[0] - 46.0) * M, 1);
         assertEquals(180, m.bearing(), 0.5);
     }
@@ -79,7 +80,7 @@ public class TunnelMatchTest {
         TunnelMatch m = map(first, second).match(46.0 + 10 / M, 8.0, 0);
         assertNotNull(m);
         // 490 m to the end of the first way, 141.4 m of the bend, 68.6 m east.
-        assertNull(m.advance(700));
+        assertNull(m.advance(700, TunnelBranch.Side.UNKNOWN));
         assertEquals(600, (m.position()[0] - 46.0) * M, 1);
         assertEquals(168.6, (m.position()[1] - 8.0) * M * Math.cos(Math.toRadians(46.0)), 1.5);
         assertEquals(90, m.bearing(), 0.5);
@@ -89,7 +90,7 @@ public class TunnelMatchTest {
     public void theEndOfTheMapStops() {
         TunnelMatch m = map(NORTH).match(46.0 + 10 / M, 8.0, 0);
         assertNotNull(m);
-        assertEquals(TunnelMatch.Stop.END, m.advance(2000));
+        assertEquals(TunnelMatch.Stop.END, m.advance(2000, TunnelBranch.Side.UNKNOWN));
         assertEquals(1100, (m.position()[0] - 46.0) * M, 1); // left at the exit, not beyond
         assertEquals(910, m.overshoot(), 1); // 2000 m from 10 m in: 910 m past the exit
     }
@@ -100,7 +101,7 @@ public class TunnelMatchTest {
         TunnelMapFile.Way left = way(true, end, 8.0, end + 300 / M, 8.0 - eastDeg(100));
         TunnelMapFile.Way right = way(true, end, 8.0, end + 300 / M, 8.0 + eastDeg(100));
         TunnelMatch m = map(NORTH, left, right).match(46.0 + 10 / M, 8.0, 0);
-        assertEquals(TunnelMatch.Stop.JUNCTION, m.advance(1200));
+        assertEquals(TunnelMatch.Stop.JUNCTION, m.advance(1200, TunnelBranch.Side.UNKNOWN));
         assertEquals(1100, (m.position()[0] - 46.0) * M, 1);
     }
 
@@ -110,11 +111,11 @@ public class TunnelMatchTest {
         // A one-way ramp coming in at the exit: not a way out.
         TunnelMapFile.Way rampIn = way(true, end + 300 / M, 8.0 + eastDeg(50), end, 8.0);
         TunnelMatch m = map(NORTH, rampIn).match(46.0 + 10 / M, 8.0, 0);
-        assertEquals(TunnelMatch.Stop.END, m.advance(1200));
+        assertEquals(TunnelMatch.Stop.END, m.advance(1200, TunnelBranch.Side.UNKNOWN));
         // A sharp turn back: not the road going on either.
         TunnelMapFile.Way back = way(true, end, 8.0, end - 300 / M, 8.0 + eastDeg(60));
         TunnelMatch n = map(NORTH, back).match(46.0 + 10 / M, 8.0, 0);
-        assertEquals(TunnelMatch.Stop.JUNCTION, n.advance(1200));
+        assertEquals(TunnelMatch.Stop.JUNCTION, n.advance(1200, TunnelBranch.Side.UNKNOWN));
     }
 
     @Test
@@ -126,5 +127,35 @@ public class TunnelMatchTest {
         assertEquals(-10, p[1], 0.1); // to the right of a northward line
         List<TunnelMapFile.Way> none = Arrays.asList();
         assertNull(new TunnelMatch.Map(none).match(46.0, 8.0, 0));
+    }
+
+    @Test
+    public void theManeuverPicksTheBranch() {
+        double end = 46.0 + 1100 / M;
+        TunnelMapFile.Way left = way(true, end, 8.0, end + 300 / M, 8.0 - eastDeg(100));
+        TunnelMapFile.Way right = way(true, end, 8.0, end + 300 / M, 8.0 + eastDeg(100));
+        TunnelMatch r = map(NORTH, left, right).match(46.0 + 10 / M, 8.0, 0);
+        assertNull(r.advance(1200, TunnelBranch.Side.RIGHT));
+        assertEquals(1, r.branches());
+        assertTrue(r.position()[1] > 8.0); // went right
+        TunnelMatch l = map(NORTH, left, right).match(46.0 + 10 / M, 8.0, 0);
+        assertNull(l.advance(1200, TunnelBranch.Side.LEFT));
+        assertTrue(l.position()[1] < 8.0);
+        // Two branches equally straight: no maneuver here doesn't tell which.
+        TunnelMatch s = map(NORTH, left, right).match(46.0 + 10 / M, 8.0, 0);
+        assertEquals(TunnelMatch.Stop.JUNCTION, s.advance(1200, TunnelBranch.Side.STRAIGHT));
+    }
+
+    @Test
+    public void withoutAManeuverHereTheRoadGoesStraightOn() {
+        double end = 46.0 + 1100 / M;
+        TunnelMapFile.Way on = way(true, end, 8.0, end + 500 / M, 8.0 + eastDeg(10));
+        TunnelMapFile.Way exit = way(true, end, 8.0, end + 200 / M, 8.0 + eastDeg(120));
+        TunnelMatch m = map(NORTH, on, exit).match(46.0 + 10 / M, 8.0, 0);
+        assertNull(m.advance(1300, TunnelBranch.Side.STRAIGHT));
+        assertEquals(1310, (m.position()[0] - 46.0) * M, 2); // 10 m in, 1300 m on
+        // Unknown (no guidance): no choice made.
+        TunnelMatch u = map(NORTH, on, exit).match(46.0 + 10 / M, 8.0, 0);
+        assertEquals(TunnelMatch.Stop.JUNCTION, u.advance(1300, TunnelBranch.Side.UNKNOWN));
     }
 }
