@@ -331,8 +331,7 @@ public final class PatchSettingsActivity extends Activity {
                 .putExtra(android.content.Intent.EXTRA_ALLOW_MULTIPLE, true);
         try {
             startActivityForResult(i, PICK_MAPS);
-            toast(PatchSettings.phrase("Pick the country's .tun file and its .tun.sig together.",
-                    "Scegli insieme il file .tun del paese e il suo .tun.sig."));
+            toast(PatchSettings.phrase("Pick the country's .aaretun file", "Scegli il file .aaretun del paese"));
         } catch (android.content.ActivityNotFoundException e) {
             toast(PatchSettings.phrase("No file picker on this phone.", "Su questo telefono manca la scelta dei file."));
         }
@@ -369,39 +368,43 @@ public final class PatchSettingsActivity extends Activity {
         }, "aare-tunnel-maps").start();
     }
 
-    /** Pairs each picked "X.tun" with "X.tun.sig" by name, and installs the pairs. Blocking. */
+    /** Installs each picked map file ("Switzerland.aaretun"). Blocking. Returns the message to show. */
     private String installPicked(java.util.List<android.net.Uri> uris) {
-        java.util.Map<String, android.net.Uri> byName = new java.util.HashMap<>();
-        for (android.net.Uri u : uris) {
-            String n = displayName(u);
-            if (n != null) byName.put(n, u);
-        }
-        int ok = 0, bad = 0;
+        java.util.List<String> added = new java.util.ArrayList<>();
+        int bad = 0;
         boolean signature = false;
-        for (java.util.Map.Entry<String, android.net.Uri> e : byName.entrySet()) {
-            if (!e.getKey().endsWith(".tun")) continue;
-            android.net.Uri sig = byName.get(e.getKey() + ".sig");
+        for (android.net.Uri u : uris) {
             try {
-                if (sig == null) throw new TunnelMaps.Failure("no signature file", true);
-                TunnelMaps.install(this, readPicked(e.getValue(), TunnelMapFile.MAX_FILE_BYTES), readPicked(sig, 1024));
-                ok++;
+                added.add(TunnelMaps.install(this, readPicked(u, TunnelMapFile.MAX_FILE_BYTES)));
             } catch (TunnelMaps.Failure f) {
                 bad++;
                 signature |= f.signature;
                 PatchLog.add("maps", "a map from a file failed (" + f.getMessage() + ")");
             }
         }
-        PatchLog.add("maps", ok + " maps added from files, " + bad + " refused");
-        if (ok == 0 && bad == 0) {
-            return PatchSettings.phrase("No .tun file among those picked.", "Nessun file .tun tra quelli scelti.");
+        PatchLog.add("maps", added.size() + " maps added from files, " + bad + " refused");
+        String done = mapsMessage(added, java.util.Collections.emptyList());
+        if (bad == 0) return done;
+        String refused = signature
+                ? PatchSettings.phrase(bad + " refused: wrong signature", bad + " rifiutate: firma sbagliata")
+                : PatchSettings.phrase(bad + " refused: not a tunnel map", bad + " rifiutate: non sono mappe delle gallerie");
+        return added.isEmpty() ? refused : done + " · " + refused;
+    }
+
+    /** Short: "Switzerland downloaded", "3 maps downloaded", "1 downloaded, 1 deleted", "Already up to date". */
+    private static String mapsMessage(java.util.List<String> got, java.util.List<String> removed) {
+        int g = got.size(), r = removed.size();
+        if (g == 0 && r == 0) return PatchSettings.phrase("Already up to date", "Già aggiornate");
+        if (r == 0) {
+            return g == 1 ? TunnelMaps.name(got.get(0)) + PatchSettings.phrase(" downloaded", " scaricata")
+                    : g + PatchSettings.phrase(" maps downloaded", " mappe scaricate");
         }
-        if (bad > 0) {
-            return signature
-                    ? PatchSettings.phrase(ok + " added; " + bad + " refused: a signature was wrong or missing (pick the .tun.sig too).",
-                            ok + " aggiunte; " + bad + " rifiutate: una firma era sbagliata o mancava (scegli anche il .tun.sig).")
-                    : PatchSettings.phrase(ok + " added; " + bad + " couldn't be read.", ok + " aggiunte; " + bad + " non leggibili.");
+        if (g == 0) {
+            return r == 1 ? TunnelMaps.name(removed.get(0)) + PatchSettings.phrase(" deleted", " cancellata")
+                    : r + PatchSettings.phrase(" maps deleted", " mappe cancellate");
         }
-        return PatchSettings.phrase(ok + " maps added.", ok + " mappe aggiunte.");
+        return PatchSettings.phrase(g + " downloaded, " + r + " deleted", g + (g == 1 ? " scaricata, " : " scaricate, ")
+                + r + (r == 1 ? " cancellata" : " cancellate"));
     }
 
     private String displayName(android.net.Uri u) {
@@ -440,7 +443,7 @@ public final class PatchSettingsActivity extends Activity {
         }
         java.util.List<String> installed = TunnelMaps.installed(this);
         new Thread(() -> {
-            int got = 0, removed = 0;
+            java.util.List<String> got = new java.util.ArrayList<>(), removed = new java.util.ArrayList<>();
             TunnelMaps.Failure failure = null;
             try {
                 for (int i = 0; i < codes.size(); i++) {
@@ -448,30 +451,27 @@ public final class PatchSettingsActivity extends Activity {
                     if (checked[i] && !TunnelMaps.current(this, c, index)) {
                         try {
                             TunnelMaps.download(this, c, index);
-                            got++;
+                            got.add(c);
                         } catch (TunnelMaps.Failure f) {
                             failure = f;
                             PatchLog.add("maps", "a map failed (" + f.getMessage() + ")");
                         }
                     } else if (!checked[i] && installed.contains(c)) {
-                        if (TunnelMaps.delete(this, c)) removed++;
+                        if (TunnelMaps.delete(this, c)) removed.add(c);
                     }
                 }
             } finally {
                 TunnelMaps.end();
             }
-            PatchLog.add("maps", got + " maps downloaded, " + removed + " deleted" + (failure != null ? ", some failed" : ""));
+            PatchLog.add("maps", got.size() + " maps downloaded, " + removed.size() + " deleted" + (failure != null ? ", some failed" : ""));
             final TunnelMaps.Failure f = failure;
-            final int g = got, r = removed;
             runOnUiThread(() -> {
                 if (isFinishing()) return;
                 updateMapsSummary();
                 if (f != null) {
                     failed(f);
                 } else {
-                    toast(g == 0 && r == 0
-                            ? PatchSettings.phrase("The tunnel maps are already up to date.", "Le mappe delle gallerie sono già aggiornate.")
-                            : PatchSettings.phrase(g + " downloaded, " + r + " deleted.", g + " scaricate, " + r + " cancellate."));
+                    toast(mapsMessage(got, removed));
                 }
             });
         }, "aare-tunnel-maps").start();

@@ -11,8 +11,14 @@ File format (README.md beside this script): a gzip of
 gzip with mtime 0, so the same tunnels give the same bytes and an unchanged country is not
 published again.
 
-The index (index.txt) is plain text the phone reads without a JSON parser: the line
-"AARETUN-INDEX 1", then one line per country, sorted: "<CC> <sha256> <bytes> <ways>".
+Published, each country is one file named in English ("Switzerland.aaretun"), holding the map and
+its signature: b"AARETUNS", version (1 byte, 1), signature length (2 bytes, big-endian), the
+signature (ECDSA P-256 / SHA-256, DER, of the map), then the map (the gzip above).
+
+The index (index.txt, signed by index.txt.sig) is plain text the phone reads without a JSON parser:
+the line "AARETUN-INDEX 2", then one line per country, sorted:
+"<CC> <map's sha256> <file's bytes> <ways> <file name>". The SHA-256 is the map's, not the file's:
+a signature differs at every signing, the map only when the tunnels changed.
 
 Data © OpenStreetMap contributors, ODbL 1.0.
 """
@@ -23,6 +29,7 @@ import json
 import math
 import re
 import sys
+import unicodedata
 import time
 import urllib.parse
 import urllib.request
@@ -246,9 +253,29 @@ def overpass(query, attempts=ATTEMPTS):
 
 
 def countries():
+    """Every country: code -> its English name (as OpenStreetMap has it, else its own)."""
     q = '[out:json][timeout:300];area["ISO3166-1"~"^[A-Z]{2}$"]["admin_level"="2"];out tags;'
-    codes = {e["tags"]["ISO3166-1"] for e in overpass(q)["elements"] if "tags" in e}
-    return sorted(codes)
+    out = {}
+    for e in overpass(q)["elements"]:
+        t = e.get("tags", {})
+        code = t.get("ISO3166-1")
+        if code and code not in out:
+            out[code] = t.get("name:en") or t.get("int_name") or t.get("name") or code
+    return out
+
+
+def file_name(name, code, taken=()):
+    """
+    "Switzerland.aaretun" from "Switzerland": ASCII letters, digits and dashes only (GitHub keeps
+    those as they are in a file name); the code is added when the name is empty or already taken.
+    """
+    ascii_name = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode("ascii")
+    base = re.sub(r"[^A-Za-z0-9]+", "-", ascii_name).strip("-")[:50]
+    if not base:
+        base = code
+    if base + ".aaretun" in taken:
+        base = base + "-" + code
+    return base + ".aaretun"
 
 
 def country_ways(code):
@@ -260,16 +287,34 @@ def country_ways(code):
 
 # region Index
 
-INDEX_HEADER = "AARETUN-INDEX 1"
-_INDEX_LINE = re.compile(r"^([A-Z]{2}) ([0-9a-f]{64}) ([0-9]+) ([0-9]+)$")
+INDEX_HEADER = "AARETUN-INDEX 2"
+_INDEX_LINE = re.compile(r"^([A-Z]{2}) ([0-9a-f]{64}) ([0-9]+) ([0-9]+) ([A-Za-z0-9-]{1,60}\.aaretun)$")
+PACK_MAGIC = b"AARETUNS"
+
+
+def pack(map_bytes, signature):
+    """The published file: the map with its signature (format at the top)."""
+    if not 0 < len(signature) < 65536:
+        raise ValueError("bad signature")
+    return PACK_MAGIC + bytes([1]) + len(signature).to_bytes(2, "big") + signature + map_bytes
+
+
+def unpack(data):
+    """The reverse of [pack]: (map, signature)."""
+    if data[:8] != PACK_MAGIC or len(data) < 11 or data[8] != 1:
+        raise ValueError("not a packed tunnel map")
+    n = int.from_bytes(data[9:11], "big")
+    if n == 0 or len(data) < 11 + n + 1:
+        raise ValueError("bad packed tunnel map")
+    return data[11 + n:], data[11:11 + n]
 
 
 def write_index(countries):
-    """[countries]: code -> {"sha256", "bytes", "ways"}. Sorted, so the same maps give the same index."""
+    """[countries]: code -> {"sha256", "bytes", "ways", "file"}. Sorted: the same maps, the same index."""
     lines = [INDEX_HEADER]
     for code in sorted(countries):
         c = countries[code]
-        lines.append("%s %s %d %d" % (code, c["sha256"], c["bytes"], c["ways"]))
+        lines.append("%s %s %d %d %s" % (code, c["sha256"], c["bytes"], c["ways"], c["file"]))
     return "\n".join(lines) + "\n"
 
 
@@ -283,7 +328,7 @@ def read_index(text):
         m = _INDEX_LINE.match(line)
         if not m or m.group(1) in out:
             raise ValueError("bad index line")
-        out[m.group(1)] = {"sha256": m.group(2), "bytes": int(m.group(3)), "ways": int(m.group(4))}
+        out[m.group(1)] = {"sha256": m.group(2), "bytes": int(m.group(3)), "ways": int(m.group(4)), "file": m.group(5)}
     return out
 
 # endregion
@@ -316,9 +361,10 @@ def merge_index(text, code, entry):
 
 def main(argv=None):
     """
-    countries [--first CC,..]   the countries to build, one per line, the --first ones first
-    country CC --out DIR        builds DIR/CC.tun; prints its index line, nothing if it has no tunnel
-    merge INDEX "CC sha bytes ways"   sets that country in the index file (created if missing)
+    countries [--first CC,..]   "CC FileName" per line, the --first ones first, file names unique
+    country CC --out DIR        builds DIR/CC.tun; prints "<sha256> <ways>", nothing if no tunnel
+    pack MAP SIG OUT CC WAYS    writes OUT (the map with its signature); prints its index line
+    merge INDEX LINE            sets that country in the index file (created if missing)
     """
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -327,14 +373,22 @@ def main(argv=None):
     one = sub.add_parser("country")
     one.add_argument("code")
     one.add_argument("--out", required=True)
+    pk = sub.add_parser("pack")
+    for a_ in ("map", "sig", "out", "code"):
+        pk.add_argument(a_)
+    pk.add_argument("ways", type=int)
     m = sub.add_parser("merge")
     m.add_argument("index")
     m.add_argument("line")
     args = ap.parse_args(argv)
     if args.cmd == "countries":
         first = [x.strip().upper() for x in args.first.split(",") if x.strip()]
-        for code in ordered(countries(), first):
-            print(code)
+        names = countries()
+        taken = set()
+        for code in ordered(sorted(names), first):
+            f = file_name(names[code], code, taken)
+            taken.add(f)
+            print("%s %s" % (code, f))
         return 0
     if args.cmd == "country":
         code = args.code.strip().upper()
@@ -343,7 +397,18 @@ def main(argv=None):
             return 0
         with open("%s/%s.tun" % (args.out, code), "wb") as f:
             f.write(data)
-        print("%s %s %d %d" % (code, hashlib.sha256(data).hexdigest(), len(data), n))
+        print("%s %d" % (hashlib.sha256(data).hexdigest(), n))
+        return 0
+    if args.cmd == "pack":
+        with open(args.map, "rb") as f:
+            map_bytes = f.read()
+        with open(args.sig, "rb") as f:
+            sig = f.read()
+        data = pack(map_bytes, sig)
+        with open(args.out, "wb") as f:
+            f.write(data)
+        print("%s %s %d %d %s" % (args.code, hashlib.sha256(map_bytes).hexdigest(), len(data), args.ways,
+                                  args.out.rsplit("/", 1)[-1]))
         return 0
     # merge
     line = read_index(INDEX_HEADER + "\n" + args.line + "\n")
