@@ -30,7 +30,7 @@ final class TunnelMapFile {
     private TunnelMapFile() {
     }
 
-    static final String INDEX_HEADER = "AARETUN-INDEX 1";
+    static final String INDEX_HEADER = "AARETUN-INDEX 2";
     private static final byte[] MAGIC = "AARETUN".getBytes(StandardCharsets.US_ASCII);
     private static final int VERSION = 1;
     /** Largest file accepted, compressed and not: far above the biggest country (a few MB). */
@@ -38,7 +38,9 @@ final class TunnelMapFile {
     static final int MAX_RAW_BYTES = 128 * 1024 * 1024;
     static final int MAX_INDEX_BYTES = 64 * 1024;
     static final int MAX_POINTS = 65535;
-    private static final Pattern INDEX_LINE = Pattern.compile("^([A-Z]{2}) ([0-9a-f]{64}) ([0-9]{1,10}) ([0-9]{1,10})$");
+    private static final Pattern INDEX_LINE =
+            Pattern.compile("^([A-Z]{2}) ([0-9a-f]{64}) ([0-9]{1,10}) ([0-9]{1,10}) ([A-Za-z0-9-]{1,60}\\.aaretun) ([0-9]{8})$");
+    private static final byte[] PACK_MAGIC = "AARETUNS".getBytes(StandardCharsets.US_ASCII);
 
     /** One tunnel way: its points in degrees, in the direction of travel when it is one way. */
     static final class Way {
@@ -53,17 +55,34 @@ final class TunnelMapFile {
         }
     }
 
-    /** One country of the index. */
+    /** One country of the index: its map's SHA-256, its published file's size and name. */
     static final class Entry {
         final String sha256;
         final long bytes;
         final long ways;
+        final String file;
 
-        Entry(String sha256, long bytes, long ways) {
+        Entry(String sha256, long bytes, long ways, String file) {
             this.sha256 = sha256;
             this.bytes = bytes;
             this.ways = ways;
+            this.file = file;
         }
+    }
+
+    /**
+     * A published file ("Switzerland.aaretun"): {map, signature}. Format: "AARETUNS", version 1,
+     * the signature's length (2 bytes, big-endian), the signature, then the map. Nothing checked yet
+     * but the layout: the caller verifies the signature and reads the map.
+     */
+    static byte[][] unpack(byte[] packed) throws IOException {
+        if (packed == null || packed.length < 12 || packed.length > MAX_FILE_BYTES) throw new IOException("not a tunnel map file");
+        for (int i = 0; i < PACK_MAGIC.length; i++) if (packed[i] != PACK_MAGIC[i]) throw new IOException("not a tunnel map file");
+        if (packed[8] != 1) throw new IOException("unknown tunnel map file version");
+        int n = ((packed[9] & 0xFF) << 8) | (packed[10] & 0xFF);
+        if (n == 0 || n > 1024 || packed.length < 11 + n + 1) throw new IOException("bad tunnel map file");
+        return new byte[][] {java.util.Arrays.copyOfRange(packed, 11 + n, packed.length),
+                java.util.Arrays.copyOfRange(packed, 11, 11 + n)};
     }
 
     // region Signature
@@ -125,7 +144,7 @@ final class TunnelMapFile {
             if (!m.matches() || out.containsKey(m.group(1))) throw new IOException("bad index line " + i);
             long bytes = Long.parseLong(m.group(3));
             if (bytes <= 0 || bytes > MAX_FILE_BYTES) throw new IOException("bad size on line " + i);
-            out.put(m.group(1), new Entry(m.group(2), bytes, Long.parseLong(m.group(4))));
+            out.put(m.group(1), new Entry(m.group(2), bytes, Long.parseLong(m.group(4)), m.group(5)));
         }
         return Collections.unmodifiableMap(out);
     }

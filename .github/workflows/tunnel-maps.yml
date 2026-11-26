@@ -1,14 +1,17 @@
 name: Tunnel maps
 
-# The tunnel maps for the tunnel estimate: built from OpenStreetMap once a month, signed, and
+# The tunnel maps for the tunnel estimate: built from OpenStreetMap, signed, and
 # published as assets of the "tunnel-maps" release (a pre-release, never "latest", so Morphe and the
 # patch releases ignore it). Only countries whose file changed are uploaded again. On a pull request
 # that touches the builder, only its tests and a dry run for one country, nothing published.
-# GitHub runs the schedule and the manual start only from main; a push to dev that changes the
-# builder publishes too, so the maps can be tried with the test builds before a release.
+# Every day it builds the countries that are due (missing, or built more than 30 days ago), the
+# owner's country and its neighbours first, and stops before GitHub's time limit: what is left is
+# done the next day, so each country is rebuilt about once a month. GitHub runs the schedule and the
+# manual start only from main; a push to dev that changes the builder publishes too, so the maps can
+# be tried with the test builds before a release.
 on:
   schedule:
-    - cron: '17 3 3 * *'
+    - cron: '17 3 * * *'
   workflow_dispatch:
   push:
     branches: [dev]
@@ -76,32 +79,53 @@ jobs:
           printf '%s\n' "$TUNNEL_MAPS_KEY" > "$key"
           mkdir -p work old
           gh release download "$TAG" --pattern index.txt --dir old || echo "no index published yet"
+          # An index of the first format (before one file per country): start afresh, and take its
+          # files (CH.tun, CH.tun.sig...) off the page, which only that format used.
+          if [ -s old/index.txt ] && [ "$(head -n1 old/index.txt)" != "AARETUN-INDEX 2" ]; then
+            : > old/index.txt
+            gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^[A-Z]{2}\.tun(\.sig)?$' | while read -r a; do
+              gh release delete-asset "$TAG" "$a" --yes
+            done
+          fi
           touch old/index.txt
           cp old/index.txt work/index.txt
           # ECDSA P-256 over SHA-256 (DER), as the phone checks it (SHA256withECDSA).
           sign() { openssl dgst -sha256 -sign "$key" -out "$1.sig" "$1"; }
-          codes=$(python3 tools/tunnelmaps/tunnelmaps.py countries --first "$FIRST") || { echo "::error::country list not loaded"; exit 1; }
-          done=0; same=0; failed=""
-          for cc in $codes; do
-            line=$(python3 tools/tunnelmaps/tunnelmaps.py country "$cc" --out work) || { failed="$failed $cc"; continue; }
-            [ -n "$line" ] || continue  # no tunnel worth a map
-            new=$(echo "$line" | awk '{ print $2 }')
+          list=$(python3 tools/tunnelmaps/tunnelmaps.py due old/index.txt --first "$FIRST") || { echo "::error::country list not loaded"; exit 1; }
+          echo "$(echo "$list" | grep -c .) countries due"
+          done=0; same=0; failed=""; left=0
+          while read -r cc file; do
+            [ -n "$cc" ] || continue
+            # Stop well before the job's limit (350 min): the rest is due again tomorrow.
+            if [ "$SECONDS" -gt $((320 * 60)) ]; then left=$((left + 1)); continue; fi
+            built=$(python3 tools/tunnelmaps/tunnelmaps.py country "$cc" --out work) || { failed="$failed $cc"; continue; }
+            [ -n "$built" ] || continue  # no tunnel worth a map
+            read -r sha ways <<< "$built"
             old=$(awk -v c="$cc" '$1 == c { print $2 }' old/index.txt)
-            if [ "$new" = "$old" ]; then same=$((same + 1)); rm -f "work/$cc.tun"; continue; fi
-            # The country's file first, then the index naming it: a phone never sees an index naming
-            # a file that isn't there yet. Published now, so a later timeout loses nothing.
+            if [ "$sha" = "$old" ]; then
+              # Unchanged: only its date in the index, so it isn't due again for a month.
+              same=$((same + 1)); rm -f "work/$cc.tun"
+              python3 tools/tunnelmaps/tunnelmaps.py touch work/index.txt "$cc"
+              sign work/index.txt
+              gh release upload "$TAG" work/index.txt work/index.txt.sig --clobber || failed="$failed $cc"
+              continue
+            fi
+            # One file per country, named in English: the map with its signature. The file first, then
+            # the index naming it: a phone never sees an index naming a file that isn't there yet.
+            # Published now, so a later timeout loses nothing.
             sign "work/$cc.tun"
+            line=$(python3 tools/tunnelmaps/tunnelmaps.py pack "work/$cc.tun" "work/$cc.tun.sig" "work/$file" "$cc" "$ways")
             python3 tools/tunnelmaps/tunnelmaps.py merge work/index.txt "$line"
             sign work/index.txt
-            if gh release upload "$TAG" "work/$cc.tun" "work/$cc.tun.sig" --clobber \
+            if gh release upload "$TAG" "work/$file" --clobber \
                 && gh release upload "$TAG" work/index.txt work/index.txt.sig --clobber; then
               done=$((done + 1))
-              echo "$cc published"
+              echo "$cc published as $file"
             else
               failed="$failed $cc"
             fi
-            rm -f "work/$cc.tun" "work/$cc.tun.sig"
+            rm -f "work/$cc.tun" "work/$cc.tun.sig" "work/$file"
             sleep 5  # Overpass is shared: one country at a time
-          done
-          echo "published $done, unchanged $same, failed:${failed:- none}"
+          done <<< "$list"
+          echo "published $done, unchanged $same, left for tomorrow $left, failed:${failed:- none}"
           # A failed country keeps its published file; it is tried again at the next run.

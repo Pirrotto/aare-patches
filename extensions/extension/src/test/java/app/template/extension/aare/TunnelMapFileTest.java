@@ -78,6 +78,40 @@ public class TunnelMapFileTest {
     }
 
     @Test
+    public void thePublishedFileIsUnpacked() throws IOException {
+        byte[] map = hex(FIXTURE);
+        byte[] sig = new byte[70];
+        for (int i = 0; i < sig.length; i++) sig[i] = (byte) i;
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        b.write("AARETUNS".getBytes(StandardCharsets.US_ASCII));
+        b.write(1);
+        b.write(0);
+        b.write(70);
+        b.write(sig);
+        b.write(map);
+        byte[][] parts = TunnelMapFile.unpack(b.toByteArray());
+        assertTrue(java.util.Arrays.equals(map, parts[0]));
+        assertTrue(java.util.Arrays.equals(sig, parts[1]));
+        byte[] packed = b.toByteArray();
+        byte[][] bad = {new byte[0], java.util.Arrays.copyOf(packed, 11 + 70), changed(packed, 0), changed(packed, 8),
+                changed(packed, 9), map};
+        for (byte[] x : bad) {
+            try {
+                TunnelMapFile.unpack(x);
+                fail("accepted a bad file");
+            } catch (IOException expected) {
+                // refused
+            }
+        }
+    }
+
+    private static byte[] changed(byte[] b, int at) {
+        byte[] c = b.clone();
+        c[at] ^= 0x7F;
+        return c;
+    }
+
+    @Test
     public void theCountryIsReadFromTheHeader() throws IOException {
         assertEquals("CH", TunnelMapFile.countryOf(hex(FIXTURE)));
         byte[] raw = gunzip(hex(FIXTURE));
@@ -147,15 +181,19 @@ public class TunnelMapFileTest {
     @Test
     public void theIndexIsReadStrictly() throws IOException {
         String a = "a".repeat(64);
-        Map<String, TunnelMapFile.Entry> index = TunnelMapFile.readIndex(
-                ("AARETUN-INDEX 1\nCH " + a + " 23783 940\nDE " + a + " 2 3\n").getBytes(StandardCharsets.US_ASCII));
+        Map<String, TunnelMapFile.Entry> index = TunnelMapFile.readIndex(("AARETUN-INDEX 2\nCH " + a
+                + " 23783 940 Switzerland.aaretun 20261126\nDE " + a + " 2 3 Germany.aaretun 20261101\n").getBytes(StandardCharsets.US_ASCII));
         assertEquals(2, index.size());
         assertEquals(23783, index.get("CH").bytes);
         assertEquals(a, index.get("DE").sha256);
-        String[] bad = {"", "AARETUN-INDEX 2\n", "AARETUN-INDEX 1", "AARETUN-INDEX 1\nch " + a + " 1 1\n",
-                "AARETUN-INDEX 1\nCH " + a.substring(1) + " 1 1\n", "AARETUN-INDEX 1\nCH " + a + " 0 1\n",
-                "AARETUN-INDEX 1\nCH " + a + " 99999999999 1\n", "AARETUN-INDEX 1\nCH " + a + " 1 1\nCH " + a + " 1 1\n",
-                "AARETUN-INDEX 1\nCH " + a + " 1 1\n\n", "AARETUN-INDEX 1\nCH ../" + a + " 1 1\n"};
+        assertEquals("Switzerland.aaretun", index.get("CH").file);
+        String f = " Switzerland.aaretun 20261126";
+        String[] bad = {"", "AARETUN-INDEX 1\n", "AARETUN-INDEX 2", "AARETUN-INDEX 2\nch " + a + " 1 1" + f + "\n",
+                "AARETUN-INDEX 2\nCH " + a.substring(1) + " 1 1" + f + "\n", "AARETUN-INDEX 2\nCH " + a + " 0 1" + f + "\n",
+                "AARETUN-INDEX 2\nCH " + a + " 99999999999 1" + f + "\n",
+                "AARETUN-INDEX 2\nCH " + a + " 1 1" + f + "\nCH " + a + " 1 1" + f + "\n",
+                "AARETUN-INDEX 2\nCH " + a + " 1 1" + f + "\n\n", "AARETUN-INDEX 2\nCH " + a + " 1 1 ../x.aaretun 20261126\n", "AARETUN-INDEX 2\nCH " + a + " 1 1 Switzerland.aaretun\n",
+                "AARETUN-INDEX 2\nCH " + a + " 1 1\n", "AARETUN-INDEX 2\nCH " + a + " 1 1 Switzerland.tun\n"};
         for (String s : bad) {
             try {
                 TunnelMapFile.readIndex(s.getBytes(StandardCharsets.US_ASCII));
