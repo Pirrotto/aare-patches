@@ -47,7 +47,7 @@ internal object NoticeAutoDismissFingerprint : Fingerprint(
 @Suppress("unused")
 val voiceReplyPatch = patch(
     name = "Voice reply",
-    description = "Reply to a message by voice: dictate it, hear it read back, and it is sent only after you say yes. Also from the notification centre. Off by default; Android 8+.",
+    description = "Reply to a message by voice: dictate it, hear it read back, and it is sent only after you say yes. Also from the notification centre. Test option: dictation through the car's microphone directly (Android 13+). Off by default; Android 8+.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)
