@@ -166,17 +166,33 @@ public final class VoiceReply {
      */
     public static void onNotice(Object carRuntime) {
         onRuntime(carRuntime);
-        if (state == State.ASKING) {
-            PatchLog.add("reply", "asked, another card came: reply question dropped");
-            stopListening();
-            if (speakingOurs) {
-                speakingOurs = false;
-                speaker().stop();
+        // Called from AARE's CarRuntime.notice: an error here must not stop AARE.
+        try {
+            if (state == State.ASKING) {
+                PatchLog.add("reply", "asked, another card came: reply question dropped");
+                stopListening();
+                if (speakingOurs) {
+                    speakingOurs = false;
+                    speaker().stop();
+                }
             }
+            if (state == State.OFFERED || state == State.ASKING) {
+                removeCard();
+                setState(State.IDLE);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "onNotice", t);
+            PatchLog.add("reply", "another card came, closing the reply failed: " + t.getClass().getSimpleName());
+            setStateQuietly(State.IDLE);
         }
-        if (state == State.OFFERED || state == State.ASKING) {
-            removeCard();
-            setState(State.IDLE);
+    }
+
+    /** Back to [s] after an error, without letting a second one out. */
+    private static void setStateQuietly(State s) {
+        try {
+            setState(s);
+        } catch (Throwable ignored) {
+            // Already logged by the caller; AARE keeps running.
         }
     }
 
