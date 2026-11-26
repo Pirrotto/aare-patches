@@ -63,6 +63,20 @@ final class PatchLog {
         }
     }
 
+    /**
+     * As [add], then waits (at most [timeoutMs]) until the line is in the file: for the last line a
+     * process writes before it dies (CrashNote).
+     */
+    static void addAndWait(String area, String message, long timeoutMs) {
+        add(area, message);
+        try {
+            // The writer runs in order: once this empty task ran, every line before it is written.
+            writer.submit(() -> { }).get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            Log.w(TAG, "addAndWait", e);
+        }
+    }
+
     /** Deletes the log, in memory and in its file (the user's "Delete diagnostics"). */
     static void clear() {
         synchronized (lines) {
