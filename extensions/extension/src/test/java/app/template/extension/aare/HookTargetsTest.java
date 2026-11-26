@@ -50,22 +50,29 @@ public class HookTargetsTest {
         return out;
     }
 
+    /**
+     * Calls the patches add inside an extension class itself, not in AARE's code: there the target may
+     * stay private. PatchSettings.register is called from PatchSettings.registerAll (SettingsPatch).
+     */
+    private static final java.util.Set<String> INSIDE_EXTENSION = java.util.Collections.singleton("PatchSettings.register");
+
     @Test
     public void everyHookTargetIsPublic() throws Exception {
         List<String[]> calls = calls();
         assertFalse("no hook found: wrong path?", calls.isEmpty());
         for (String[] c : calls) {
+            if (INSIDE_EXTENSION.contains(c[0] + "." + c[1])) continue;
             // Not initialised: its static code may need Android, which unit tests only stub.
             Class<?> k = Class.forName("app.template.extension.aare." + c[0], false, getClass().getClassLoader());
             assertTrue(c[0] + " (called from " + c[2] + ") must be public", Modifier.isPublic(k.getModifiers()));
+            // A name may have private helpers beside it: one public static method of that name is the hook.
             boolean found = false;
             for (Method m : k.getDeclaredMethods()) {
-                if (!m.getName().equals(c[1])) continue;
-                found = true;
-                assertTrue(c[0] + "." + c[1] + " (called from " + c[2] + ") must be public static",
-                        Modifier.isPublic(m.getModifiers()) && Modifier.isStatic(m.getModifiers()));
+                if (m.getName().equals(c[1]) && Modifier.isPublic(m.getModifiers()) && Modifier.isStatic(m.getModifiers())) {
+                    found = true;
+                }
             }
-            assertTrue(c[0] + "." + c[1] + " (called from " + c[2] + ") doesn't exist", found);
+            assertTrue(c[0] + "." + c[1] + " (called from " + c[2] + ") must exist and be public static", found);
         }
     }
 }
