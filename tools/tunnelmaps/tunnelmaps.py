@@ -226,7 +226,7 @@ def from_overpass(elements):
 # One request may take this long (s), and is tried this many times: a slow country is left for the
 # next run rather than holding the others (each country is published as soon as it is built).
 REQUEST_S = 300
-ATTEMPTS = 2
+ATTEMPTS = 3
 
 
 def overpass(query, attempts=ATTEMPTS):
@@ -241,7 +241,7 @@ def overpass(query, attempts=ATTEMPTS):
         except Exception as e:  # network or server busy: wait and try the other server
             last = e
             if attempt + 1 < attempts:
-                time.sleep(30)
+                time.sleep(60)  # a busy server (504) needs a moment
     raise RuntimeError("Overpass failed: %s" % last)
 
 
