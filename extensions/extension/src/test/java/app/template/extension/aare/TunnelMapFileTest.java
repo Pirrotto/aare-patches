@@ -78,6 +78,26 @@ public class TunnelMapFileTest {
     }
 
     @Test
+    public void theCountryIsReadFromTheHeader() throws IOException {
+        assertEquals("CH", TunnelMapFile.countryOf(hex(FIXTURE)));
+        byte[] raw = gunzip(hex(FIXTURE));
+        byte[] lower = raw.clone();
+        lower[8] = 'c';
+        try {
+            TunnelMapFile.countryOf(gzip(lower));
+            fail("accepted a bad country");
+        } catch (IOException expected) {
+            // refused
+        }
+        try {
+            TunnelMapFile.countryOf(new byte[] {1, 2});
+            fail("accepted garbage");
+        } catch (IOException expected) {
+            // refused
+        }
+    }
+
+    @Test
     public void aFileOfAnotherCountryOrDamagedIsRefused() throws IOException {
         byte[] good = hex(FIXTURE);
         refused(good, "DE");

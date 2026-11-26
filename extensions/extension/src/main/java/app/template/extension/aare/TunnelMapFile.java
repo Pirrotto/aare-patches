@@ -134,6 +134,17 @@ final class TunnelMapFile {
 
     // region Map file
 
+    /** The country a map file says it is (its header), without trusting the rest: [read] checks that. */
+    static String countryOf(byte[] gz) throws IOException {
+        if (gz == null || gz.length > MAX_FILE_BYTES) throw new IOException("file too big");
+        Reader r = new Reader(gunzip(gz));
+        for (byte b : MAGIC) if (r.u8() != (b & 0xFF)) throw new IOException("not a tunnel map");
+        if (r.u8() != VERSION) throw new IOException("unknown tunnel map version");
+        int a = r.u8(), b = r.u8();
+        if (a < 'A' || a > 'Z' || b < 'A' || b > 'Z') throw new IOException("bad country");
+        return new String(new char[] {(char) a, (char) b});
+    }
+
     /** The ways of a country's file; throws IOException if it isn't one of [country], or is damaged. */
     static List<Way> read(byte[] gz, String country) throws IOException {
         if (gz == null || gz.length > MAX_FILE_BYTES) throw new IOException("file too big");

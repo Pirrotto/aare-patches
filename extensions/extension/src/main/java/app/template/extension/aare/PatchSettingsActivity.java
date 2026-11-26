@@ -317,7 +317,118 @@ public final class PatchSettingsActivity extends Activity {
                 .setMultiChoiceItems(labels, checked, (d, which, on) -> checked[which] = on)
                 .setPositiveButton(PatchSettings.phrase("Save", "Salva"), (d, w) -> applyMaps(codes, checked, index))
                 .setNegativeButton(PatchSettings.phrase("Cancel", "Annulla"), null)
+                .setNeutralButton(PatchSettings.phrase("From file…", "Da file…"), (d, w) -> pickMapFiles())
                 .show();
+    }
+
+    private static final int PICK_MAPS = 4711;
+
+    /** Android's file picker (no permission): the user picks a map and its .sig together. */
+    private void pickMapFiles() {
+        android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                .setType("*/*")
+                .putExtra(android.content.Intent.EXTRA_ALLOW_MULTIPLE, true);
+        try {
+            startActivityForResult(i, PICK_MAPS);
+            toast(PatchSettings.phrase("Pick the country's .tun file and its .tun.sig together.",
+                    "Scegli insieme il file .tun del paese e il suo .tun.sig."));
+        } catch (android.content.ActivityNotFoundException e) {
+            toast(PatchSettings.phrase("No file picker on this phone.", "Su questo telefono manca la scelta dei file."));
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != PICK_MAPS || resultCode != RESULT_OK || data == null) return;
+        java.util.List<android.net.Uri> uris = new java.util.ArrayList<>();
+        if (data.getClipData() != null) {
+            for (int i = 0; i < data.getClipData().getItemCount(); i++) uris.add(data.getClipData().getItemAt(i).getUri());
+        } else if (data.getData() != null) {
+            uris.add(data.getData());
+        }
+        if (!TunnelMaps.begin()) {
+            toast(PatchSettings.phrase("The maps are being downloaded, try again in a moment.",
+                    "Le mappe si stanno scaricando, riprova tra poco."));
+            return;
+        }
+        new Thread(() -> {
+            String result;
+            try {
+                result = installPicked(uris);
+            } finally {
+                TunnelMaps.end();
+            }
+            final String r = result;
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                updateMapsSummary();
+                toast(r);
+            });
+        }, "aare-tunnel-maps").start();
+    }
+
+    /** Pairs each picked "X.tun" with "X.tun.sig" by name, and installs the pairs. Blocking. */
+    private String installPicked(java.util.List<android.net.Uri> uris) {
+        java.util.Map<String, android.net.Uri> byName = new java.util.HashMap<>();
+        for (android.net.Uri u : uris) {
+            String n = displayName(u);
+            if (n != null) byName.put(n, u);
+        }
+        int ok = 0, bad = 0;
+        boolean signature = false;
+        for (java.util.Map.Entry<String, android.net.Uri> e : byName.entrySet()) {
+            if (!e.getKey().endsWith(".tun")) continue;
+            android.net.Uri sig = byName.get(e.getKey() + ".sig");
+            try {
+                if (sig == null) throw new TunnelMaps.Failure("no signature file", true);
+                TunnelMaps.install(this, readPicked(e.getValue(), TunnelMapFile.MAX_FILE_BYTES), readPicked(sig, 1024));
+                ok++;
+            } catch (TunnelMaps.Failure f) {
+                bad++;
+                signature |= f.signature;
+                PatchLog.add("maps", "a map from a file failed (" + f.getMessage() + ")");
+            }
+        }
+        PatchLog.add("maps", ok + " maps added from files, " + bad + " refused");
+        if (ok == 0 && bad == 0) {
+            return PatchSettings.phrase("No .tun file among those picked.", "Nessun file .tun tra quelli scelti.");
+        }
+        if (bad > 0) {
+            return signature
+                    ? PatchSettings.phrase(ok + " added; " + bad + " refused: a signature was wrong or missing (pick the .tun.sig too).",
+                            ok + " aggiunte; " + bad + " rifiutate: una firma era sbagliata o mancava (scegli anche il .tun.sig).")
+                    : PatchSettings.phrase(ok + " added; " + bad + " couldn't be read.", ok + " aggiunte; " + bad + " non leggibili.");
+        }
+        return PatchSettings.phrase(ok + " maps added.", ok + " mappe aggiunte.");
+    }
+
+    private String displayName(android.net.Uri u) {
+        try (android.database.Cursor c = getContentResolver().query(u,
+                new String[] {android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (c != null && c.moveToFirst()) return c.getString(0);
+        } catch (RuntimeException e) {
+            PatchLog.add("maps", "a picked file's name can't be read");
+        }
+        return null;
+    }
+
+    /** A picked file, at most [max] bytes (a bigger one is refused, not cut). */
+    private byte[] readPicked(android.net.Uri u, int max) throws TunnelMaps.Failure {
+        try (java.io.InputStream in = getContentResolver().openInputStream(u)) {
+            if (in == null) throw new TunnelMaps.Failure("the file can't be opened", false);
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                if (out.size() + n > max) throw new TunnelMaps.Failure("the file is too big", false);
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        } catch (java.io.IOException | SecurityException e) {
+            throw new TunnelMaps.Failure("the file can't be opened", false);
+        }
     }
 
     /** Downloads the countries ticked and not on the phone, deletes the ones unticked. */
@@ -358,7 +469,9 @@ public final class PatchSettingsActivity extends Activity {
                 if (f != null) {
                     failed(f);
                 } else {
-                    toast(PatchSettings.phrase(g + " downloaded, " + r + " deleted.", g + " scaricate, " + r + " cancellate."));
+                    toast(g == 0 && r == 0
+                            ? PatchSettings.phrase("The tunnel maps are already up to date.", "Le mappe delle gallerie sono già aggiornate.")
+                            : PatchSettings.phrase(g + " downloaded, " + r + " deleted.", g + " scaricate, " + r + " cancellate."));
                 }
             });
         }, "aare-tunnel-maps").start();
