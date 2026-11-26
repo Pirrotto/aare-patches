@@ -22,8 +22,10 @@ Data © OpenStreetMap contributors, [ODbL 1.0](https://opendatacommons.org/licen
 
 - `<CC>.tun`: one country, by its ISO 3166-1 code.
 - `index.txt`: the line `AARETUN-INDEX 1`, then one line per country, sorted:
-  `<CC> <sha256> <bytes> <ways>`. Plain text, so the phone reads it without a JSON parser. It is
-  published last, so it never names a file that isn't there yet.
+  `<CC> <sha256> <bytes> <ways>`. Plain text, so the phone reads it without a JSON parser.
+  Countries are built and published one at a time (Switzerland and its neighbours first): each
+  country's file goes up first, then the index naming it, so a phone never sees an index naming a
+  file that isn't there yet, and a run stopped by GitHub's time limit loses nothing already done.
 - `<file>.sig`: the ECDSA P-256 / SHA-256 signature (DER) of each file, made with the key in the
   `TUNNEL_MAPS_KEY` secret. The phone accepts a file only if its signature matches the public key
   pinned in the code, and only if the country's SHA-256 matches the signed index.

@@ -110,5 +110,22 @@ class IndexTest(unittest.TestCase):
                 tm.read_index(bad)
 
 
+
+class PublishEachTest(unittest.TestCase):
+    def test_order(self):
+        self.assertEqual(["CH", "DE", "AT", "FR"], tm.ordered(["AT", "CH", "DE", "FR"], ["CH", "DE", "XX"]))
+        self.assertEqual(["AT", "CH"], tm.ordered(["AT", "CH"], []))
+
+    def test_merge_index(self):
+        e = {"sha256": "a" * 64, "bytes": 5, "ways": 1}
+        text = tm.merge_index("", "CH", e)
+        self.assertEqual({"CH": e}, tm.read_index(text))
+        e2 = {"sha256": "b" * 64, "bytes": 7, "ways": 2}
+        text = tm.merge_index(text, "AT", e2)
+        text = tm.merge_index(text, "CH", e2)
+        self.assertEqual({"AT": e2, "CH": e2}, tm.read_index(text))
+        self.assertEqual({"CH": e2}, tm.read_index(tm.merge_index(text, "AT", None)))
+
+
 if __name__ == "__main__":
     unittest.main()
