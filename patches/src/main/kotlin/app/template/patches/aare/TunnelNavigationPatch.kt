@@ -1,6 +1,7 @@
 package app.template.patches.aare
 
 import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.patch.patch
@@ -16,6 +17,14 @@ internal object PhoneLocationFeedPushFingerprint : Fingerprint(
     parameters = listOf("Landroid/location/Location;"),
 )
 
+/** NavStatusBridge.update(Trip): the hosted navigation app's trip, on its way to the car's cluster. */
+internal object NavStatusBridgeUpdateFingerprint : Fingerprint(
+    definingClass = "Lnet/prototux/aare/car/NavStatusBridge;",
+    name = "update",
+    returnType = "V",
+    parameters = listOf("Landroidx/car/app/navigation/model/Trip;"),
+)
+
 @Suppress("unused")
 val tunnelNavigationPatch = patch(
     name = "Tunnel navigation",
@@ -29,7 +38,8 @@ val tunnelNavigationPatch = patch(
         "gets the location without opening AARE on the phone. \"Tunnel maps\" in the patches' Settings downloads, on a " +
         "tap, the road tunnels of the chosen countries (OpenStreetMap, signed, from this project's GitHub page; " +
         "optional daily update and \"Add the country I'm in\", both off by default); in those tunnels the estimate " +
-        "follows the tunnel's shape, and goes back to the gyroscope at a junction or where it isn't sure.",
+        "follows the tunnel's shape; at a junction it takes the branch of the navigation's next maneuver (or straight " +
+        "on without one), and goes back to the gyroscope where it isn't sure.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)
@@ -68,5 +78,11 @@ val tunnelNavigationPatch = patch(
                 ExternalLabel("aare_tunnel", getInstruction(0)),
             )
         }
+
+        // The next maneuver, read for the branch to take where a tunnel of the maps splits.
+        NavStatusBridgeUpdateFingerprint.method.addInstructions(
+            0,
+            "invoke-static { p1 }, Lapp/template/extension/aare/TunnelManeuver;->onTrip(Ljava/lang/Object;)V",
+        )
     }
 }
