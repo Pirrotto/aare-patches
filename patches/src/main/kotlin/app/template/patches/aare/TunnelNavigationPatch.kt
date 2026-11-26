@@ -28,18 +28,7 @@ internal object NavStatusBridgeUpdateFingerprint : Fingerprint(
 @Suppress("unused")
 val tunnelNavigationPatch = patch(
     name = "Tunnel navigation",
-    description = "With the car's GPS used for the phone, the position keeps moving in tunnels: it is estimated from the " +
-        "car's speed, compass and gyroscope, with an honest accuracy, and stops before that passes 45 m (about 400 m " +
-        "of tunnel at first, more once the tunnels' exits measured the car's own error), 5 km or 5 minutes. Outside tunnels it learns " +
-        "from the GPS how much to turn in curves, and remembers it for each car model (deleted when switched off). " +
-        "Off by default: turn it on in the patches' Settings. A test switch below it, \"Location check\", notes in the " +
-        "diagnostics whether the navigation apps may read the location (with Shizuku); the test switch \"Location for " +
-        "navigation at the start\" has the Shizuku shell start a small location service in AARE, so the navigation app " +
-        "gets the location without opening AARE on the phone. \"Tunnel maps\" in the patches' Settings downloads, on a " +
-        "tap, the road tunnels of the chosen countries (OpenStreetMap, signed, from this project's GitHub page; " +
-        "optional daily update and \"Add the country I'm in\", both off by default); in those tunnels the estimate " +
-        "follows the tunnel's shape; at a junction it takes the branch of the navigation's next maneuver (or straight " +
-        "on without one), and goes back to the gyroscope where it isn't sure.",
+    description = "In tunnels the position keeps moving, estimated from the car's speed and gyroscope with an honest accuracy; with the optional tunnel maps it follows the tunnel and its junctions. Off by default.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)

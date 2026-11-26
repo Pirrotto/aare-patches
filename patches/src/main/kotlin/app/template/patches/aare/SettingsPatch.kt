@@ -70,8 +70,7 @@ private val strings = mapOf(
 @Suppress("unused")
 val settingsPatch = patch(
     name = "Settings",
-    description = "Adds \"Settings\" to AARE's settings home: one switch with a short description for each " +
-        "installed patch. New releases of the patches add their switches there by themselves.",
+    description = "Adds \"Settings\" to AARE: a switch with a short description for each installed patch.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)
