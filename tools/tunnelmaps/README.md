@@ -2,7 +2,7 @@
 
 The shape of every road tunnel, one file per country, for the tunnel estimate to follow a tunnel
 instead of the gyroscope. Built from OpenStreetMap by `tunnelmaps.py` on GitHub
-(`.github/workflows/tunnel-maps.yml`), once a month, and published as assets of the `tunnel-maps`
+(`.github/workflows/tunnel-maps.yml`), every day for the countries that are due, and published as assets of the `tunnel-maps`
 release. That release is a pre-release and never "latest", so Morphe and the patch releases
 ignore it. The phone never builds anything: it only downloads a country's file, when the user
 asks, and checks its signature.
@@ -25,8 +25,11 @@ Data © OpenStreetMap contributors, [ODbL 1.0](https://opendatacommons.org/licen
   version (1 byte, 1), the signature's length (2 bytes, big-endian), the signature (ECDSA P-256 /
   SHA-256, DER, of the map, made with the key in the `TUNNEL_MAPS_KEY` secret), then the map below.
 - `index.txt` and its signature `index.txt.sig`: the line `AARETUN-INDEX 2`, then one line per
-  country, sorted: `<CC> <map's sha256> <file's bytes> <ways> <file name>`. The SHA-256 is the
-  map's: a signature differs at every signing, the map only when the tunnels changed. Plain text,
+  country, sorted: `<CC> <map's sha256> <file's bytes> <ways> <file name> <YYYYMMDD built>`. The
+  SHA-256 is the map's: a signature differs at every signing, the map only when the tunnels changed.
+  The date makes the runs resumable: every day the countries due (missing, or built more than 30
+  days ago) are built, the owner's country and its neighbours first, until GitHub's time limit
+  nears; the rest is done the next day, so each country is rebuilt about once a month. Plain text,
   so the phone reads it without a JSON parser.
   Countries are built and published one at a time (Switzerland and its neighbours first): each
   country's file goes up first, then the index naming it, so a phone never sees an index naming a

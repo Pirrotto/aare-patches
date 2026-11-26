@@ -39,7 +39,7 @@ final class TunnelMapFile {
     static final int MAX_INDEX_BYTES = 64 * 1024;
     static final int MAX_POINTS = 65535;
     private static final Pattern INDEX_LINE =
-            Pattern.compile("^([A-Z]{2}) ([0-9a-f]{64}) ([0-9]{1,10}) ([0-9]{1,10}) ([A-Za-z0-9-]{1,60}\\.aaretun)$");
+            Pattern.compile("^([A-Z]{2}) ([0-9a-f]{64}) ([0-9]{1,10}) ([0-9]{1,10}) ([A-Za-z0-9-]{1,60}\\.aaretun) ([0-9]{8})$");
     private static final byte[] PACK_MAGIC = "AARETUNS".getBytes(StandardCharsets.US_ASCII);
 
     /** One tunnel way: its points in degrees, in the direction of travel when it is one way. */

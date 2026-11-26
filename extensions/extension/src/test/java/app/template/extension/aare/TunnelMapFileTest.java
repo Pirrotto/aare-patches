@@ -182,17 +182,17 @@ public class TunnelMapFileTest {
     public void theIndexIsReadStrictly() throws IOException {
         String a = "a".repeat(64);
         Map<String, TunnelMapFile.Entry> index = TunnelMapFile.readIndex(("AARETUN-INDEX 2\nCH " + a
-                + " 23783 940 Switzerland.aaretun\nDE " + a + " 2 3 Germany.aaretun\n").getBytes(StandardCharsets.US_ASCII));
+                + " 23783 940 Switzerland.aaretun 20261126\nDE " + a + " 2 3 Germany.aaretun 20261101\n").getBytes(StandardCharsets.US_ASCII));
         assertEquals(2, index.size());
         assertEquals(23783, index.get("CH").bytes);
         assertEquals(a, index.get("DE").sha256);
         assertEquals("Switzerland.aaretun", index.get("CH").file);
-        String f = " Switzerland.aaretun";
+        String f = " Switzerland.aaretun 20261126";
         String[] bad = {"", "AARETUN-INDEX 1\n", "AARETUN-INDEX 2", "AARETUN-INDEX 2\nch " + a + " 1 1" + f + "\n",
                 "AARETUN-INDEX 2\nCH " + a.substring(1) + " 1 1" + f + "\n", "AARETUN-INDEX 2\nCH " + a + " 0 1" + f + "\n",
                 "AARETUN-INDEX 2\nCH " + a + " 99999999999 1" + f + "\n",
                 "AARETUN-INDEX 2\nCH " + a + " 1 1" + f + "\nCH " + a + " 1 1" + f + "\n",
-                "AARETUN-INDEX 2\nCH " + a + " 1 1" + f + "\n\n", "AARETUN-INDEX 2\nCH " + a + " 1 1 ../x.aaretun\n",
+                "AARETUN-INDEX 2\nCH " + a + " 1 1" + f + "\n\n", "AARETUN-INDEX 2\nCH " + a + " 1 1 ../x.aaretun 20261126\n", "AARETUN-INDEX 2\nCH " + a + " 1 1 Switzerland.aaretun\n",
                 "AARETUN-INDEX 2\nCH " + a + " 1 1\n", "AARETUN-INDEX 2\nCH " + a + " 1 1 Switzerland.tun\n"};
         for (String s : bad) {
             try {
