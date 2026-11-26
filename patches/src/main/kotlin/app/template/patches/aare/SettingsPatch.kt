@@ -33,6 +33,14 @@ internal object CategoryRowFingerprint : Fingerprint(
 )
 
 /** PatchSettings.registerAll(String): where each applied patch registers its switch. */
+/** AareApp.onCreate: AARE's start, where the crash note is set up. */
+internal object AareAppOnCreateFingerprint : Fingerprint(
+    definingClass = "Lnet/prototux/aare/AareApp;",
+    name = "onCreate",
+    returnType = "V",
+    parameters = listOf(),
+)
+
 internal object RegisterAllFingerprint : Fingerprint(
     definingClass = SETTINGS_CLASS,
     name = "registerAll",
@@ -127,6 +135,12 @@ val settingsPatch = patch(
                 """,
             )
         }
+
+        // If AARE stops because of an error, the patches' diagnostics say which and where (names only).
+        AareAppOnCreateFingerprint.method.addInstructions(
+            0,
+            "invoke-static { }, Lapp/template/extension/aare/CrashNote;->install()V",
+        )
 
         // The new row opens the Settings screen instead of a page of AARE.
         CategoryRowFingerprint.method.addInstructions(

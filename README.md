@@ -12,7 +12,7 @@
 | **Voice messages** | When AARE reads a message aloud, WhatsApp voice messages play in the car instead of "Voice message (0:05)". Off by default. | Shizuku, allowed for AARE (as for car audio) |
 | **Voice reply** | After a message is read aloud: a **Reply** card for 15 s and **Reply** in the notification centre. Dictate (with punctuation on Android 13+), hear it read back, say "yes" or tap **Send**. Off by default. | Voice messages patch; with AARE's *Car microphone for phone apps* on it listens through the car |
 | **Car radio pause** | While AARE reads a message aloud and during a voice reply, the car's radio pauses instead of only getting lower, until AARE is done. Off by default. | Voice messages patch |
-| **Settings** | A **Settings** row at the end of AARE's settings, with one switch per patch. | Included with every patch |
+| **Settings** | A **Settings** row at the end of AARE's settings, with one switch per patch. If AARE stops because of an error, "Copy diagnostics" says which error and where (names only, never its message). | Included with every patch |
 
 ### Tunnel navigation
 
