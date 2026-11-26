@@ -149,10 +149,10 @@ public final class PatchSettings {
                         phrase("Tunnel navigation", "Navigazione in galleria"),
                         phrase("With the car's GPS for the phone: in tunnels the position keeps moving, estimated from the car's "
                                         + "speed, compass and gyroscope, for as long as it stays within 45 m (about 400 m of tunnel at first, longer as it measures the car's error). What it learns "
-                                        + "about each car is kept, and deleted when switched off. Tunnel maps per country can be downloaded below.",
+                                        + "about each car is kept, and deleted when switched off. With the tunnel maps per country downloaded below, it follows the tunnel's shape.",
                                 "Col GPS dell'auto per il telefono: in galleria la posizione continua ad avanzare, stimata da "
                                         + "velocità, bussola e giroscopio dell'auto, finché resta entro 45 m (all'inizio circa 400 m di galleria, di più man mano che misura l'errore dell'auto). Ricorda ciò "
-                                        + "che impara di ogni auto e lo cancella quando la spegni. Qui sotto si possono scaricare le mappe delle gallerie per paese."),
+                                        + "che impara di ogni auto e lo cancella quando la spegni. Con le mappe delle gallerie per paese scaricate qui sotto, segue la forma della galleria."),
                         ICON_TUNNEL),
                 new Feature(TUNNEL_MAPS_AUTO,
                         phrase("Update the tunnel maps", "Aggiorna le mappe delle gallerie"),
