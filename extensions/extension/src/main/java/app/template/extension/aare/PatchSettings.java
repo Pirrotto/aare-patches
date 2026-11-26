@@ -37,6 +37,8 @@ public final class PatchSettings {
     public static final String VOICE_REPLY_ASK = "voice_reply_ask";
     /** A setting of the Voice reply patch: a short tone each time it starts listening. */
     public static final String VOICE_REPLY_BEEP = "voice_reply_beep";
+    /** A test setting of the Voice reply patch: the speech recognition hears the car's mic directly (Android 13+). */
+    public static final String VOICE_REPLY_CAR_MIC = "voice_reply_car_mic";
     /** Pause the car's radio while AARE speaks (Car radio pause patch). */
     public static final String RADIO_PAUSE = "radio_pause";
     /** A setting of Car radio pause: the radio also pauses while a phone app records. */
@@ -118,7 +120,7 @@ public final class PatchSettings {
         List<Feature> list = new ArrayList<>();
         for (Feature f : known()) {
             // "Ask by voice to reply" comes with the Voice reply patch.
-            String patch = VOICE_REPLY_ASK.equals(f.key) || VOICE_REPLY_BEEP.equals(f.key) ? VOICE_REPLY
+            String patch = VOICE_REPLY_ASK.equals(f.key) || VOICE_REPLY_BEEP.equals(f.key) || VOICE_REPLY_CAR_MIC.equals(f.key) ? VOICE_REPLY
                     : LOCATION_CHECK.equals(f.key) || LOCATION_FIX.equals(f.key) || TUNNEL_MAPS_AUTO.equals(f.key)
                     || TUNNEL_MAPS_HERE.equals(f.key) ? TUNNEL_NAVIGATION
                     : ASSISTANT_CAR_SCREEN_DRIVING.equals(f.key) ? ASSISTANT_CAR_SCREEN
@@ -167,6 +169,10 @@ public final class PatchSettings {
                         phrase("Listening beep", "Bip quando ascolta"),
                         phrase("A short tone when it starts and stops listening.",
                                 "Un breve suono quando inizia e smette di ascoltare."), VOICE_REPLY),
+                new Feature(VOICE_REPLY_CAR_MIC,
+                        phrase("Car microphone for dictation (test)", "Microfono dell'auto per la dettatura (prova)"),
+                        phrase("The speech recognition hears the car's microphone directly. Android 13+.",
+                                "Il riconoscimento vocale sente direttamente il microfono dell'auto. Android 13+."), VOICE_REPLY),
                 new Feature(RADIO_PAUSE,
                         phrase("Pause the radio", "Pausa della radio"),
                         phrase("The radio pauses while AARE reads or listens, instead of getting lower.",
@@ -202,7 +208,7 @@ public final class PatchSettings {
      * Features off until the user turns them on, as AARE would ship them: they change what other apps
      * get (tunnel navigation's estimated position) or read another app's files (voice messages).
      */
-    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, RADIO_PAUSE_RECORDING, LOCATION_CHECK, LOCATION_FIX, TUNNEL_MAPS_AUTO, TUNNEL_MAPS_HERE, ASSISTANT_CAR_SCREEN, ASSISTANT_CAR_SCREEN_DRIVING, MAP_AREA_NOTE));
+    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, VOICE_REPLY_CAR_MIC, RADIO_PAUSE, RADIO_PAUSE_RECORDING, LOCATION_CHECK, LOCATION_FIX, TUNNEL_MAPS_AUTO, TUNNEL_MAPS_HERE, ASSISTANT_CAR_SCREEN, ASSISTANT_CAR_SCREEN_DRIVING, MAP_AREA_NOTE));
 
     /**
      * The voice features use Android 8's audio focus requests; AARE also runs on Android 6 and 7,
@@ -214,7 +220,7 @@ public final class PatchSettings {
     }
 
     private static final Set<String> NEEDS_ANDROID_8 = new HashSet<>(Arrays.asList(
-            VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, RADIO_PAUSE, RADIO_PAUSE_RECORDING));
+            VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, VOICE_REPLY_CAR_MIC, RADIO_PAUSE, RADIO_PAUSE_RECORDING));
 
     /** Whether [key]'s feature can run on this phone's Android version. */
     public static boolean available(String key) {

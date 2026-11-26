@@ -112,6 +112,19 @@ public final class VoiceReply {
     private static long cardSeq;
 
     private static SpeechRecognizer recognizer;
+
+    // "Car microphone for dictation" (test): the car's mic fed to the recognizer (CarMicFeed).
+    private static CarMicFeed feed;
+    /** The Listener of the listening the feed belongs to: a late callback of an older one leaves it alone. */
+    private static Object feedOwner;
+    private static String feedLastPartial;
+    private static long feedLastChangeAt;
+    /** The feed was ended by our own silence check: the dictation is over, no new listening. */
+    private static boolean feedEndedBySilence;
+    private static Runnable feedWatch;
+    /** With an audio source the recognizer ends only when the audio does: quiet this long ends a yes/no. */
+    private static final long FEED_ANSWER_PAUSE_MS = 1_500L;
+    private static final long FEED_WATCH_MS = 250L;
     /**
      * What the current listening got from the recognizer, for the diagnostics (technical only, never
      * what was said): whether it started (onReadyForSpeech), when, whether a voice began, the loudest
@@ -728,7 +741,9 @@ public final class VoiceReply {
             listenHeard = false;
             listenReadyAfterMs = -1;
             loudestDb = Float.NEGATIVE_INFINITY;
-            recognizer.setRecognitionListener(new Listener(expected));
+            closeFeed();
+            Listener listener = new Listener(expected);
+            recognizer.setRecognitionListener(listener);
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                     .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                     .putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
@@ -745,8 +760,21 @@ public final class VoiceReply {
                     intent.putExtra(RecognizerIntent.EXTRA_ENABLE_FORMATTING, RecognizerIntent.FORMATTING_OPTIMIZE_QUALITY);
                 }
             }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                    && PatchSettings.isEnabled(context, PatchSettings.VOICE_REPLY_CAR_MIC)) {
+                feed = CarMicFeed.open(runtime.get());
+                if (feed != null) {
+                    feed.putExtras(intent);
+                    feedOwner = listener;
+                    feedLastPartial = null;
+                    feedLastChangeAt = 0;
+                    feedEndedBySilence = false;
+                    watchFeed(expected);
+                    if (expected != State.DICTATING || dictatedPieces == 0) PatchLog.add("reply", "car mic fed to the recognizer");
+                }
+            }
             requestListenFocus(context);
-            // With AARE's "Car microphone for phone apps" on, the recognizer hears the car by itself.
+            // Without the feed: with AARE's "Car microphone for phone apps" on, the recognizer hears the car by itself.
             recognizer.startListening(intent);
             listenStartedAt = SystemClock.uptimeMillis();
             scheduleListenTimeout(expected, noSpeechMs);
@@ -787,7 +815,9 @@ public final class VoiceReply {
             return;
         }
         long left = MAX_LISTEN_MS - (SystemClock.uptimeMillis() - dictationStartedAt);
-        if (left <= 0) {
+        if (left <= 0 || feedEndedBySilence) {
+            // With the car's mic fed, our own silence check already waited the dictation pause.
+            feedEndedBySilence = false;
             finishDictation();
             return;
         }
@@ -821,6 +851,7 @@ public final class VoiceReply {
         listenTimeout = () -> {
             listenTimeout = null;
             if (state != expected) return;
+            closeFeed();
             if (!(expected == State.DICTATING && !dictated.isEmpty())) {
                 PatchLog.add("reply", "speech recognizer gave no answer in time (" + listenSummary() + ")");
             }
@@ -863,8 +894,44 @@ public final class VoiceReply {
         listenTimeout = null;
     }
 
+    /**
+     * With the feed, the recognizer doesn't end on silence: once words came and the partial results
+     * stayed the same for the pause ([DICTATION_PAUSE_MS], or [FEED_ANSWER_PAUSE_MS] for a yes/no),
+     * the audio is ended and the recognizer gives its result.
+     */
+    private static void watchFeed(State expected) {
+        if (feedWatch != null) main.removeCallbacks(feedWatch);
+        long pause = expected == State.DICTATING ? DICTATION_PAUSE_MS : FEED_ANSWER_PAUSE_MS;
+        feedWatch = new Runnable() {
+            @Override
+            public void run() {
+                if (feed == null || state != expected || feedWatch != this) return;
+                if (CarMicFeed.quiet(feedLastChangeAt, SystemClock.uptimeMillis(), pause)) {
+                    feedEndedBySilence = expected == State.DICTATING;
+                    feed.finish();
+                    feedWatch = null;
+                    return;
+                }
+                main.postDelayed(this, FEED_WATCH_MS);
+            }
+        };
+        main.postDelayed(feedWatch, FEED_WATCH_MS);
+    }
+
+    /** Ends the car's mic feed, if any: the microphone goes back to AARE. */
+    private static void closeFeed() {
+        if (feedWatch != null) main.removeCallbacks(feedWatch);
+        feedWatch = null;
+        CarMicFeed f = feed;
+        feed = null;
+        feedOwner = null;
+        feedLastPartial = null;
+        if (f != null) f.close();
+    }
+
     private static void stopListening() {
         cancelListenTimeout();
+        closeFeed();
         try {
             if (recognizer != null) recognizer.cancel();
         } catch (Throwable ignored) {
@@ -914,6 +981,7 @@ public final class VoiceReply {
 
         @Override
         public void onError(int error) {
+            if (feedOwner == this) closeFeed();
             if (current()) cancelListenTimeout();
             if (current() && expected == State.DICTATING && !dictated.isEmpty()) {
                 // Silence after the last words (or a hiccup): the dictation is what was said so far.
@@ -942,6 +1010,7 @@ public final class VoiceReply {
 
         @Override
         public void onResults(Bundle results) {
+            if (feedOwner == this) closeFeed();
             if (current()) cancelListenTimeout();
             if (current() && expected == State.DICTATING) {
                 onDictationPiece(first(results));
@@ -956,6 +1025,14 @@ public final class VoiceReply {
 
         @Override
         public void onPartialResults(Bundle partialResults) {
+            if (feedOwner == this) {
+                // New words keep the car's mic open; the same words for a while end it (watchFeed).
+                String heard = first(partialResults);
+                if (heard != null && !heard.trim().isEmpty() && !heard.equals(feedLastPartial)) {
+                    feedLastPartial = heard;
+                    feedLastChangeAt = SystemClock.uptimeMillis();
+                }
+            }
             if (current() && expected == State.CONFIRMING) {
                 // A clear yes or no to "Send it?" while still speaking: acted on at once.
                 String heard = first(partialResults);
