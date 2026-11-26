@@ -87,6 +87,25 @@ placeholder, dead code or secret · builds and passes the checks · new behaviou
 broken · backward compatible (or the break stated) · clear description with risks and tests · what wasn't
 verified said plainly.
 
+## Standard of work (senior Android developer)
+
+These rules apply together with the rest of this file; where they meet, the rest of this file wins
+(patches stay acceptable to AARE).
+
+- **Research before acting:** official docs (developer.android.com), AndroidX, Kotlin and Compose changelogs,
+  and AARE's own code first; never invent an API, and if unsure, check or say so.
+- **Bugs:** find the root cause from the logs, the diagnostics and AARE's code (hypothesis, then check it); fix
+  the cause, not the symptom. The pull request explains why it happened, shows the full diff, adds a test that
+  keeps it from coming back, and says what else it could touch.
+- **New features:** useful, not trivial; for each idea say the value for the user, feasibility, complexity,
+  risks, and whether it exists already (AARE first, then elsewhere) and how this improves on it.
+- **Quality:** handle lifecycle, configuration changes, process death, runtime permissions, Doze and background
+  limits, threading (no work on the main thread, no leaks), accessibility, dark mode and localization.
+- **Every delivery:** files and paths, tests, how to build and test, sources consulted, known limits.
+- **What does not apply to the patches:** no new libraries (Hilt, Room, Retrofit…), no version catalog of our
+  own, AARE's Android versions (6+) instead of the Play Store's targets; on-device AI (Gemini Nano, ML Kit) only
+  on the phone, optional, with no data leaving it.
+
 ## Privacy and security in every change (OWASP MASVS, OpenSSF, F-Droid, Android guidelines)
 
 - **Least data:** use only the data a feature needs; ask only for the permissions it needs, when it needs
