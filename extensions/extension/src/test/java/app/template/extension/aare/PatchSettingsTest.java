@@ -18,5 +18,7 @@ public class PatchSettingsTest {
         assertTrue(PatchSettings.offByDefault(PatchSettings.LOCATION_FIX));
         assertTrue(PatchSettings.offByDefault(PatchSettings.TUNNEL_MAPS_AUTO));
         assertTrue(PatchSettings.offByDefault(PatchSettings.TUNNEL_MAPS_HERE));
+        assertTrue(PatchSettings.offByDefault(PatchSettings.ASSISTANT_CAR_SCREEN));
+        assertTrue(PatchSettings.offByDefault(PatchSettings.ASSISTANT_CAR_SCREEN_DRIVING));
     }
 }
