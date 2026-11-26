@@ -26,9 +26,7 @@ private const val RADIO_FOCUS = "Lapp/template/extension/aare/CarRadioFocus;"
 @Suppress("unused")
 val carRadioPausePatch = patch(
     name = "Car radio pause",
-    description = "While AARE reads a message aloud and during a voice reply, the car's own sound (radio) pauses instead " +
-        "of only getting lower, and stays paused until AARE is done, as with Android Auto's assistant. Navigation " +
-        "prompts are unchanged. Off by default: turn it on in the patches' Settings.",
+    description = "The car's radio pauses while AARE reads a message or you reply by voice, instead of only getting quieter. Navigation prompts unchanged. Off by default.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)

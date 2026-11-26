@@ -31,9 +31,7 @@ internal object NotificationPostedFingerprint : Fingerprint(
 @Suppress("unused")
 val voiceMessagesPatch = patch(
     name = "Voice messages",
-    description = "Plays WhatsApp voice messages in the car when a message is read aloud, instead of " +
-        "reading \"Voice message (0:05)\". Reads them through Shizuku, which AARE already uses for " +
-        "car audio, so AARE needs no storage permission. Android 8 or later; off by default.",
+    description = "Plays WhatsApp voice messages in the car instead of reading \"Voice message\", through Shizuku (no storage permission). Off by default; Android 8+.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_AARE)
