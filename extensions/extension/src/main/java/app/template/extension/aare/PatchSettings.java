@@ -119,79 +119,48 @@ public final class PatchSettings {
     }
 
     static List<Feature> known() {
+        // Short, as AARE's own switches (one or two lines): the details are in the README.
         return Arrays.asList(
                 new Feature(TUNNEL_NAVIGATION,
                         phrase("Tunnel navigation", "Navigazione in galleria"),
-                        phrase("With the car's GPS for the phone: in tunnels the position keeps moving, estimated from the car's "
-                                        + "speed, compass and gyroscope, for as long as it stays within 45 m (about 400 m of tunnel at first, longer as it measures the car's error). What it learns "
-                                        + "about each car is kept, and deleted when switched off. With the tunnel maps per country downloaded below, it follows the tunnel's shape, and at a junction the side of the navigation's next maneuver.",
-                                "Col GPS dell'auto per il telefono: in galleria la posizione continua ad avanzare, stimata da "
-                                        + "velocità, bussola e giroscopio dell'auto, finché resta entro 45 m (all'inizio circa 400 m di galleria, di più man mano che misura l'errore dell'auto). Ricorda ciò "
-                                        + "che impara di ogni auto e lo cancella quando la spegni. Con le mappe delle gallerie per paese scaricate qui sotto, segue la forma della galleria e, a un bivio, il lato della prossima manovra della navigazione.")),
+                        phrase("In tunnels the position keeps moving, estimated from the car's sensors.",
+                                "In galleria la posizione continua ad avanzare, stimata dai sensori dell'auto.")),
                 new Feature(TUNNEL_MAPS_AUTO,
                         phrase("Update the tunnel maps", "Aggiorna le mappe delle gallerie"),
-                        phrase("The tunnel maps downloaded under \"Tunnel maps\" below are checked at most once a day, never while "
-                                        + "a car is connected, and downloaded again when OpenStreetMap changed. It contacts only this "
-                                        + "project's GitHub page and asks only for the map files, never your position.",
-                                "Le mappe delle gallerie scaricate da «Mappe delle gallerie» qui sotto vengono controllate al massimo "
-                                        + "una volta al giorno, mai con l'auto collegata, e riscaricate quando OpenStreetMap è cambiato. "
-                                        + "Contatta solo la pagina GitHub del progetto e chiede solo i file delle mappe, mai la tua posizione."), TUNNEL_NAVIGATION),
+                        phrase("Once a day, never with the car connected. Only from the maps' GitHub page.",
+                                "Una volta al giorno, mai con l'auto collegata. Solo dalla pagina GitHub delle mappe."), TUNNEL_NAVIGATION),
                 new Feature(TUNNEL_MAPS_HERE,
                         phrase("Add the country I'm in", "Aggiungi il paese in cui sono"),
-                        phrase("At the same daily check, downloads the map of the mobile network's country if it isn't on the "
-                                        + "phone (no GPS, no permission). GitHub then sees which country's file was asked for.",
-                                "Allo stesso controllo giornaliero scarica la mappa del paese della rete mobile, se non è già sul "
-                                        + "telefono (senza GPS e senza permessi). GitHub vede quindi di quale paese è il file chiesto."), TUNNEL_NAVIGATION),
+                        phrase("Downloads the map of the mobile network's country, without GPS.",
+                                "Scarica la mappa del paese della rete mobile, senza GPS."), TUNNEL_NAVIGATION),
                 new Feature(LOCATION_CHECK,
                         phrase("Location check (test)", "Controllo posizione (prova)"),
-                        phrase("Diagnostics only: for 5 minutes after the car connects, notes every 15 s whether AARE and the "
-                                        + "navigation apps may read the location (needs Shizuku). For the black map at the start.",
-                                "Solo diagnostica: per 5 minuti dopo il collegamento annota ogni 15 s se AARE e le app di "
-                                        + "navigazione possono leggere la posizione (serve Shizuku). Per la mappa nera all'avvio."), TUNNEL_NAVIGATION),
+                        phrase("Notes in the diagnostics whether the apps may read the location.",
+                                "Annota nella diagnostica se le app possono leggere la posizione."), TUNNEL_NAVIGATION),
                 new Feature(LOCATION_FIX,
                         phrase("Location for navigation at the start (test)", "Posizione per la navigazione all'avvio (prova)"),
-                        phrase("When the car connects with AARE in the background, the navigation app may get no location until "
-                                        + "AARE is opened on the phone (black map). With this, the Shizuku shell starts a small location "
-                                        + "service in AARE while the car is connected, as Android Auto's own start does, so AARE can "
-                                        + "pass the location on. An extra AARE notification shows meanwhile.",
-                                "Quando l'auto si collega con AARE in background, l'app di navigazione può restare senza "
-                                        + "posizione finché non apri AARE sul telefono (mappa nera). Con questa opzione la shell di "
-                                        + "Shizuku avvia in AARE un piccolo servizio di posizione mentre l'auto è collegata, come "
-                                        + "fa Android Auto, così AARE può passare la posizione. Intanto compare una notifica di AARE."), TUNNEL_NAVIGATION),
+                        phrase("Avoids the black map when AARE starts in the background.",
+                                "Evita la mappa nera quando AARE parte in background."), TUNNEL_NAVIGATION),
                 new Feature(VOICE_MESSAGES,
                         phrase("Voice messages", "Messaggi vocali"),
-                        phrase("Plays WhatsApp voice messages in the car when AARE reads a message. Needs Shizuku running.",
-                                "Riproduce in auto i vocali di WhatsApp quando AARE legge un messaggio. Serve Shizuku attivo.")),
+                        phrase("Plays WhatsApp voice messages in the car.",
+                                "Riproduce in auto i vocali di WhatsApp.")),
                 new Feature(VOICE_REPLY,
                         phrase("Voice reply", "Risposta vocale"),
-                        phrase("After reading a message, shows \"Reply\" for 15 seconds and in the notification centre: "
-                                        + "dictate the answer (with punctuation on Android 13+), then confirm to send it (\"retry\" dictates it again). With AARE's Car microphone for "
-                                        + "phone apps on, it listens through the car. Off by default.",
-                                "Dopo la lettura mostra «Rispondi» per 15 secondi e nel centro notifiche: "
-                                        + "detti la risposta (con la punteggiatura da Android 13) e confermi l'invio («riprova» la fa dettare di nuovo). Con «Microfono dell'auto per le app» "
-                                        + "di AARE attivo, ascolta dal microfono dell'auto. Disattivata di default.")),
+                        phrase("Dictate the answer, hear it read back and confirm to send it.",
+                                "Detti la risposta, la senti rileggere e confermi l'invio.")),
                 new Feature(VOICE_REPLY_ASK,
                         phrase("Ask by voice to reply", "Chiedi a voce se rispondere"),
-                        phrase("With Voice reply: after reading a message that can be answered, asks \"Do you want to reply?\" "
-                                        + "and listens a few seconds (the music pauses meanwhile). Say \"yes\" to dictate, "
-                                        + "\"no\" to close; otherwise the Reply card stays.",
-                                "Con Risposta vocale: dopo la lettura di un messaggio a cui si può rispondere chiede "
-                                        + "«Vuoi rispondere?» e ascolta qualche secondo (intanto la musica va in pausa). "
-                                        + "Di' «sì» per dettare, «no» per chiudere; altrimenti resta la scheda Rispondi."), VOICE_REPLY),
+                        phrase("After reading, asks \"Do you want to reply?\".",
+                                "Dopo la lettura chiede «Vuoi rispondere?»."), VOICE_REPLY),
                 new Feature(VOICE_REPLY_BEEP,
                         phrase("Listening beep", "Bip quando ascolta"),
-                        phrase("With Voice reply: a short tone going up when it starts listening and going down when it stops, "
-                                        + "as Android Auto's assistant does.",
-                                "Con Risposta vocale: un breve suono che sale quando inizia ad ascoltare e che scende quando "
-                                        + "smette, come l'assistente di Android Auto."), VOICE_REPLY),
+                        phrase("A short tone when it starts and stops listening.",
+                                "Un breve suono quando inizia e smette di ascoltare."), VOICE_REPLY),
                 new Feature(RADIO_PAUSE,
-                        phrase("Pause the car's radio while AARE speaks", "Pausa della radio dell'auto quando AARE parla"),
-                        phrase("While a message is read aloud and during a voice reply, the car's own sound (radio) pauses "
-                                        + "instead of only getting lower, and stays paused until AARE is done, as with Android "
-                                        + "Auto's assistant. Navigation prompts are unchanged.",
-                                "Mentre AARE legge un messaggio e durante la risposta vocale, il suono dell'auto (radio) va "
-                                        + "in pausa invece di abbassarsi solo un po', e resta in pausa finché AARE ha finito, come "
-                                        + "con l'assistente di Android Auto. Le indicazioni stradali restano come prima.")));
+                        phrase("Pause the radio", "Pausa della radio"),
+                        phrase("The radio pauses while AARE reads or listens, instead of getting lower.",
+                                "La radio va in pausa mentre AARE legge o ascolta, invece di abbassarsi.")));
     }
 
     // endregion
