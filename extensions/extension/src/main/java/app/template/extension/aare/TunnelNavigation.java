@@ -75,8 +75,10 @@ public final class TunnelNavigation {
     private static volatile TunnelMatch match;
     /** This estimate's error so far: each stretch's distance times its own rate. */
     private static double errorM;
-    /** Which ways this estimate went: its error is learned only for the one it used alone. */
+    /** Which ways this estimate went: its error is learned only for the one it used (see mapLearned). */
     private static boolean usedMap, usedGyro;
+    /** Metres of this estimate driven with the gyroscope (after a map's end, or without a map). */
+    private static double gyroM;
     private static boolean limitLogged;
     /** "May be off the road" was logged for this estimate. */
     private static boolean wideLogged;
@@ -178,9 +180,11 @@ public final class TunnelNavigation {
                 if (travelledM >= TunnelMath.ErrorLearner.MIN_TUNNEL_M && !limitLogged
                         && fix.hasAccuracy() && fix.getAccuracy() <= LEARN_ACCURACY_M) {
                     // Each way's error is learned only from an estimate that used it alone.
-                    TunnelMath.ErrorLearner learner = usedMap && !usedGyro ? mapErrorRate : usedGyro && !usedMap ? errorRate : null;
+                    TunnelMath.ErrorLearner learner = !usedMap ? (usedGyro ? errorRate : null)
+                            : TunnelMath.mapLearned(travelledM, gyroM) ? mapErrorRate : null;
                     if (learner == null) {
-                        PatchLog.add("tunnel", "estimate used the tunnel map and the gyroscope: its error isn't learned");
+                        PatchLog.add("tunnel", "estimate used the tunnel map and " + (int) gyroM
+                                + " m of gyroscope: too much to learn the map's error from it");
                     } else {
                         synchronized (learnedLock) {
                             if (learner.add(per100)) {
@@ -282,6 +286,7 @@ public final class TunnelNavigation {
                 mapPerM = mapErrorRate.rate();
             }
             errorM = 0;
+            gyroM = 0;
             usedMap = usedGyro = false;
             startAccuracy = lastFix.hasAccuracy() ? lastFix.getAccuracy() : 10f;
             if (Double.isNaN(bearing) && lastFix.hasBearing()) bearing = lastFix.getBearing();
@@ -364,6 +369,7 @@ public final class TunnelNavigation {
                 double past = Math.min(match.overshoot(), distance);
                 errorM += mapPerM * (distance - past) + errorPerM * past;
                 if (past > 0) usedGyro = true;
+                gyroM += past;
                 next = destination(next, bearing, past);
                 PatchLog.add("tunnel", (stop == TunnelMatch.Stop.END ? "the tunnel's end on the map" : "a junction on the map")
                         + " after " + (int) travelledM + " m: on with the gyroscope");
@@ -373,6 +379,7 @@ public final class TunnelNavigation {
             next = destination(estimate, bearing, distance);
             errorM += errorPerM * distance;
             usedGyro = true;
+            gyroM += distance;
         }
         next.setSpeed((float) speedNow);
         next.setBearing((float) bearing);
