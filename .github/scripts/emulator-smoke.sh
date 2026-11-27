@@ -24,7 +24,7 @@ crashed() {
 check() {
   sleep "${2:-4}"
   if crashed; then echo "::error::AARE crashed or froze after: $1"; fail=1; return 1; fi
-  echo "ok: $1"
+  echo "ok: $1 (in front: $(adb shell dumpsys activity activities | grep -m1 -oE 'mResumedActivity[^}]*' | grep -oE '[a-zA-Z0-9_.]+/[a-zA-Z0-9_.]+' | head -1))"
 }
 
 adb root > /dev/null 2>&1 || true
@@ -94,4 +94,9 @@ echo "preview controls pressed: $n"
 # 5. Still alive at the end.
 check "the end" 3
 alive || { echo "::error::AARE isn't running at the end"; fail=1; }
+# What the patches caught and kept out of AARE (their try/catch log a warning): shown, not failed,
+# since some are expected here (no car, no Shizuku).
+echo "--- patches' warnings in the log"
+grep -E " (W|E) AarePatches" "$OUT/logcat.txt" | sed -E 's/^.{0,31}//' | sort | uniq -c | sort -rn | head -40 || true
+grep -A3 -E " W AarePatches[A-Za-z]*: " "$OUT/logcat.txt" | grep -E "Exception|Error" | sort | uniq -c | sort -rn | head -20 || true
 exit $fail
