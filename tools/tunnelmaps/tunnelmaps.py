@@ -237,21 +237,31 @@ def from_overpass(elements):
 # next run rather than holding the others (each country is published as soon as it is built).
 REQUEST_S = 300
 ATTEMPTS = 3
+# The wait after a failed request grows: 60 s, then 120 s.
+BUSY_WAIT_S = 60
+# A country the servers can't answer whole (Germany, France: a 502 every time) is asked for in
+# tiles of its bounding box, each tile split again when it fails too, down to this depth
+# (2x2 per level: at most 4^3 = 64 tiles).
+TILE_DEPTH = 3
+TILE_REQUEST_S = 180
+TILE_ATTEMPTS = 2
+# A country in tiles gives up after this long, so the others still get their turn in the run.
+TILES_BUDGET_S = 45 * 60
 
 
-def overpass(query, attempts=ATTEMPTS):
+def overpass(query, attempts=ATTEMPTS, timeout=REQUEST_S):
     data = urllib.parse.urlencode({"data": query}).encode()
     last = None
     for attempt in range(attempts):
         url = OVERPASS[attempt % len(OVERPASS)]
         try:
             req = urllib.request.Request(url, data=data, headers={"User-Agent": "aare-patches tunnel maps"})
-            with urllib.request.urlopen(req, timeout=REQUEST_S) as r:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.load(r)
         except Exception as e:  # network or server busy: wait and try the other server
             last = e
             if attempt + 1 < attempts:
-                time.sleep(60)  # a busy server (504) needs a moment
+                time.sleep(BUSY_WAIT_S * (attempt + 1))  # a busy server (502, 504) needs longer each time
     raise RuntimeError("Overpass failed: %s" % last)
 
 
@@ -281,10 +291,70 @@ def file_name(name, code, taken=()):
     return base + ".aaretun"
 
 
+def _tunnel_query(code, timeout, box=None):
+    where = "" if box is None else "(%.6f,%.6f,%.6f,%.6f)" % box
+    return ('[out:json][timeout:%d];area["ISO3166-1"="%s"]["admin_level"="2"]->.a;'
+            'way(area.a)%s["highway"~"^(%s)$"]["tunnel"="yes"];out tags geom;') % (timeout, code, where, HIGHWAYS)
+
+
+def split(box):
+    """A (south, west, north, east) box in four quarters."""
+    s, w, n, e = box
+    mlat, mlon = (s + n) / 2, (w + e) / 2
+    return [(s, w, mlat, mlon), (s, mlon, mlat, e), (mlat, w, n, mlon), (mlat, mlon, n, e)]
+
+
+def merge_elements(*answers):
+    """The elements of several Overpass answers, each way once (tiles overlap on their edges)."""
+    seen = set()
+    out = []
+    for elements in answers:
+        for e in elements:
+            key = (e.get("type"), e.get("id"))
+            if e.get("id") is not None and key in seen:
+                continue
+            seen.add(key)
+            out.append(e)
+    return out
+
+
+def country_box(code):
+    """The country's bounding box (south, west, north, east), from its boundary relation."""
+    q = '[out:json][timeout:120];rel["ISO3166-1"="%s"]["admin_level"="2"];out bb;' % code
+    for e in overpass(q, timeout=180)["elements"]:
+        b = e.get("bounds")
+        if b:
+            return (b["minlat"], b["minlon"], b["maxlat"], b["maxlon"])
+    raise RuntimeError("no bounding box for %s" % code)
+
+
+def tile_elements(code, box, depth, fetch=None, deadline=None):
+    """
+    The tunnel ways of [box] in [code]; a tile that fails is split, [depth] more times at most.
+    Past [deadline] (time.monotonic()) no more tiles are asked for: the country fails and is tried
+    again at the next run.
+    """
+    if deadline is not None and time.monotonic() > deadline:
+        raise RuntimeError("%s: out of time for its tiles" % code)
+    fetch = fetch or (lambda b: overpass(_tunnel_query(code, TILE_REQUEST_S, b), TILE_ATTEMPTS, TILE_REQUEST_S + 30)["elements"])
+    try:
+        return fetch(box)
+    except Exception:
+        if depth <= 0:
+            raise
+        print("  %s: tile %.2f,%.2f,%.2f,%.2f busy, in quarters" % ((code,) + tuple(box)), file=sys.stderr)
+        return merge_elements(*[tile_elements(code, q, depth - 1, fetch, deadline) for q in split(box)])
+
+
 def country_ways(code):
-    q = ('[out:json][timeout:%d];area["ISO3166-1"="%s"]["admin_level"="2"]->.a;'
-         'way(area.a)["highway"~"^(%s)$"]["tunnel"="yes"];out tags geom;') % (REQUEST_S, code, HIGHWAYS)
-    return from_overpass(overpass(q)["elements"])
+    try:
+        return from_overpass(overpass(_tunnel_query(code, REQUEST_S))["elements"])
+    except RuntimeError as whole:
+        print("  %s: whole country failed (%s), in tiles" % (code, whole), file=sys.stderr)
+    box = country_box(code)
+    deadline = time.monotonic() + TILES_BUDGET_S
+    elements = merge_elements(*[tile_elements(code, q, TILE_DEPTH - 1, deadline=deadline) for q in split(box)])
+    return from_overpass(elements)
 
 # endregion
 

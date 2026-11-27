@@ -174,3 +174,38 @@ class DueTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TilesTest(unittest.TestCase):
+    def test_split_covers_the_box_in_four(self):
+        q = tm.split((40.0, 0.0, 50.0, 20.0))
+        self.assertEqual(q, [(40.0, 0.0, 45.0, 10.0), (40.0, 10.0, 45.0, 20.0), (45.0, 0.0, 50.0, 10.0), (45.0, 10.0, 50.0, 20.0)])
+
+    def test_a_way_in_two_tiles_is_kept_once(self):
+        a = [{"type": "way", "id": 1, "x": 1}, {"type": "way", "id": 2}]
+        b = [{"type": "way", "id": 2}, {"type": "way", "id": 3}]
+        self.assertEqual([e["id"] for e in tm.merge_elements(a, b)], [1, 2, 3])
+
+    def test_a_failing_tile_is_split_and_the_ways_merged(self):
+        calls = []
+
+        def fetch(box):
+            calls.append(box)
+            if box == (0.0, 0.0, 4.0, 4.0):
+                raise RuntimeError("502")
+            return [{"type": "way", "id": 7}, {"type": "way", "id": int(box[0] * 10 + box[1])}]
+
+        out = tm.tile_elements("DE", (0.0, 0.0, 4.0, 4.0), 1, fetch)
+        self.assertEqual(len(calls), 5)  # the whole tile, then its four quarters
+        # Way 7 comes from every quarter but is kept once.
+        self.assertEqual(sorted(e["id"] for e in out), [0, 2, 7, 20, 22])
+
+    def test_a_tile_failing_at_the_last_depth_fails_the_country(self):
+        def fetch(box):
+            raise RuntimeError("502")
+        with self.assertRaises(RuntimeError):
+            tm.tile_elements("DE", (0.0, 0.0, 4.0, 4.0), 1, fetch)
+
+    def test_no_tiles_after_the_deadline(self):
+        with self.assertRaises(RuntimeError):
+            tm.tile_elements("DE", (0.0, 0.0, 4.0, 4.0), 2, lambda b: [], deadline=0.0)
