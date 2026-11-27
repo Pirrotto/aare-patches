@@ -135,7 +135,7 @@ public final class VoiceReply {
     private static float loudestDb = Float.NEGATIVE_INFINITY;
 
     private static String listenSummary() {
-        return ListenNote.of(listenReady, listenReadyAfterMs, listenHeard, loudestDb);
+        return ListenNote.of(listenReady, listenReadyAfterMs, listenHeard, loudestDb) + MicForeground.note();
     }
     private static AudioFocusRequest listenFocus;
 

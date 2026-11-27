@@ -14,9 +14,18 @@ import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 
 private const val REPLY_CLASS = "Lapp/template/extension/aare/VoiceReply;"
 
+private const val MIC_FOREGROUND = "Lapp/template/extension/aare/MicForeground;"
 private const val RUNTIME_CLASS = "Lnet/prototux/aare/host/CarRuntime;"
 
 /** CarRuntime.notice(title, text, icon, durationMs, actions, message): shows a card on the car screen. */
+/** ProjectionService.goForeground$start(service, types): one attempt at running in the foreground. */
+internal object ProjectionGoForegroundStartFingerprint : Fingerprint(
+    definingClass = "Lnet/prototux/aare/service/ProjectionService;",
+    name = "goForeground\$start",
+    returnType = "V",
+    parameters = listOf("Lnet/prototux/aare/service/ProjectionService;", "I"),
+)
+
 internal object CarRuntimeNoticeFingerprint : Fingerprint(
     definingClass = RUNTIME_CLASS,
     name = "notice",
@@ -59,6 +68,13 @@ val voiceReplyPatch = patch(
 
     execute {
         registerSetting("voice_reply")
+
+        // Diagnostics: whether AARE runs with the microphone foreground type (else the recognizer
+        // hears nothing while the phone is locked).
+        ProjectionGoForegroundStartFingerprint.method.addInstruction(
+            0,
+            "invoke-static { p0 }, $MIC_FOREGROUND->trying(Ljava/lang/Object;)V",
+        )
 
         // Messages kept in the notification centre get a "Reply" button. Range call: the last
         // parameter register is above v15 in AARE 1.5.0, and p0..p4 are consecutive.
