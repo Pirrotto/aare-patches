@@ -37,6 +37,8 @@ public final class MapAreaNote {
         if (inside) return;
         try {
             if (geometry == null || !PatchSettings.isEnabled(null, PatchSettings.MAP_AREA_NOTE)) return;
+            // With the Map area fix on, MapAreaFix notes the area it chose.
+            if (PatchSettings.isEnabled(null, PatchSettings.MAP_AREA_FIX)) return;
             Object free;
             inside = true;
             try {
@@ -44,6 +46,19 @@ public final class MapAreaNote {
             } finally {
                 inside = false;
             }
+            noted(map, obstacles, free, false);
+        } catch (Throwable t) {
+            Log.w(TAG, "note", t);
+        }
+    }
+
+    /**
+     * Notes [free] for [map] and [obstacles], [fixed] when the Map area fix chose it. Called by
+     * [note] and by MapAreaFix (whose early return may come before [note]'s hook). Never throws.
+     */
+    static void noted(Object map, Object obstacles, Object free, boolean fixed) {
+        try {
+            if (!PatchSettings.isEnabled(null, PatchSettings.MAP_AREA_NOTE)) return;
             StringBuilder cards = new StringBuilder();
             if (obstacles instanceof List) {
                 for (Object o : (List<?>) obstacles) {
@@ -51,7 +66,7 @@ public final class MapAreaNote {
                     cards.append(box(o));
                 }
             }
-            String line = line(box(map), cards.toString(), box(free));
+            String line = line(box(map), cards.toString(), box(free)) + (fixed ? " (fixed)" : "");
             long now = SystemClock.elapsedRealtime();
             synchronized (MapAreaNote.class) {
                 if (line.equals(last)) return;
@@ -64,7 +79,7 @@ public final class MapAreaNote {
             }
             PatchLog.add("map area", line);
         } catch (Throwable t) {
-            Log.w(TAG, "note", t);
+            Log.w(TAG, "noted", t);
         }
     }
 
