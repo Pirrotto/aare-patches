@@ -34,6 +34,10 @@ Data © OpenStreetMap contributors, [ODbL 1.0](https://opendatacommons.org/licen
   Countries are built and published one at a time (Switzerland and its neighbours first): each
   country's file goes up first, then the index naming it, so a phone never sees an index naming a
   file that isn't there yet, and a run stopped by GitHub's time limit loses nothing already done.
+  A country the shared Overpass servers can't answer whole (Germany and France got a 502 every
+  time) is asked for in tiles of its bounding box, each tile split in four again when it fails, two
+  more times at most (64 tiles), with the ways merged by their id. It gets 45 minutes; past that it
+  fails and is tried again at the next run.
 
 The phone accepts a map only if its signature matches the public key pinned in the code, and, for a
 download, only if its size and SHA-256 match the signed index.
