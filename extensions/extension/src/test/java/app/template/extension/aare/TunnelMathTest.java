@@ -211,4 +211,18 @@ public class TunnelMathTest {
         assertFalse(TunnelMath.mapLearned(0, 0));
         assertFalse(TunnelMath.mapLearned(500, Double.NaN));
     }
+
+    @Test
+    public void whyATunnelIsNotLearned() {
+        // 27.11 17:14 and 19:55: good tunnels, the car's GPS at the exit without accuracy.
+        assertTrue(TunnelMath.notLearned(579, false, false, Float.NaN, 15f).contains("no accuracy"));
+        assertTrue(TunnelMath.notLearned(346, false, false, Float.NaN, 15f).contains("no accuracy"));
+        assertTrue(TunnelMath.notLearned(800, false, true, 30f, 15f).contains("30 m"));
+        assertTrue(TunnelMath.notLearned(800, true, true, 3f, 15f).contains("limit"));
+        assertTrue(TunnelMath.notLearned(120, false, true, 3f, 15f).contains("shorter"));
+        assertTrue(TunnelMath.notLearned(Double.NaN, false, true, 3f, 15f).contains("shorter"));
+        // Learned: long enough, ran to the GPS's return, a precise exit.
+        assertNull(TunnelMath.notLearned(3434, false, true, 4f, 15f));
+        assertNull(TunnelMath.notLearned(300, false, true, 15f, 15f));
+    }
 }

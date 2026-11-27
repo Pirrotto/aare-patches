@@ -177,8 +177,13 @@ public final class TunnelNavigation {
                 PatchLog.add("tunnel", back);
                 // Learned only from a long enough tunnel, a precise fix at the exit, and an estimate
                 // that ran to the GPS's return (not frozen at the 5 km / 5 min limit).
-                if (travelledM >= TunnelMath.ErrorLearner.MIN_TUNNEL_M && !limitLogged
-                        && fix.hasAccuracy() && fix.getAccuracy() <= LEARN_ACCURACY_M) {
+                String notLearned = TunnelMath.notLearned(travelledM, limitLogged, fix.hasAccuracy(),
+                        fix.hasAccuracy() ? fix.getAccuracy() : Float.NaN, LEARN_ACCURACY_M);
+                // A tunnel long enough to learn from that wasn't counted says why, so a slow learning is explained.
+                if (notLearned != null && travelledM >= TunnelMath.ErrorLearner.MIN_TUNNEL_M) {
+                    PatchLog.add("tunnel", "error not learned from this tunnel: " + notLearned);
+                }
+                if (notLearned == null) {
                     // Each way's error is learned only from an estimate that used it alone.
                     TunnelMath.ErrorLearner learner = !usedMap ? (usedGyro ? errorRate : null)
                             : TunnelMath.mapLearned(travelledM, gyroM) ? mapErrorRate : null;
