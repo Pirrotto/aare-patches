@@ -209,3 +209,33 @@ class TilesTest(unittest.TestCase):
     def test_no_tiles_after_the_deadline(self):
         with self.assertRaises(RuntimeError):
             tm.tile_elements("DE", (0.0, 0.0, 4.0, 4.0), 2, lambda b: [], deadline=0.0)
+
+
+class NamesTest(unittest.TestCase):
+    WORLD = {("%c%c" % (65 + i // 26, 65 + i % 26)): "Country %d" % i for i in range(200)}
+
+    def test_names_roundtrip(self):
+        names = {"CH": "Switzerland", "BA": "Bosnia and Herzegovina"}
+        self.assertEqual(tm.read_names(tm.write_names(names)), names)
+
+    def test_bad_lines_are_skipped(self):
+        self.assertEqual(tm.read_names("CH Switzerland\nxx bad\nDE\n\nFR France\n"), {"CH": "Switzerland", "FR": "France"})
+
+    def test_the_servers_list_is_used_when_it_comes(self):
+        names, cached = tm.names_or_cached(lambda: {"CH": "Switzerland"}, tm.write_names(self.WORLD))
+        self.assertEqual((names, cached), ({"CH": "Switzerland"}, False))
+
+    def test_the_kept_list_is_used_when_the_servers_fail(self):
+        def fail():
+            raise RuntimeError("Overpass failed: HTTP Error 502")
+        names, cached = tm.names_or_cached(fail, tm.write_names(self.WORLD))
+        self.assertTrue(cached)
+        self.assertEqual(names, self.WORLD)
+
+    def test_a_small_kept_list_is_not_trusted(self):
+        def fail():
+            raise RuntimeError("Overpass failed")
+        with self.assertRaises(RuntimeError):
+            tm.names_or_cached(fail, "CH Switzerland\n")
+        with self.assertRaises(RuntimeError):
+            tm.names_or_cached(fail, "")
