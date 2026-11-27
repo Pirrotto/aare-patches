@@ -106,6 +106,19 @@ final class TunnelMath {
      * end and the GPS's return. Up to 100 m, or 10 % of the way, it counts: that stretch can only make
      * the measured error bigger, so the map's learned error stays honest (pessimistic if anything).
      */
+    /**
+     * Why a tunnel's error at the exit can't be learned, or null if it can: long enough, an estimate
+     * that ran to the GPS's return (not frozen at its limit), and a precise exit fix (the car's GPS
+     * sometimes gives no accuracy at all: such a fix can't say how far off the estimate was).
+     */
+    static String notLearned(double travelledM, boolean limitReached, boolean hasAccuracy, float accuracyM, float maxAccuracyM) {
+        if (!(travelledM >= ErrorLearner.MIN_TUNNEL_M)) return "shorter than " + (int) ErrorLearner.MIN_TUNNEL_M + " m";
+        if (limitReached) return "the estimate stopped at its time or distance limit";
+        if (!hasAccuracy || Float.isNaN(accuracyM)) return "the GPS at the exit gave no accuracy";
+        if (accuracyM > maxAccuracyM) return "the GPS at the exit was " + Math.round(accuracyM) + " m, not within " + Math.round(maxAccuracyM) + " m";
+        return null;
+    }
+
     static boolean mapLearned(double travelledM, double gyroM) {
         if (!(travelledM > 0) || !(gyroM >= 0)) return false;
         return gyroM <= Math.max(MAP_TAIL_M, MAP_TAIL_SHARE * travelledM);
