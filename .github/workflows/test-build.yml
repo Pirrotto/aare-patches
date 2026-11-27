@@ -81,3 +81,52 @@ jobs:
           path: work/test-build/*.mpp
           archive: false
           retention-days: 14
+
+      - name: Keep the patched APK for the emulator test (1 day)
+        uses: actions/upload-artifact@v6
+        with:
+          name: patched-apk-${{ github.run_id }}
+          path: work/patched.apk
+          retention-days: 1
+
+  emulator:
+    name: Emulator smoke test (starts, Settings, car screen preview)
+    needs: test-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Get the patched APK
+        uses: actions/download-artifact@v7
+        with:
+          name: patched-apk-${{ github.run_id }}
+          path: work
+
+      - name: Enable KVM (hardware acceleration for the emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run AARE on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: .github/scripts/emulator-smoke.sh work/patched.apk work/smoke
+
+      - name: Keep screenshots and log (3 days)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: emulator-smoke-${{ github.run_id }}
+          path: work/smoke
+          retention-days: 3
