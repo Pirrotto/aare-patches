@@ -38,6 +38,8 @@ Data © OpenStreetMap contributors, [ODbL 1.0](https://opendatacommons.org/licen
   time) is asked for in tiles of its bounding box, each tile split in four again when it fails, two
   more times at most (64 tiles), with the ways merged by their id. It gets 45 minutes; past that it
   fails and is tried again at the next run.
+- `countries.txt`: the countries' English names (`CC Name` per line) of the last run that could
+  list them, kept so a run still starts when the shared servers can't answer that big request.
 
 The phone accepts a map only if its signature matches the public key pinned in the code, and, for a
 download, only if its size and SHA-256 match the signed index.

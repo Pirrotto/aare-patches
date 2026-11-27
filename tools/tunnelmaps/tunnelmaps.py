@@ -267,14 +267,43 @@ def overpass(query, attempts=ATTEMPTS, timeout=REQUEST_S):
 
 def countries():
     """Every country: code -> its English name (as OpenStreetMap has it, else its own)."""
-    q = '[out:json][timeout:300];area["ISO3166-1"~"^[A-Z]{2}$"]["admin_level"="2"];out tags;'
+    # The boundary relations, not their areas: the same tags, a lighter request.
+    q = '[out:json][timeout:300];rel["ISO3166-1"~"^[A-Z]{2}$"]["admin_level"="2"];out tags;'
     out = {}
-    for e in overpass(q)["elements"]:
+    for e in overpass(q, attempts=5)["elements"]:
         t = e.get("tags", {})
         code = t.get("ISO3166-1")
         if code and code not in out:
             out[code] = t.get("name:en") or t.get("int_name") or t.get("name") or code
     return out
+
+
+def read_names(text):
+    """A names file ("CC Name" per line, as [write_names] makes it): code -> name."""
+    out = {}
+    for line in text.splitlines():
+        parts = line.strip().split(" ", 1)
+        if len(parts) == 2 and re.fullmatch(r"[A-Z]{2}", parts[0]) and parts[1].strip():
+            out[parts[0]] = parts[1].strip()
+    return out
+
+
+def write_names(names):
+    return "".join("%s %s\n" % (c, names[c].replace("\n", " ")) for c in sorted(names))
+
+
+def names_or_cached(fetch, cached_text):
+    """
+    The countries' names from [fetch], or from the names kept by the last run when the servers
+    can't answer: (names, from_cache). A cache too small to be the world's list isn't trusted.
+    """
+    try:
+        return fetch(), False
+    except RuntimeError:
+        cached = read_names(cached_text or "")
+        if len(cached) < 150:
+            raise
+        return cached, True
 
 
 def file_name(name, code, taken=()):
@@ -470,6 +499,8 @@ def main(argv=None):
     d = sub.add_parser("due")
     d.add_argument("index")
     d.add_argument("--first", default="")
+    d.add_argument("--names", help="the names kept by the last run, used when the servers can't list the countries")
+    d.add_argument("--save-names", help="where to write the names used, for the next run")
     one = sub.add_parser("country")
     one.add_argument("code")
     one.add_argument("--out", required=True)
@@ -501,7 +532,12 @@ def main(argv=None):
             index = read_index(text) if text else {}
         except ValueError:
             index = {}  # an index of an older format: everything is due
-        names = countries()
+        names, cached = names_or_cached(countries, load(args.names) if args.names else "")
+        if cached:
+            print("the servers can't list the countries: the last run's list is used", file=sys.stderr)
+        if args.save_names:
+            with open(args.save_names, "w") as f:
+                f.write(write_names(names))
         taken = set()
         files = {}
         for code in sorted(names):
