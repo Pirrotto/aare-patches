@@ -57,6 +57,8 @@ public final class PatchSettings {
     public static final String ASSISTANT_CAR_SCREEN_DRIVING = "assistant_car_screen_driving";
     /** Test diagnostics: the map's free area in pixels (Map area check patch). */
     public static final String MAP_AREA_NOTE = "map_area_note";
+    /** The map's free area as the largest rectangle the cards leave (Map area fix patch). */
+    public static final String MAP_AREA_FIX = "map_area_fix";
 
     /** One switch of the screen. */
     static final class Feature {
@@ -189,6 +191,10 @@ public final class PatchSettings {
                         phrase("Also while driving", "Anche durante la guida"),
                         phrase("The assistant's panel on the car screen opens while driving too.",
                                 "Il riquadro dell'assistente sullo schermo dell'auto si apre anche in guida."), ASSISTANT_CAR_SCREEN),
+                new Feature(MAP_AREA_FIX,
+                        phrase("Map centred right", "Mappa centrata giusta"),
+                        phrase("The navigation app gets the largest free part of the map, so the route doesn't slide towards the cards.",
+                                "L'app di navigazione riceve la parte libera più grande della mappa: la strada non scivola verso i riquadri.")),
                 new Feature(MAP_AREA_NOTE,
                         phrase("Map area check (test)", "Controllo area della mappa (prova)"),
                         phrase("Notes in the diagnostics, in pixels, the free part of the map given to the navigation app.",
@@ -208,7 +214,7 @@ public final class PatchSettings {
      * Features off until the user turns them on, as AARE would ship them: they change what other apps
      * get (tunnel navigation's estimated position) or read another app's files (voice messages).
      */
-    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, VOICE_REPLY_CAR_MIC, RADIO_PAUSE, RADIO_PAUSE_RECORDING, LOCATION_CHECK, LOCATION_FIX, TUNNEL_MAPS_AUTO, TUNNEL_MAPS_HERE, ASSISTANT_CAR_SCREEN, ASSISTANT_CAR_SCREEN_DRIVING, MAP_AREA_NOTE));
+    private static final java.util.Set<String> OFF_BY_DEFAULT = new java.util.HashSet<>(java.util.Arrays.asList(TUNNEL_NAVIGATION, VOICE_MESSAGES, VOICE_REPLY, VOICE_REPLY_ASK, VOICE_REPLY_BEEP, VOICE_REPLY_CAR_MIC, RADIO_PAUSE, RADIO_PAUSE_RECORDING, LOCATION_CHECK, LOCATION_FIX, TUNNEL_MAPS_AUTO, TUNNEL_MAPS_HERE, ASSISTANT_CAR_SCREEN, ASSISTANT_CAR_SCREEN_DRIVING, MAP_AREA_NOTE, MAP_AREA_FIX));
 
     /**
      * The voice features use Android 8's audio focus requests; AARE also runs on Android 6 and 7,
